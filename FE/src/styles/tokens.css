@@ -1,0 +1,21 @@
+:root {
+  --color-bg: #052e2b;
+  --color-bg-deep: #021c1a;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-muted: #64748b;
+
+  --color-brand: #059669;
+  --color-brand-soft: #10b981;
+  --color-accent: #a3e635;
+
+  --radius-card: 1.5rem;
+  --radius-control: 0.875rem;
+
+  --shadow-card: 0 30px 80px -30px rgba(2, 28, 26, 0.6),
+    0 10px 30px -15px rgba(5, 150, 105, 0.35);
+
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
