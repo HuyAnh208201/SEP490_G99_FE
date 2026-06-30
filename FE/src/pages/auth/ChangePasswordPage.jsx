@@ -34,11 +34,11 @@ export default function ChangePasswordPage() {
     setSuccess('');
 
     if (form.newPassword.length < 6) {
-      setError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      setError('New password must be at least 6 characters');
       return;
     }
     if (form.newPassword !== form.confirmNewPassword) {
-      setError('Mật khẩu xác nhận không khớp');
+      setError('Password confirmation does not match');
       return;
     }
 
@@ -50,11 +50,11 @@ export default function ChangePasswordPage() {
         confirmNewPassword: form.confirmNewPassword,
       });
       setSuccess(
-        typeof message === 'string' ? message : 'Đổi mật khẩu thành công',
+        typeof message === 'string' ? message : 'Password changed successfully',
       );
       setForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
     } catch (err) {
-      setError(err.message || 'Đổi mật khẩu thất bại');
+      setError(err.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ export default function ChangePasswordPage() {
           <Logo size={36} />
           <div>
             <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Quản lý chuỗi cửa hàng</p>
+            <p className="text-xs text-slate-500">Chain Store Management</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -79,20 +79,20 @@ export default function ChangePasswordPage() {
             Dashboard
           </button>
           <span className="text-sm text-slate-600">
-            Xin chào, <strong>{user?.name || 'Người dùng'}</strong>
+            Hello, <strong>{user?.name || 'User'}</strong>
           </span>
           <Button variant="ghost" onClick={handleLogout}>
-            Đăng xuất
+            Sign out
           </Button>
         </div>
       </header>
 
       <main className="mx-auto max-w-lg px-8 py-12">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Đổi mật khẩu
+          Change password
         </h1>
         <p className="mt-2 text-slate-600">
-          Cập nhật mật khẩu tài khoản của bạn. Mật khẩu mới cần ít nhất 6 ký tự.
+          Update your account password. The new password must be at least 6 characters.
         </p>
 
         <form
@@ -101,7 +101,7 @@ export default function ChangePasswordPage() {
           noValidate
         >
           <PasswordInput
-            label="Mật khẩu hiện tại"
+            label="Current password"
             value={form.oldPassword}
             onChange={updateField('oldPassword')}
             autoComplete="current-password"
@@ -109,17 +109,17 @@ export default function ChangePasswordPage() {
           />
 
           <PasswordInput
-            label="Mật khẩu mới"
+            label="New password"
             value={form.newPassword}
             onChange={updateField('newPassword')}
             autoComplete="new-password"
             required
             minLength={6}
-            hint="Tối thiểu 6 ký tự"
+            hint="At least 6 characters"
           />
 
           <PasswordInput
-            label="Xác nhận mật khẩu mới"
+            label="Confirm new password"
             value={form.confirmNewPassword}
             onChange={updateField('confirmNewPassword')}
             autoComplete="new-password"
@@ -147,14 +147,14 @@ export default function ChangePasswordPage() {
 
           <div className="flex flex-wrap gap-3 pt-2">
             <Button type="submit" loading={loading}>
-              Lưu mật khẩu mới
+              Save new password
             </Button>
             <Button
               type="button"
               variant="ghost"
               onClick={() => navigate('/dashboard')}
             >
-              Huỷ
+              Cancel
             </Button>
           </div>
         </form>

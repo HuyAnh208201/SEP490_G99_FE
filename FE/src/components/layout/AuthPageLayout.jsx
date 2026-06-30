@@ -12,7 +12,7 @@ export default function AuthPageLayout({ title, subtitle, children, footer }) {
             to="/login"
             className="text-xs font-semibold uppercase tracking-[0.05em] text-[#0058be] hover:underline"
           >
-            Đăng nhập
+            Sign in
           </Link>
         </div>
       </header>
@@ -56,7 +56,7 @@ export default function AuthPageLayout({ title, subtitle, children, footer }) {
       <footer className="mt-auto border-t border-[#e0e3e5] bg-white">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-center px-6 py-2">
           <div className="text-sm text-[#45464d] opacity-80">
-            © 2026 ChainStore. Bảo lưu mọi quyền.
+            © 2026 ChainStore. All rights reserved.
           </div>
         </div>
       </footer>
