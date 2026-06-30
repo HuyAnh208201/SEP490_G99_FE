@@ -1,21 +1,41 @@
 :root {
+  /* Admin light theme — đồng bộ Figma / Login */
+  --admin-bg: #f7f9fb;
+  --admin-surface: #ffffff;
+  --admin-border: #e0e3e5;
+  --admin-text: #191c1e;
+  --admin-muted: #45464d;
+  --admin-subtle: #76777d;
+  --admin-brand: #0058be;
+  --admin-brand-soft: #adc6ff;
+  --admin-brand-hover: #004a9f;
+  --admin-success: #0d7a3e;
+  --admin-warning: #b45309;
+  --admin-danger: #93000a;
+  --admin-danger-bg: #ffdad6;
+
+  --sidebar-width: 260px;
+  --sidebar-collapsed: 72px;
+  --header-height: 64px;
+
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-elevated: 0 10px 25px -5px rgba(0, 88, 190, 0.08);
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Legacy dark tokens (auth marketing panels) */
   --color-bg: #052e2b;
   --color-bg-deep: #021c1a;
   --color-surface: #ffffff;
   --color-text: #0f172a;
   --color-muted: #64748b;
-
   --color-brand: #059669;
   --color-brand-soft: #10b981;
   --color-accent: #a3e635;
-
-  --radius-card: 1.5rem;
-  --radius-control: 0.875rem;
-
-  --shadow-card: 0 30px 80px -30px rgba(2, 28, 26, 0.6),
-    0 10px 30px -15px rgba(5, 150, 105, 0.35);
-
-  --duration-fast: 150ms;
-  --duration-normal: 300ms;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }

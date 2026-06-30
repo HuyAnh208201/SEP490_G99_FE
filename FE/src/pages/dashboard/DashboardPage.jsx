@@ -1,81 +1,199 @@
-import { useAuth } from '../../contexts/AuthContext.jsx';
-import Button from '../../components/ui/Button.jsx';
-import Logo from '../../components/brand/Logo.jsx';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import {
+  adminApi,
+  branchManagerApi,
+  directorApi,
+  warehouseApi,
+} from '../../api/modules.js';
+import PageHeader from '../../components/ui/PageHeader.jsx';
+import StatCard from '../../components/ui/StatCard.jsx';
+import Card from '../../components/ui/Card.jsx';
+import SetupWorkflowBanner from '../../components/domain/SetupWorkflowBanner.jsx';
+import Badge from '../../components/ui/Badge.jsx';
+import { ROLE_LABELS } from '../../config/navigation.js';
+
+const ROLE_DASHBOARD = {
+  ADMIN: {
+    permission: 'ADMIN_DASHBOARD',
+    title: 'Admin Dashboard',
+    fetch: adminApi.dashboard,
+    stats: [
+      { label: 'Branches', value: '—', icon: 'store', hint: 'Branches API pending' },
+      { label: 'Users', value: '—', icon: 'users', hint: 'Open Users' },
+      { label: 'Promotions', value: '—', icon: 'tag', hint: 'Promotions API pending' },
+      { label: 'Settings', value: '—', icon: 'settings', hint: 'Master data' },
+    ],
+  },
+  DIRECTOR: {
+    permission: 'DIRECTOR_DASHBOARD',
+    title: 'Executive dashboard',
+    fetch: directorApi.dashboard,
+    stats: [
+      { label: 'Chain revenue', value: '—', icon: 'chart', hint: 'Consolidated reports' },
+      { label: 'Branches', value: '—', icon: 'store', hint: 'Performance tracking' },
+      { label: 'Promotions', value: '—', icon: 'tag', hint: 'Active campaigns' },
+      { label: 'Planning', value: '—', icon: 'plan', hint: 'Import strategy' },
+    ],
+  },
+  BRANCH_MANAGER: {
+    permission: 'BRANCH_DASHBOARD',
+    title: 'Branch operations',
+    fetch: branchManagerApi.dashboard,
+    stats: [
+      { label: 'Today revenue', value: '—', icon: 'cash', hint: 'POS + shift close' },
+      { label: 'Shifts', value: '—', icon: 'clock', hint: 'Shift management' },
+      { label: 'Staff', value: '—', icon: 'staff', hint: 'Assignments' },
+      { label: 'Import requests', value: '—', icon: 'request', hint: 'Purchase requests' },
+    ],
+  },
+  WAREHOUSE_MANAGER: {
+    permission: 'WAREHOUSE_DASHBOARD',
+    title: 'Central warehouse',
+    fetch: warehouseApi.dashboard,
+    stats: [
+      { label: 'Inventory', value: '—', icon: 'boxes', hint: 'Central inventory' },
+      { label: 'Import requests', value: '—', icon: 'inbox', hint: 'From branches' },
+      { label: 'Dispatch', value: '—', icon: 'dispatch', hint: 'Dispatch orders' },
+      { label: 'Suppliers', value: '—', icon: 'truck', hint: 'Choose supplier' },
+    ],
+  },
+};
+
+const QUICK_LINKS = {
+  ADMIN: [
+    { to: '/catalog/categories', label: 'Product categories' },
+    { to: '/catalog/products', label: 'Products' },
+    { to: '/branches', label: 'Branches' },
+    { to: '/users', label: 'User management' },
+  ],
+  DIRECTOR: [
+    { to: '/director/reports', label: 'Performance reports' },
+    { to: '/promotions', label: 'Promotions' },
+    { to: '/branches', label: 'Branch list' },
+    { to: '/catalog/suppliers', label: 'Suppliers' },
+  ],
+  BRANCH_MANAGER: [
+    { to: '/branch-manager/shifts', label: 'Shifts' },
+    { to: '/branch-manager/staff', label: 'Staff' },
+    { to: '/branch-manager/import-requests', label: 'Import requests' },
+    { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
+  ],
+  WAREHOUSE_MANAGER: [
+    { to: '/warehouse/inventory', label: 'Inventory' },
+    { to: '/warehouse/import-requests', label: 'Import requests' },
+    { to: '/warehouse/dispatch', label: 'Dispatch orders' },
+    { to: '/catalog/suppliers', label: 'Suppliers' },
+  ],
+};
 
 export default function DashboardPage() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { role, has } = usePermissions();
+  const webRole =
+    role === 'MANAGER' ? 'BRANCH_MANAGER' : role === 'OWNER' ? 'DIRECTOR' : role;
 
-  async function handleLogout() {
-    await signOut();
-    navigate('/login', { replace: true });
-  }
+  const config = ROLE_DASHBOARD[webRole];
+  const [moduleData, setModuleData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cfg = ROLE_DASHBOARD[webRole];
+    if (!cfg?.fetch || !has(cfg.permission)) {
+      setLoading(false);
+      setModuleData(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    cfg
+      .fetch()
+      .then((data) => {
+        if (!cancelled) setModuleData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setModuleData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [webRole, has]);
+
+  const quickLinks = QUICK_LINKS[webRole] || [];
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4">
-        <div className="flex items-center gap-3">
-          <Logo size={36} />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Chain Store Management</p>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader
+        title={config?.title || 'Overview'}
+        description={`Role: ${ROLE_LABELS[webRole] || webRole || '—'}. ChainStore convenience chain management system.`}
+        badge={
+          moduleData?.status === 'placeholder' ? (
+            <Badge tone="soon">API placeholder</Badge>
+          ) : null
+        }
+      />
+
+      {(webRole === 'ADMIN' || webRole === 'DIRECTOR') && <SetupWorkflowBanner />}
+
+      {config ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {config.stats.map((s) => (
+              <StatCard key={s.label} {...s} />
+            ))}
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-600">
-            Hello, <strong>{user?.name || 'Admin'}</strong>
-          </span>
-          <Button variant="ghost" onClick={handleLogout}>
-            Sign out
-          </Button>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-6xl px-8 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Overview
-        </h1>
-        <p className="mt-2 text-slate-600">
-          You have signed in successfully. This is a placeholder for the main dashboard.
-        </p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <h2 className="text-base font-semibold text-[var(--admin-text)]">Module status</h2>
+              <p className="mt-1 text-sm text-[var(--admin-muted)]">
+                {loading
+                  ? 'Loading data from backend...'
+                  : moduleData?.message ||
+                    'API connected. Detailed business logic will ship in upcoming sprints.'}
+              </p>
+              {moduleData && (
+                <div className="mt-4 rounded-lg bg-[#f7f9fb] px-4 py-3 text-sm">
+                  <p>
+                    <span className="font-medium">Module:</span> {moduleData.module || '—'}
+                  </p>
+                  <p>
+                    <span className="font-medium">Screen:</span> {moduleData.screen || '—'}
+                  </p>
+                </div>
+              )}
+            </Card>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <button
-            type="button"
-            onClick={() => navigate('/users')}
-            className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-          >
-            <p className="text-sm font-medium text-emerald-600">Module</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
-              User Management
-            </p>
-            <p className="mt-2 text-sm text-slate-600">
-              View the list of users synced from dummyjson.com.
-            </p>
-            <span className="mt-4 inline-flex items-center text-sm font-semibold text-emerald-600 group-hover:underline">
-              Open list →
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate('/change-password')}
-            className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-          >
-            <p className="text-sm font-medium text-emerald-600">Account</p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
-              Change password
-            </p>
-            <p className="mt-2 text-sm text-slate-600">
-              Update your sign-in password when you know your current password.
-            </p>
-            <span className="mt-4 inline-flex items-center text-sm font-semibold text-emerald-600 group-hover:underline">
-              Open change password page →
-            </span>
-          </button>
-        </div>
-      </main>
+            <Card>
+              <h2 className="text-base font-semibold text-[var(--admin-text)]">Quick links</h2>
+              <ul className="mt-3 space-y-2">
+                {quickLinks.map((link) => (
+                  <li key={link.to}>
+                    <Link
+                      to={link.to}
+                      className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
+                    >
+                      {link.label}
+                      <span aria-hidden>→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <Card>
+          <p className="text-sm text-[var(--admin-muted)]">
+            This role does not have a dedicated web dashboard. Use the POS or mobile app for
+            Cashier / Inventory staff roles.
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

@@ -46,6 +46,7 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-6px); }
 }
-.animate-float-soft {
-  animation: float-soft 6s var(--ease-out) infinite;
+.admin-scope {
+  color: var(--admin-text);
+  background: var(--admin-bg);
 }

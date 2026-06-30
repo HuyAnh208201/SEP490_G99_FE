@@ -98,7 +98,7 @@ export default function LoginPage() {
                 htmlFor="username"
                 className="text-xs font-semibold uppercase tracking-wider text-[#191c1e]"
               >
-                Username
+                Username / Email
               </label>
               <div className="group relative flex items-center rounded-lg border border-[#c6c6cd] bg-white transition-all focus-within:border-[#0058be] focus-within:shadow-[0_0_0_3px_rgba(0,88,190,0.2)]">
                 <svg
@@ -123,7 +123,7 @@ export default function LoginPage() {
                   id="username"
                   type="text"
                   autoComplete="username"
-                  placeholder="admin"
+                  placeholder="admin@chainstore.vn"
                   value={form.username}
                   onChange={updateField('username')}
                   required
@@ -249,61 +249,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-12">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#e0e3e5]"></div>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-3 text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d]">
-                Or sign in with
-              </span>
-            </div>
-          </div>
-
-          {/* Social */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2 rounded-lg border border-[#c6c6cd] py-3 transition-colors hover:bg-[#eceef0] active:scale-[0.98]"
-            >
-              <svg width="20" height="20" viewBox="0 0 48 48">
-                <path
-                  fill="#FFC107"
-                  d="M43.6 20.5H42V20.4H24v7.2h11.3c-1.5 4.2-5.5 7.2-10.3 7.2-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.4 1.1 7.3 2.8l5.1-5.1C34.4 7.3 29.5 5.4 24 5.4 13.7 5.4 5.4 13.7 5.4 24S13.7 42.6 24 42.6 42.6 34.3 42.6 24c0-1.2-.1-2.4-.3-3.5z"
-                />
-                <path
-                  fill="#FF3D00"
-                  d="m7.3 14.7 5.9 4.3C14.8 15 19 12 24 12c2.8 0 5.4 1.1 7.3 2.8l5.1-5.1C34.4 7.3 29.5 5.4 24 5.4c-7 0-13 3.8-16.7 9.3z"
-                />
-                <path
-                  fill="#4CAF50"
-                  d="M24 42.6c5.3 0 10.1-2 13.7-5.3l-6.3-5.3c-2 1.4-4.5 2.2-7.4 2.2-4.8 0-8.8-2.9-10.3-7.1l-5.9 4.5C10.7 38.6 16.9 42.6 24 42.6z"
-                />
-                <path
-                  fill="#1976D2"
-                  d="M43.6 20.5H42V20.4H24v7.2h11.3c-.7 2-2 3.8-3.6 5l6.3 5.3c4.4-4.1 7.3-10.1 7.3-17 0-1.2-.1-2.4-.3-3.4z"
-                />
-              </svg>
-              <span className="text-xs font-semibold uppercase tracking-[0.05em]">
-                Google
-              </span>
-            </button>
-            <button
-              type="button"
-              className="flex items-center justify-center gap-2 rounded-lg border border-[#c6c6cd] py-3 transition-colors hover:bg-[#eceef0] active:scale-[0.98]"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-              </svg>
-              <span className="text-xs font-semibold uppercase tracking-[0.05em]">
-                Apple
-              </span>
-            </button>
-          </div>
-
-          {/* Sign up */}
-          <div className="mt-12 text-center">
+          <div className="mt-8 text-center">
             <p className="text-sm text-[#45464d]">
               Don't have an account?{' '}
               <a href="#" className="ml-1 font-bold text-[#0058be] hover:underline">

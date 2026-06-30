@@ -8,13 +8,15 @@ export default function Button({
   ...rest
 }) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:opacity-60 disabled:cursor-not-allowed';
+    'inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be]/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60';
 
   const variants = {
     primary:
-      'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/30 hover:brightness-110',
+      'bg-[var(--admin-brand)] text-white shadow-sm hover:bg-[var(--admin-brand-hover)]',
+    secondary:
+      'border border-[var(--admin-border)] bg-white text-[var(--admin-text)] hover:bg-[#f0f4f8]',
     ghost:
-      'bg-transparent text-slate-700 hover:bg-slate-100',
+      'bg-transparent text-[var(--admin-muted)] hover:bg-[#f0f4f8] hover:text-[var(--admin-text)]',
   };
 
   return (
