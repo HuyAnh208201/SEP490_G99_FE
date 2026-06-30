@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
 
     const trimmed = contactInfo.trim();
     if (!trimmed) {
-      setError('Vui lòng nhập email hoặc tên đăng nhập');
+      setError('Please enter your email or username');
       return;
     }
 
@@ -25,11 +25,11 @@ export default function ForgotPasswordPage() {
       const data = await initiateForgotPassword({ contactInfo: trimmed });
       setSuccess(
         data?.message ||
-          'Link đặt lại mật khẩu đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư.',
+          'A password reset link has been sent to your email. Please check your inbox.',
       );
       setContactInfo('');
     } catch (err) {
-      setError(err.message || 'Không thể gửi yêu cầu đặt lại mật khẩu');
+      setError(err.message || 'Unable to send the password reset request');
     } finally {
       setLoading(false);
     }
@@ -37,13 +37,13 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthPageLayout
-      title="Quên mật khẩu"
-      subtitle="Nhập email hoặc tên đăng nhập để nhận link đặt lại mật khẩu"
+      title="Forgot password"
+      subtitle="Enter your email or username to receive a password reset link"
       footer={
         <p className="text-sm text-[#45464d]">
-          Nhớ mật khẩu?{' '}
+          Remember your password?{' '}
           <Link to="/login" className="font-bold text-[#0058be] hover:underline">
-            Quay lại đăng nhập
+            Back to sign in
           </Link>
         </p>
       }
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
             htmlFor="contactInfo"
             className="text-xs font-semibold uppercase tracking-wider text-[#191c1e]"
           >
-            Email hoặc tên đăng nhập
+            Email or username
           </label>
           <div className="group relative flex items-center rounded-lg border border-[#c6c6cd] bg-white transition-all focus-within:border-[#0058be] focus-within:shadow-[0_0_0_3px_rgba(0,88,190,0.2)]">
             <svg
@@ -79,7 +79,7 @@ export default function ForgotPasswordPage() {
               id="contactInfo"
               type="text"
               autoComplete="username email"
-              placeholder="admin hoặc email@example.com"
+              placeholder="admin or email@example.com"
               value={contactInfo}
               onChange={(e) => setContactInfo(e.target.value)}
               disabled={loading || Boolean(success)}
@@ -111,7 +111,7 @@ export default function ForgotPasswordPage() {
           disabled={loading || Boolean(success)}
           className="w-full rounded-lg border-t border-white/10 bg-[#0058be] py-3 text-xs font-bold uppercase tracking-[0.05em] text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Đang gửi...' : 'Gửi link đặt lại mật khẩu'}
+          {loading ? 'Sending...' : 'Send password reset link'}
         </button>
       </form>
     </AuthPageLayout>

@@ -19,25 +19,25 @@ export default function DashboardPage() {
           <Logo size={36} />
           <div>
             <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Quản lý chuỗi cửa hàng</p>
+            <p className="text-xs text-slate-500">Chain Store Management</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-600">
-            Xin chào, <strong>{user?.name || 'Admin'}</strong>
+            Hello, <strong>{user?.name || 'Admin'}</strong>
           </span>
           <Button variant="ghost" onClick={handleLogout}>
-            Đăng xuất
+            Sign out
           </Button>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-8 py-12">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Tổng quan
+          Overview
         </h1>
         <p className="mt-2 text-slate-600">
-          Bạn đã đăng nhập thành công. Đây là placeholder cho dashboard chính.
+          You have signed in successfully. This is a placeholder for the main dashboard.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -48,13 +48,13 @@ export default function DashboardPage() {
           >
             <p className="text-sm font-medium text-emerald-600">Module</p>
             <p className="mt-1 text-lg font-semibold text-slate-900">
-              Quản lý Users
+              User Management
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Xem danh sách users đồng bộ từ dummyjson.com.
+              View the list of users synced from dummyjson.com.
             </p>
             <span className="mt-4 inline-flex items-center text-sm font-semibold text-emerald-600 group-hover:underline">
-              Mở danh sách →
+              Open list →
             </span>
           </button>
 
@@ -63,15 +63,15 @@ export default function DashboardPage() {
             onClick={() => navigate('/change-password')}
             className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
           >
-            <p className="text-sm font-medium text-emerald-600">Tài khoản</p>
+            <p className="text-sm font-medium text-emerald-600">Account</p>
             <p className="mt-1 text-lg font-semibold text-slate-900">
-              Đổi mật khẩu
+              Change password
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              Cập nhật mật khẩu đăng nhập khi bạn đã biết mật khẩu hiện tại.
+              Update your sign-in password when you know your current password.
             </p>
             <span className="mt-4 inline-flex items-center text-sm font-semibold text-emerald-600 group-hover:underline">
-              Mở trang đổi mật khẩu →
+              Open change password page →
             </span>
           </button>
         </div>

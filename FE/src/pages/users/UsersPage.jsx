@@ -31,7 +31,7 @@ export default function UsersPage() {
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err?.message || 'Không tải được danh sách users');
+        setError(err?.message || 'Failed to load the user list');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -67,7 +67,7 @@ export default function UsersPage() {
           <Logo size={36} />
           <div>
             <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Quản lý chuỗi cửa hàng</p>
+            <p className="text-xs text-slate-500">Chain Store Management</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -79,10 +79,10 @@ export default function UsersPage() {
             Dashboard
           </button>
           <span className="text-sm text-slate-600">
-            Xin chào, <strong>{user?.name || 'Admin'}</strong>
+            Hello, <strong>{user?.name || 'Admin'}</strong>
           </span>
           <Button variant="ghost" onClick={handleLogout}>
-            Đăng xuất
+            Sign out
           </Button>
         </div>
       </header>
@@ -91,17 +91,17 @@ export default function UsersPage() {
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Danh sách Users
+              User List
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Dữ liệu từ <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">dummyjson.com/users</code> — tổng {total} users.
+              Data from <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">dummyjson.com/users</code> — {total} users total.
             </p>
           </div>
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên, email, username..."
+            placeholder="Search by name, email, username..."
             className="w-72 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
           />
         </div>
@@ -149,17 +149,17 @@ export default function UsersPage() {
                     <dd className="truncate text-slate-800">{u.email}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Điện thoại</dt>
+                    <dt className="text-slate-500">Phone</dt>
                     <dd className="truncate text-slate-800">{u.phone}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Tuổi / Giới tính</dt>
+                    <dt className="text-slate-500">Age / Gender</dt>
                     <dd className="truncate text-slate-800 capitalize">
                       {u.age} · {u.gender}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Thành phố</dt>
+                    <dt className="text-slate-500">City</dt>
                     <dd className="truncate text-slate-800">
                       {u.address?.city || '—'}
                     </dd>
@@ -170,7 +170,7 @@ export default function UsersPage() {
 
             {filtered.length === 0 && (
               <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-                Không tìm thấy user phù hợp.
+                No matching users found.
               </div>
             )}
           </div>
@@ -178,7 +178,7 @@ export default function UsersPage() {
 
         <div className="mt-8 flex items-center justify-between">
           <p className="text-sm text-slate-600">
-            Trang {page + 1} / {totalPages}
+            Page {page + 1} / {totalPages}
           </p>
           <div className="flex gap-2">
             <Button
@@ -186,14 +186,14 @@ export default function UsersPage() {
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0 || loading}
             >
-              ← Trước
+              ← Previous
             </Button>
             <Button
               variant="ghost"
               onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
               disabled={page + 1 >= totalPages || loading}
             >
-              Sau →
+              Next →
             </Button>
           </div>
         </div>
