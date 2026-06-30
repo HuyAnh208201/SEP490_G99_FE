@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext.jsx';
 import { changePassword } from '../../api/password.js';
+import PageHeader from '../../components/ui/PageHeader.jsx';
+import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PasswordInput from '../../components/ui/PasswordInput.jsx';
-import Logo from '../../components/brand/Logo.jsx';
 
 export default function ChangePasswordPage() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({
@@ -21,11 +20,6 @@ export default function ChangePasswordPage() {
 
   function updateField(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  }
-
-  async function handleLogout() {
-    await signOut();
-    navigate('/login', { replace: true });
   }
 
   async function handleSubmit(e) {
@@ -49,9 +43,7 @@ export default function ChangePasswordPage() {
         newPassword: form.newPassword,
         confirmNewPassword: form.confirmNewPassword,
       });
-      setSuccess(
-        typeof message === 'string' ? message : 'Đổi mật khẩu thành công',
-      );
+      setSuccess(typeof message === 'string' ? message : 'Đổi mật khẩu thành công');
       setForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
     } catch (err) {
       setError(err.message || 'Đổi mật khẩu thất bại');
@@ -61,45 +53,14 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4">
-        <div className="flex items-center gap-3">
-          <Logo size={36} />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Quản lý chuỗi cửa hàng</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            Dashboard
-          </button>
-          <span className="text-sm text-slate-600">
-            Xin chào, <strong>{user?.name || 'Người dùng'}</strong>
-          </span>
-          <Button variant="ghost" onClick={handleLogout}>
-            Đăng xuất
-          </Button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-lg">
+      <PageHeader
+        title="Đổi mật khẩu"
+        description="Cập nhật mật khẩu tài khoản. Mật khẩu mới cần ít nhất 6 ký tự."
+      />
 
-      <main className="mx-auto max-w-lg px-8 py-12">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Đổi mật khẩu
-        </h1>
-        <p className="mt-2 text-slate-600">
-          Cập nhật mật khẩu tài khoản của bạn. Mật khẩu mới cần ít nhất 6 ký tự.
-        </p>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-8 space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
-          noValidate
-        >
+      <Card>
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
           <PasswordInput
             label="Mật khẩu hiện tại"
             value={form.oldPassword}
@@ -130,7 +91,7 @@ export default function ChangePasswordPage() {
           {error && (
             <div
               role="alert"
-              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700"
+              className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
             >
               {error}
             </div>
@@ -139,7 +100,7 @@ export default function ChangePasswordPage() {
           {success && (
             <div
               role="status"
-              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+              className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
             >
               {success}
             </div>
@@ -149,16 +110,12 @@ export default function ChangePasswordPage() {
             <Button type="submit" loading={loading}>
               Lưu mật khẩu mới
             </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => navigate('/dashboard')}
-            >
+            <Button type="button" variant="secondary" onClick={() => navigate('/dashboard')}>
               Huỷ
             </Button>
           </div>
         </form>
-      </main>
+      </Card>
     </div>
   );
 }

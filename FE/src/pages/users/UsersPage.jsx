@@ -1,203 +1,121 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchUsers } from '../../api/users.js';
+import { useModuleData } from '../../hooks/useModuleData.js';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import PageHeader from '../../components/ui/PageHeader.jsx';
+import Card from '../../components/ui/Card.jsx';
+import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
-import Logo from '../../components/brand/Logo.jsx';
-
-const PAGE_SIZE = 12;
+import { ROLE_LABELS } from '../../config/navigation.js';
 
 export default function UsersPage() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-
-  const [users, setUsers] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
+  const { has } = usePermissions();
+  const { data: users, loading, error } = useModuleData(fetchUsers, []);
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    fetchUsers({ limit: PAGE_SIZE, skip: page * PAGE_SIZE })
-      .then((data) => {
-        if (cancelled) return;
-        setUsers(data.users || []);
-        setTotal(data.total || 0);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err?.message || 'Không tải được danh sách users');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [page]);
-
-  async function handleLogout() {
-    await signOut();
-    navigate('/login', { replace: true });
-  }
-
-  const filtered = users.filter((u) => {
-    if (!query.trim()) return true;
+  const filtered = useMemo(() => {
+    const list = users || [];
+    if (!query.trim()) return list;
     const q = query.toLowerCase();
-    return (
-      u.firstName?.toLowerCase().includes(q) ||
-      u.lastName?.toLowerCase().includes(q) ||
-      u.email?.toLowerCase().includes(q) ||
-      u.username?.toLowerCase().includes(q)
+    return list.filter(
+      (u) =>
+        u.name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q) ||
+        u.phone?.includes(q) ||
+        u.role?.toLowerCase().includes(q),
     );
-  });
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  }, [users, query]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-4">
-        <div className="flex items-center gap-3">
-          <Logo size={36} />
-          <div>
-            <p className="text-sm font-semibold text-slate-900">ChainStore</p>
-            <p className="text-xs text-slate-500">Quản lý chuỗi cửa hàng</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            Dashboard
-          </button>
-          <span className="text-sm text-slate-600">
-            Xin chào, <strong>{user?.name || 'Admin'}</strong>
-          </span>
-          <Button variant="ghost" onClick={handleLogout}>
-            Đăng xuất
-          </Button>
-        </div>
-      </header>
+    <div className="mx-auto max-w-7xl">
+      <PageHeader
+        title="Quản lý người dùng"
+        description="Danh sách tài khoản đồng bộ từ API /api/auth/get-list-users. Admin/Director/BM có quyền xem."
+        actions={
+          has('USER_DETAILS_EDIT') ? (
+            <Link to="/users/create">
+              <Button>+ Tạo tài khoản</Button>
+            </Link>
+          ) : null
+        }
+      />
 
-      <main className="mx-auto max-w-6xl px-8 py-10">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Danh sách Users
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Dữ liệu từ <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">dummyjson.com/users</code> — tổng {total} users.
-            </p>
-          </div>
+      <Card className="mb-4 !p-0 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
+          <p className="text-sm text-[var(--admin-muted)]">
+            Tổng <strong>{users?.length ?? 0}</strong> tài khoản
+          </p>
           <input
-            type="text"
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên, email, username..."
-            className="w-72 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            placeholder="Tìm theo tên, email, SĐT, vai trò..."
+            className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
           />
         </div>
 
         {error && (
-          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
           </div>
         )}
 
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-40 animate-pulse rounded-2xl border border-slate-200 bg-white"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((u) => (
-              <article
-                key={u.id}
-                className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-              >
-                <div className="flex items-center gap-4">
-                  <img
-                    src={u.image}
-                    alt={`${u.firstName} ${u.lastName}`}
-                    className="h-14 w-14 rounded-full border border-slate-200 bg-slate-100 object-cover"
-                    loading="lazy"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-slate-900">
-                      {u.firstName} {u.lastName}
-                    </p>
-                    <p className="truncate text-xs text-slate-500">@{u.username}</p>
-                  </div>
-                </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
+              <tr>
+                <th className="px-4 py-3">Người dùng</th>
+                <th className="px-4 py-3">Email / Username</th>
+                <th className="px-4 py-3">Điện thoại</th>
+                <th className="px-4 py-3">Vai trò</th>
+                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3">Chi nhánh</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-t border-[var(--admin-border)]">
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
+                      </td>
+                    </tr>
+                  ))
+                : filtered.map((u) => (
+                    <tr
+                      key={u.id}
+                      className="border-t border-[var(--admin-border)] transition hover:bg-[#f7f9fb]/80"
+                    >
+                      <td className="px-4 py-3 font-medium text-[var(--admin-text)]">
+                        {u.name}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--admin-muted)]">{u.email || u.username}</td>
+                      <td className="px-4 py-3 text-[var(--admin-muted)]">{u.phone || '—'}</td>
+                      <td className="px-4 py-3">
+                        <Badge tone="brand">{ROLE_LABELS[u.role] || u.role || '—'}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge tone={u.isActive !== false ? 'success' : 'danger'}>
+                          {u.isActive !== false ? 'Hoạt động' : 'Khóa'}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-[var(--admin-muted)]">
+                        {u.branchId ? `#${u.branchId}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+            </tbody>
+          </table>
 
-                <dl className="mt-4 space-y-1.5 text-sm">
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Email</dt>
-                    <dd className="truncate text-slate-800">{u.email}</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Điện thoại</dt>
-                    <dd className="truncate text-slate-800">{u.phone}</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Tuổi / Giới tính</dt>
-                    <dd className="truncate text-slate-800 capitalize">
-                      {u.age} · {u.gender}
-                    </dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt className="text-slate-500">Thành phố</dt>
-                    <dd className="truncate text-slate-800">
-                      {u.address?.city || '—'}
-                    </dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
-
-            {filtered.length === 0 && (
-              <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-                Không tìm thấy user phù hợp.
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mt-8 flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            Trang {page + 1} / {totalPages}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0 || loading}
-            >
-              ← Trước
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setPage((p) => (p + 1 < totalPages ? p + 1 : p))}
-              disabled={page + 1 >= totalPages || loading}
-            >
-              Sau →
-            </Button>
-          </div>
+          {!loading && filtered.length === 0 && (
+            <p className="px-4 py-10 text-center text-sm text-[var(--admin-muted)]">
+              Không tìm thấy người dùng phù hợp.
+            </p>
+          )}
         </div>
-      </main>
+      </Card>
     </div>
   );
 }
