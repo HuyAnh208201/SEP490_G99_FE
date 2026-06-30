@@ -9,7 +9,7 @@ function toProfile(dto) {
   const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
   return {
     ...dto,
-    name: fullName || dto.userName || 'Người dùng',
+    name: fullName || dto.userName || 'User',
     username: dto.userName,
     role: dto.role,
     avatar: dto.avatar ?? null,
@@ -28,11 +28,11 @@ export async function login({ username, password }) {
     const { data: body } = await http.post('/auth/login', { username, password });
     token = body?.data?.accessToken;
     if (!body?.success || !token) {
-      throw new Error(body?.message || 'Đăng nhập thất bại');
+      throw new Error(body?.message || 'Login failed');
     }
   } catch (err) {
     const message =
-      err?.response?.data?.message || err?.message || 'Đăng nhập thất bại';
+      err?.response?.data?.message || err?.message || 'Login failed';
     const wrapped = new Error(message);
     wrapped.code = err?.response?.status ?? 'NETWORK_ERROR';
     throw wrapped;

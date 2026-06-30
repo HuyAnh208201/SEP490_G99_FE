@@ -26,7 +26,7 @@ export default function LoginPage() {
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err.message || 'Đăng nhập thất bại');
+      setError(err.message || 'Login failed');
     }
   }
 
@@ -43,13 +43,13 @@ export default function LoginPage() {
               href="#"
               className="text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d] transition-colors hover:text-[#0058be]"
             >
-              Hỗ trợ
+              Support
             </a>
             <a
               href="#"
               className="rounded-lg bg-[#0058be] px-6 py-1 text-xs font-semibold uppercase tracking-[0.05em] text-white transition-transform active:scale-[0.98]"
             >
-              Tạo tài khoản
+              Sign up
             </a>
           </nav>
         </div>
@@ -83,10 +83,10 @@ export default function LoginPage() {
               </svg>
             </div>
             <h1 className="mb-1 text-[32px] font-semibold leading-10 tracking-tight text-[#191c1e]">
-              Chào mừng trở lại
+              Welcome back
             </h1>
             <p className="text-center text-base text-[#45464d]">
-              Đăng nhập an toàn vào hệ thống quản lý chuỗi cửa hàng
+              Securely sign in to the chain store management system
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 htmlFor="username"
                 className="text-xs font-semibold uppercase tracking-wider text-[#191c1e]"
               >
-                Tên đăng nhập
+                Username
               </label>
               <div className="group relative flex items-center rounded-lg border border-[#c6c6cd] bg-white transition-all focus-within:border-[#0058be] focus-within:shadow-[0_0_0_3px_rgba(0,88,190,0.2)]">
                 <svg
@@ -139,13 +139,13 @@ export default function LoginPage() {
                   htmlFor="password"
                   className="text-xs font-semibold uppercase tracking-wider text-[#191c1e]"
                 >
-                  Mật khẩu
+                  Password
                 </label>
                 <Link
                   to="/forgot-password"
                   className="text-xs font-semibold uppercase tracking-[0.05em] text-[#0058be] hover:underline"
                 >
-                  Quên mật khẩu?
+                  Forgot password?
                 </Link>
               </div>
               <div className="group relative flex items-center rounded-lg border border-[#c6c6cd] bg-white transition-all focus-within:border-[#0058be] focus-within:shadow-[0_0_0_3px_rgba(0,88,190,0.2)]">
@@ -183,7 +183,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 text-[#76777d] transition-colors hover:text-[#191c1e]"
                 >
                   {showPassword ? (
@@ -225,7 +225,7 @@ export default function LoginPage() {
                 className="h-4 w-4 rounded-sm border-[#c6c6cd] text-[#0058be] focus:ring-[#0058be]/20"
               />
               <label htmlFor="remember" className="text-sm text-[#45464d]">
-                Ghi nhớ đăng nhập trong 30 ngày
+                Keep me signed in for 30 days
               </label>
             </div>
 
@@ -245,7 +245,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-lg border-t border-white/10 bg-[#0058be] py-3 text-xs font-bold uppercase tracking-[0.05em] text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? 'Đang đăng nhập...' : 'Đăng nhập vào ChainStore'}
+              {loading ? 'Signing in...' : 'Sign in to ChainStore'}
             </button>
           </form>
 
@@ -256,7 +256,7 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center">
               <span className="bg-white px-3 text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d]">
-                Hoặc đăng nhập với
+                Or sign in with
               </span>
             </div>
           </div>
@@ -305,9 +305,9 @@ export default function LoginPage() {
           {/* Sign up */}
           <div className="mt-12 text-center">
             <p className="text-sm text-[#45464d]">
-              Chưa có tài khoản?{' '}
+              Don't have an account?{' '}
               <a href="#" className="ml-1 font-bold text-[#0058be] hover:underline">
-                Đăng ký ngay
+                Sign up now
               </a>
             </p>
           </div>
@@ -318,26 +318,26 @@ export default function LoginPage() {
       <footer className="mt-auto border-t border-[#e0e3e5] bg-white">
         <div className="mx-auto flex w-full max-w-7xl flex-row items-center justify-between px-6 py-2">
           <div className="text-sm text-[#45464d] opacity-80 transition-opacity hover:opacity-100">
-            © 2026 ChainStore. Bảo lưu mọi quyền.
+            © 2026 ChainStore. All rights reserved.
           </div>
           <div className="flex gap-6">
             <a
               href="#"
               className="text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d] transition-colors hover:text-[#0058be]"
             >
-              Bảo mật
+              Privacy
             </a>
             <a
               href="#"
               className="text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d] transition-colors hover:text-[#0058be]"
             >
-              Điều khoản
+              Terms
             </a>
             <a
               href="#"
               className="text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d] transition-colors hover:text-[#0058be]"
             >
-              Hỗ trợ
+              Support
             </a>
           </div>
         </div>
