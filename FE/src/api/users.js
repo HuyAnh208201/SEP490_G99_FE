@@ -1,13 +1,60 @@
-import axios from 'axios';
+import { http } from './http.js';
 
-const usersClient = axios.create({
-  baseURL: 'https://dummyjson.com',
-  timeout: 15000,
-});
+function unwrap(body) {
+  if (!body?.success) {
+    const err = new Error(body?.message || 'Yêu cầu thất bại');
+    err.errors = body?.errors;
+    err.status = body?.statusCode;
+    throw err;
+  }
+  return body.data;
+}
 
-export async function fetchUsers({ limit = 30, skip = 0 } = {}) {
-  const { data } = await usersClient.get('/users', {
-    params: { limit, skip },
-  });
-  return data;
+function normalizeUser(u) {
+  if (!u) return null;
+  const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+  return {
+    ...u,
+    id: u.id,
+    name: fullName || u.fullName || u.userName || u.email || '—',
+    username: u.userName || u.email,
+    role: u.role,
+    status: u.status,
+    isActive: u.isActive ?? u.status === 'active',
+    branchId: u.branchId,
+  };
+}
+
+export async function fetchUsers() {
+  const { data } = await http.get('/auth/get-list-users');
+  const list = unwrap(data);
+  return (Array.isArray(list) ? list : []).map(normalizeUser);
+}
+
+export async function fetchUserById(id) {
+  const { data } = await http.get('/auth/get-user-by-id', { params: { id } });
+  return normalizeUser(unwrap(data));
+}
+
+export async function createUser(payload) {
+  const { data } = await http.post('/auth/admin/create-user', payload);
+  return normalizeUser(unwrap(data));
+}
+
+export async function updateProfile(payload) {
+  const { data } = await http.post('/auth/update-profile', payload);
+  return normalizeUser(unwrap(data));
+}
+
+export async function fetchMe() {
+  const { data } = await http.get('/auth/me');
+  const dto = unwrap(data);
+  const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
+  return {
+    ...dto,
+    name: fullName || dto.userName || 'Người dùng',
+    username: dto.userName,
+    role: dto.role,
+    avatar: dto.avatar ?? null,
+  };
 }
