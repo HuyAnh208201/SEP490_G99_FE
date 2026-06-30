@@ -1,5 +1,18 @@
 import { http } from './http.js';
 
+function resolveAuthError(err, fallback) {
+  const status = err?.response?.status;
+  const serverMessage = err?.response?.data?.message;
+
+  if (!err?.response) {
+    return 'Cannot reach the backend. Start BE first on port 4313 (cd BE && mvnw.cmd spring-boot:run).';
+  }
+  if ((status === 500 || status === 502 || status === 503 || status === 504) && !serverMessage) {
+    return 'Backend is not running or returned an error. Check http://localhost:4313 is up.';
+  }
+  return serverMessage || err?.message || fallback;
+}
+
 /**
  * Chuẩn hoá payload user từ BE (`/api/auth/me` → UserDto) sang shape FE dùng.
  * @param {Record<string, any> | null} dto
@@ -31,8 +44,7 @@ export async function login({ username, password }) {
       throw new Error(body?.message || 'Login failed');
     }
   } catch (err) {
-    const message =
-      err?.response?.data?.message || err?.message || 'Login failed';
+    const message = resolveAuthError(err, 'Login failed');
     const wrapped = new Error(message);
     wrapped.code = err?.response?.status ?? 'NETWORK_ERROR';
     throw wrapped;
