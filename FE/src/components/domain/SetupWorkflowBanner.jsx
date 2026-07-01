@@ -10,9 +10,9 @@ export default function SetupWorkflowBanner() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-[var(--admin-text)]">
-              Luồng khởi tạo hệ thống
+              System setup workflow
             </h2>
-            <Badge tone="brand">Theo tracking</Badge>
+            <Badge tone="brand">Per tracking</Badge>
           </div>
           <p className="mt-1 text-sm text-[var(--admin-muted)]">
             Categories → Products → Suppliers → Branches → Users → Promotions → Purchase → Stock → Shift → Reports

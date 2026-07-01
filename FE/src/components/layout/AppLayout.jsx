@@ -17,7 +17,7 @@ export default function AppLayout() {
           <button
             type="button"
             className="absolute inset-0 bg-black/40"
-            aria-label="Đóng menu"
+            aria-label="Close menu"
             onClick={() => setMobileOpen(false)}
           />
           <div className="relative z-10 h-full w-[var(--sidebar-width)] shadow-xl">

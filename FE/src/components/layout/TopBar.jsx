@@ -30,7 +30,7 @@ export default function TopBar({ onMenuToggle, showMenuButton }) {
             type="button"
             onClick={onMenuToggle}
             className="rounded-lg border border-[var(--admin-border)] p-2 text-[var(--admin-muted)] hover:bg-[#f0f4f8] lg:hidden"
-            aria-label="Mở menu"
+            aria-label="Open menu"
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
               <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -39,10 +39,10 @@ export default function TopBar({ onMenuToggle, showMenuButton }) {
         )}
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--admin-subtle)]">
-            Hệ thống quản trị
+            Admin console
           </p>
           <p className="text-sm font-semibold text-[var(--admin-text)]">
-            Xin chào, {user?.name || 'bạn'}
+            Hello, {user?.name || 'there'}
           </p>
         </div>
       </div>
@@ -60,12 +60,12 @@ export default function TopBar({ onMenuToggle, showMenuButton }) {
             {initials}
           </span>
           <span className="hidden text-sm font-medium text-[var(--admin-text)] sm:block">
-            Hồ sơ
+            Profile
           </span>
         </Link>
 
         <Button variant="ghost" className="!px-3 !py-2" onClick={handleSignOut}>
-          Đăng xuất
+          Sign out
         </Button>
       </div>
     </header>

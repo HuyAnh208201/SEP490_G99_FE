@@ -7,17 +7,17 @@ export default function BranchManagerDashboardPage() {
   const { data, loading, error } = useModuleData(branchManagerApi.dashboard, []);
   return (
     <ModulePageShell
-      title="Vận hành chi nhánh"
-      description="Tổng quan doanh thu, ca làm, nhân sự và yêu cầu nhập hàng tại chi nhánh."
+      title="Branch operations"
+      description="Revenue, shifts, staff, and import requests at your branch."
       loading={loading}
       error={error}
       moduleData={data}
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Doanh thu hôm nay" value="—" icon="cash" />
-        <StatCard label="Ca đang mở" value="—" icon="clock" />
-        <StatCard label="Nhân viên ca" value="—" icon="staff" />
-        <StatCard label="YC nhập chờ" value="—" icon="request" />
+        <StatCard label="Today revenue" value="—" icon="cash" />
+        <StatCard label="Open shifts" value="—" icon="clock" />
+        <StatCard label="Staff on shift" value="—" icon="staff" />
+        <StatCard label="Pending imports" value="—" icon="request" />
       </div>
     </ModulePageShell>
   );
@@ -27,8 +27,8 @@ export function BranchStaffPage() {
   const { data, loading, error } = useModuleData(branchManagerApi.staff, []);
   return (
     <ModulePageShell
-      title="Nhân viên chi nhánh"
-      description="Xem hồ sơ và phân công nhân viên thu ngân / kho tại chi nhánh."
+      title="Branch staff"
+      description="View profiles and assign cashiers / inventory staff at the branch."
       loading={loading}
       error={error}
       moduleData={data}
@@ -40,8 +40,8 @@ export function BranchShiftsPage() {
   const { data, loading, error } = useModuleData(branchManagerApi.shifts, []);
   return (
     <ModulePageShell
-      title="Ca làm việc"
-      description="Tạo ca, gán nhân viên, nhập số dư tiền mặt đầu ca — theo UC Shift Management."
+      title="Shifts"
+      description="Create shifts, assign staff, and record opening cash balance — Shift Management UC."
       loading={loading}
       error={error}
       moduleData={data}
@@ -53,8 +53,8 @@ export function BranchImportRequestsPage() {
   const { data, loading, error } = useModuleData(branchManagerApi.importRequests, []);
   return (
     <ModulePageShell
-      title="Yêu cầu nhập hàng"
-      description="BM tạo purchase request gửi kho trung tâm / Admin duyệt."
+      title="Import requests"
+      description="Branch manager creates purchase requests sent to central warehouse / Admin approval."
       loading={loading}
       error={error}
       moduleData={data}
@@ -69,8 +69,8 @@ export function CashDiscrepancyPage() {
   );
   return (
     <ModulePageShell
-      title="Đối soát tiền mặt"
-      description="BM phê duyệt chênh lệch Expected vs Actual khi đóng ca."
+      title="Cash reconciliation"
+      description="Branch manager approves expected vs actual cash variance when closing a shift."
       loading={loading}
       error={error}
       moduleData={data}

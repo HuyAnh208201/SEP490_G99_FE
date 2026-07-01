@@ -28,9 +28,9 @@ export function PermissionRoute({ permission, anyOf, children }) {
   if (!allowed) {
     return (
       <div className="mx-auto max-w-lg rounded-xl border border-[var(--admin-border)] bg-white p-8 text-center shadow-sm">
-        <p className="text-lg font-semibold text-[var(--admin-text)]">Không có quyền truy cập</p>
+        <p className="text-lg font-semibold text-[var(--admin-text)]">Access denied</p>
         <p className="mt-2 text-sm text-[var(--admin-muted)]">
-          Tài khoản của bạn không được phép xem trang này.
+          Your account is not allowed to view this page.
         </p>
         <a
           href="/dashboard"
@@ -40,7 +40,7 @@ export function PermissionRoute({ permission, anyOf, children }) {
           }}
           className="mt-4 inline-block text-sm font-semibold text-[var(--admin-brand)] hover:underline"
         >
-          Về Dashboard
+          Back to dashboard
         </a>
       </div>
     );

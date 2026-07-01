@@ -2,7 +2,7 @@ import { http } from './http.js';
 
 function unwrap(body) {
   if (!body?.success) {
-    const err = new Error(body?.message || 'Yêu cầu thất bại');
+    const err = new Error(body?.message || 'Request failed');
     err.status = body?.statusCode;
     throw err;
   }

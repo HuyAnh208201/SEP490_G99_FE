@@ -19,7 +19,7 @@ export default function ModulePageShell({
         title={title}
         description={description}
         actions={actions}
-        badge={comingSoon ? <Badge tone="soon">Sắp có API</Badge> : null}
+        badge={comingSoon ? <Badge tone="soon">API coming soon</Badge> : null}
       />
 
       {error && (
@@ -42,8 +42,8 @@ export default function ModulePageShell({
           {children || (
             <Card>
               <p className="text-sm text-[var(--admin-muted)]">
-                Giao diện module đã sẵn sàng. Backend sẽ cung cấp dữ liệu thật trong sprint tiếp
-                theo theo luồng: Categories → Products → Suppliers → Branches → Users.
+                Module UI is ready. Backend will provide live data in upcoming sprints following
+                the flow: Categories → Products → Suppliers → Branches → Users.
               </p>
             </Card>
           )}

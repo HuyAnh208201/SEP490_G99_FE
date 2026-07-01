@@ -20,71 +20,71 @@ const ROLE_DASHBOARD = {
     title: 'Admin Dashboard',
     fetch: adminApi.dashboard,
     stats: [
-      { label: 'Chi nhánh', value: '—', icon: 'store', hint: 'Chờ API branches' },
-      { label: 'Người dùng', value: '—', icon: 'users', hint: 'Xem mục Người dùng' },
-      { label: 'Khuyến mãi', value: '—', icon: 'tag', hint: 'Chờ API promotions' },
-      { label: 'Cấu hình', value: '—', icon: 'settings', hint: 'Master data' },
+      { label: 'Branches', value: '—', icon: 'store', hint: 'Branches API pending' },
+      { label: 'Users', value: '—', icon: 'users', hint: 'Open Users' },
+      { label: 'Promotions', value: '—', icon: 'tag', hint: 'Promotions API pending' },
+      { label: 'Settings', value: '—', icon: 'settings', hint: 'Master data' },
     ],
   },
   DIRECTOR: {
     permission: 'DIRECTOR_DASHBOARD',
-    title: 'Ban điều hành',
+    title: 'Executive dashboard',
     fetch: directorApi.dashboard,
     stats: [
-      { label: 'Doanh thu chuỗi', value: '—', icon: 'chart', hint: 'Báo cáo tổng hợp' },
-      { label: 'Chi nhánh', value: '—', icon: 'store', hint: 'Theo dõi hiệu suất' },
-      { label: 'Khuyến mãi', value: '—', icon: 'tag', hint: 'Chiến dịch đang chạy' },
-      { label: 'Kế hoạch', value: '—', icon: 'plan', hint: 'Chiến lược nhập hàng' },
+      { label: 'Chain revenue', value: '—', icon: 'chart', hint: 'Consolidated reports' },
+      { label: 'Branches', value: '—', icon: 'store', hint: 'Performance tracking' },
+      { label: 'Promotions', value: '—', icon: 'tag', hint: 'Active campaigns' },
+      { label: 'Planning', value: '—', icon: 'plan', hint: 'Import strategy' },
     ],
   },
   BRANCH_MANAGER: {
     permission: 'BRANCH_DASHBOARD',
-    title: 'Chi nhánh',
+    title: 'Branch operations',
     fetch: branchManagerApi.dashboard,
     stats: [
-      { label: 'Doanh thu hôm nay', value: '—', icon: 'cash', hint: 'POS + đóng ca' },
-      { label: 'Ca làm việc', value: '—', icon: 'clock', hint: 'Quản lý ca' },
-      { label: 'Nhân viên', value: '—', icon: 'staff', hint: 'Phân công' },
-      { label: 'Yêu cầu nhập', value: '—', icon: 'request', hint: 'Purchase request' },
+      { label: 'Today revenue', value: '—', icon: 'cash', hint: 'POS + shift close' },
+      { label: 'Shifts', value: '—', icon: 'clock', hint: 'Shift management' },
+      { label: 'Staff', value: '—', icon: 'staff', hint: 'Assignments' },
+      { label: 'Import requests', value: '—', icon: 'request', hint: 'Purchase requests' },
     ],
   },
   WAREHOUSE_MANAGER: {
     permission: 'WAREHOUSE_DASHBOARD',
-    title: 'Kho trung tâm',
+    title: 'Central warehouse',
     fetch: warehouseApi.dashboard,
     stats: [
-      { label: 'Tồn kho', value: '—', icon: 'boxes', hint: 'Central inventory' },
-      { label: 'Yêu cầu nhập', value: '—', icon: 'inbox', hint: 'Từ chi nhánh' },
-      { label: 'Phiếu xuất', value: '—', icon: 'dispatch', hint: 'Dispatch orders' },
-      { label: 'NCC', value: '—', icon: 'truck', hint: 'Chọn supplier' },
+      { label: 'Inventory', value: '—', icon: 'boxes', hint: 'Central inventory' },
+      { label: 'Import requests', value: '—', icon: 'inbox', hint: 'From branches' },
+      { label: 'Dispatch', value: '—', icon: 'dispatch', hint: 'Dispatch orders' },
+      { label: 'Suppliers', value: '—', icon: 'truck', hint: 'Choose supplier' },
     ],
   },
 };
 
 const QUICK_LINKS = {
   ADMIN: [
-    { to: '/users', label: 'Quản lý người dùng' },
-    { to: '/branches', label: 'Chi nhánh' },
-    { to: '/catalog/products', label: 'Sản phẩm (sắp có)' },
-    { to: '/system/settings', label: 'Cấu hình hệ thống' },
+    { to: '/catalog/categories', label: 'Product categories' },
+    { to: '/catalog/products', label: 'Products' },
+    { to: '/branches', label: 'Branches' },
+    { to: '/users', label: 'User management' },
   ],
   DIRECTOR: [
-    { to: '/director/reports', label: 'Báo cáo hiệu suất' },
-    { to: '/promotions', label: 'Khuyến mãi' },
-    { to: '/branches', label: 'Danh sách chi nhánh' },
-    { to: '/catalog/suppliers', label: 'Nhà cung cấp' },
+    { to: '/director/reports', label: 'Performance reports' },
+    { to: '/promotions', label: 'Promotions' },
+    { to: '/branches', label: 'Branch list' },
+    { to: '/catalog/suppliers', label: 'Suppliers' },
   ],
   BRANCH_MANAGER: [
-    { to: '/branch-manager/shifts', label: 'Ca làm việc' },
-    { to: '/branch-manager/staff', label: 'Nhân viên' },
-    { to: '/branch-manager/import-requests', label: 'Yêu cầu nhập hàng' },
-    { to: '/branch-manager/cash-discrepancy', label: 'Đối soát tiền mặt' },
+    { to: '/branch-manager/shifts', label: 'Shifts' },
+    { to: '/branch-manager/staff', label: 'Staff' },
+    { to: '/branch-manager/import-requests', label: 'Import requests' },
+    { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
   ],
   WAREHOUSE_MANAGER: [
-    { to: '/warehouse/inventory', label: 'Tồn kho' },
-    { to: '/warehouse/import-requests', label: 'Yêu cầu nhập' },
-    { to: '/warehouse/dispatch', label: 'Phiếu xuất kho' },
-    { to: '/catalog/suppliers', label: 'Nhà cung cấp' },
+    { to: '/warehouse/inventory', label: 'Inventory' },
+    { to: '/warehouse/import-requests', label: 'Import requests' },
+    { to: '/warehouse/dispatch', label: 'Dispatch orders' },
+    { to: '/catalog/suppliers', label: 'Suppliers' },
   ],
 };
 
@@ -128,8 +128,8 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
-        title={config?.title || 'Tổng quan'}
-        description={`Vai trò: ${ROLE_LABELS[webRole] || webRole || '—'}. Hệ thống quản lý chuỗi cửa hàng tiện lợi Shelfly / ChainStore.`}
+        title={config?.title || 'Overview'}
+        description={`Role: ${ROLE_LABELS[webRole] || webRole || '—'}. ChainStore convenience chain management system.`}
         badge={
           moduleData?.status === 'placeholder' ? (
             <Badge tone="soon">API placeholder</Badge>
@@ -149,14 +149,12 @@ export default function DashboardPage() {
 
           <div className="grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
-              <h2 className="text-base font-semibold text-[var(--admin-text)]">
-                Trạng thái module
-              </h2>
+              <h2 className="text-base font-semibold text-[var(--admin-text)]">Module status</h2>
               <p className="mt-1 text-sm text-[var(--admin-muted)]">
                 {loading
-                  ? 'Đang tải dữ liệu từ backend...'
+                  ? 'Loading data from backend...'
                   : moduleData?.message ||
-                    'Kết nối API thành công. Nghiệp vụ chi tiết sẽ được bổ sung ở các sprint tiếp theo.'}
+                    'API connected. Detailed business logic will ship in upcoming sprints.'}
               </p>
               {moduleData && (
                 <div className="mt-4 rounded-lg bg-[#f7f9fb] px-4 py-3 text-sm">
@@ -171,7 +169,7 @@ export default function DashboardPage() {
             </Card>
 
             <Card>
-              <h2 className="text-base font-semibold text-[var(--admin-text)]">Truy cập nhanh</h2>
+              <h2 className="text-base font-semibold text-[var(--admin-text)]">Quick links</h2>
               <ul className="mt-3 space-y-2">
                 {quickLinks.map((link) => (
                   <li key={link.to}>
@@ -191,8 +189,8 @@ export default function DashboardPage() {
       ) : (
         <Card>
           <p className="text-sm text-[var(--admin-muted)]">
-            Vai trò hiện tại không có dashboard web riêng. Vui lòng sử dụng ứng dụng POS hoặc
-            mobile cho vai trò Thu ngân / Nhân viên kho.
+            This role does not have a dedicated web dashboard. Use the POS or mobile app for
+            Cashier / Inventory staff roles.
           </p>
         </Card>
       )}

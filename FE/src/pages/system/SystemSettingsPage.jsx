@@ -8,8 +8,8 @@ export default function SystemSettingsPage() {
 
   return (
     <ModulePageShell
-      title="Cấu hình hệ thống"
-      description="Master data, quy tắc tích điểm, cấu hình chung cho chuỗi cửa hàng."
+      title="System settings"
+      description="Master data, loyalty rules, and global configuration for the chain."
       loading={loading}
       error={error}
       moduleData={data}
@@ -18,13 +18,13 @@ export default function SystemSettingsPage() {
         <Card>
           <h3 className="font-semibold">Loyalty rules</h3>
           <p className="mt-2 text-sm text-[var(--admin-muted)]">
-            Công thức quy đổi điểm (VD: 10.000đ = 1 điểm) và mốc hạng thành viên.
+            Point conversion (e.g. 10,000 VND = 1 point) and membership tiers.
           </p>
         </Card>
         <Card>
           <h3 className="font-semibold">Audit & monitoring</h3>
           <p className="mt-2 text-sm text-[var(--admin-muted)]">
-            Theo dõi trạng thái hệ thống và nhật ký thao tác quan trọng.
+            System health and audit log for critical operations.
           </p>
         </Card>
       </div>
