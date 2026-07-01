@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUser } from '../../api/users.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { listDraft } from '../../lib/setupDraft.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -23,6 +24,7 @@ export default function CreateUserPage() {
   const navigate = useNavigate();
   const { role } = usePermissions();
   const roles = getAssignableRoles(role);
+  const [branches, setBranches] = useState([]);
 
   const [form, setForm] = useState({
     userName: '',
@@ -31,10 +33,15 @@ export default function CreateUserPage() {
     lastName: '',
     phone: '',
     role: roles[0] || 'CASHIER',
+    branchNote: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    setBranches(listDraft('branches'));
+  }, []);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -46,27 +53,36 @@ export default function CreateUserPage() {
     setSuccess('');
     setLoading(true);
     try {
-      await createUser(form);
-      setSuccess('Tạo tài khoản thành công. Mật khẩu mặc định đã được gửi qua email (nếu mail được cấu hình).');
-      setTimeout(() => navigate('/users'), 1200);
+      await createUser({
+        userName: form.userName,
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        phone: form.phone,
+        role: form.role,
+      });
+      setSuccess(
+        'Account created. Default password was emailed if mail is configured. Assign branch when the API supports branchId.',
+      );
+      setTimeout(() => navigate('/users'), 1500);
     } catch (err) {
-      const fieldErrors = err.errors
-        ? Object.values(err.errors).join('. ')
-        : '';
-      setError(fieldErrors || err.message || 'Không thể tạo tài khoản');
+      const fieldErrors = err.errors ? Object.values(err.errors).join('. ') : '';
+      setError(fieldErrors || err.message || 'Unable to create account');
     } finally {
       setLoading(false);
     }
   }
 
+  const isBranchRole = ['BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'].includes(form.role);
+
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title="Tạo tài khoản"
-        description="Admin tạo BM/Director; Director tạo nhân sự chi nhánh; BM tạo Thu ngân / Nhân viên kho."
+        title="Create account"
+        description="Admin creates Director/BM; Director creates branch staff; BM creates Cashier / Inventory staff."
         actions={
           <Link to="/users">
-            <Button variant="secondary">← Danh sách</Button>
+            <Button variant="secondary">← Back to list</Button>
           </Link>
         }
       />
@@ -76,7 +92,7 @@ export default function CreateUserPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block space-y-1 sm:col-span-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Tên đăng nhập *
+                Username *
               </span>
               <input
                 required
@@ -101,7 +117,7 @@ export default function CreateUserPage() {
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Họ *
+                First name *
               </span>
               <input
                 required
@@ -113,7 +129,7 @@ export default function CreateUserPage() {
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Tên
+                Last name
               </span>
               <input
                 value={form.lastName}
@@ -124,7 +140,7 @@ export default function CreateUserPage() {
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Số điện thoại *
+                Phone *
               </span>
               <input
                 required
@@ -137,7 +153,7 @@ export default function CreateUserPage() {
 
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Vai trò *
+                Role *
               </span>
               <select
                 required
@@ -152,6 +168,29 @@ export default function CreateUserPage() {
                 ))}
               </select>
             </label>
+
+            {isBranchRole && (
+              <label className="block space-y-1 sm:col-span-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+                  Branch assignment (reference)
+                </span>
+                <select
+                  value={form.branchNote}
+                  onChange={update('branchNote')}
+                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                >
+                  <option value="">Select branch (saved when API supports branchId)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.name}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-[var(--admin-muted)]">
+                  Create branches first, then assign BM / Cashier / Inventory staff to them.
+                </p>
+              </label>
+            )}
           </div>
 
           {error && (
@@ -167,10 +206,10 @@ export default function CreateUserPage() {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="secondary" onClick={() => navigate('/users')}>
-              Hủy
+              Cancel
             </Button>
             <Button type="submit" loading={loading}>
-              Tạo tài khoản
+              Create account
             </Button>
           </div>
         </form>

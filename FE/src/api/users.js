@@ -2,7 +2,7 @@ import { http } from './http.js';
 
 function unwrap(body) {
   if (!body?.success) {
-    const err = new Error(body?.message || 'Yêu cầu thất bại');
+    const err = new Error(body?.message || 'Request failed');
     err.errors = body?.errors;
     err.status = body?.statusCode;
     throw err;
@@ -52,7 +52,7 @@ export async function fetchMe() {
   const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
   return {
     ...dto,
-    name: fullName || dto.userName || 'Người dùng',
+    name: fullName || dto.userName || 'User',
     username: dto.userName,
     role: dto.role,
     avatar: dto.avatar ?? null,

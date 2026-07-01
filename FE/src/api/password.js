@@ -18,11 +18,11 @@ export async function initiateForgotPassword({ contactInfo }) {
       contactInfo,
     });
     if (!body?.success) {
-      throw new Error(body?.message || 'Không thể gửi yêu cầu đặt lại mật khẩu');
+      throw new Error(body?.message || 'Unable to send the password reset request');
     }
     return body.data;
   } catch (err) {
-    throwApiError(err, 'Không thể gửi yêu cầu đặt lại mật khẩu');
+    throwApiError(err, 'Unable to send the password reset request');
   }
 }
 
@@ -42,11 +42,11 @@ export async function completeForgotPassword({
       confirmNewPassword,
     });
     if (!body?.success) {
-      throw new Error(body?.message || 'Đặt lại mật khẩu thất bại');
+      throw new Error(body?.message || 'Password reset failed');
     }
     return body.data ?? body.message;
   } catch (err) {
-    throwApiError(err, 'Đặt lại mật khẩu thất bại');
+    throwApiError(err, 'Password reset failed');
   }
 }
 
@@ -66,10 +66,10 @@ export async function changePassword({
       confirmNewPassword,
     });
     if (!body?.success) {
-      throw new Error(body?.message || 'Đổi mật khẩu thất bại');
+      throw new Error(body?.message || 'Failed to change password');
     }
     return body.data ?? body.message;
   } catch (err) {
-    throwApiError(err, 'Đổi mật khẩu thất bại');
+    throwApiError(err, 'Failed to change password');
   }
 }

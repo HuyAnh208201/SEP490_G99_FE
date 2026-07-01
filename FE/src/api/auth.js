@@ -1,5 +1,18 @@
 import { http } from './http.js';
 
+function resolveAuthError(err, fallback) {
+  const status = err?.response?.status;
+  const serverMessage = err?.response?.data?.message;
+
+  if (!err?.response) {
+    return 'Cannot reach the backend. Start BE first on port 4313 (cd BE && mvnw.cmd spring-boot:run).';
+  }
+  if ((status === 500 || status === 502 || status === 503 || status === 504) && !serverMessage) {
+    return 'Backend is not running or returned an error. Check http://localhost:4313 is up.';
+  }
+  return serverMessage || err?.message || fallback;
+}
+
 /**
  * Chuẩn hoá payload user từ BE (`/api/auth/me` → UserDto) sang shape FE dùng.
  * @param {Record<string, any> | null} dto
@@ -9,7 +22,7 @@ function toProfile(dto) {
   const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
   return {
     ...dto,
-    name: fullName || dto.userName || 'Người dùng',
+    name: fullName || dto.userName || 'User',
     username: dto.userName,
     role: dto.role,
     avatar: dto.avatar ?? null,
@@ -28,11 +41,10 @@ export async function login({ username, password }) {
     const { data: body } = await http.post('/auth/login', { username, password });
     token = body?.data?.accessToken;
     if (!body?.success || !token) {
-      throw new Error(body?.message || 'Đăng nhập thất bại');
+      throw new Error(body?.message || 'Login failed');
     }
   } catch (err) {
-    const message =
-      err?.response?.data?.message || err?.message || 'Đăng nhập thất bại';
+    const message = resolveAuthError(err, 'Login failed');
     const wrapped = new Error(message);
     wrapped.code = err?.response?.status ?? 'NETWORK_ERROR';
     throw wrapped;

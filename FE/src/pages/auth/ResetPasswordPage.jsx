@@ -25,15 +25,15 @@ export default function ResetPasswordPage() {
     setSuccess('');
 
     if (!resetToken) {
-      setError('Link đặt lại mật khẩu không hợp lệ hoặc thiếu token');
+      setError('The password reset link is invalid or missing a token');
       return;
     }
     if (form.newPassword.length < 6) {
-      setError('Mật khẩu phải có ít nhất 6 ký tự');
+      setError('Password must be at least 6 characters');
       return;
     }
     if (form.newPassword !== form.confirmNewPassword) {
-      setError('Mật khẩu xác nhận không khớp');
+      setError('Password confirmation does not match');
       return;
     }
 
@@ -47,11 +47,11 @@ export default function ResetPasswordPage() {
       setSuccess(
         typeof message === 'string'
           ? message
-          : 'Đặt lại mật khẩu thành công. Bạn có thể đăng nhập với mật khẩu mới.',
+          : 'Password reset successful. You can now sign in with your new password.',
       );
       setTimeout(() => navigate('/login', { replace: true }), 2000);
     } catch (err) {
-      setError(err.message || 'Đặt lại mật khẩu thất bại');
+      setError(err.message || 'Password reset failed');
     } finally {
       setLoading(false);
     }
@@ -60,11 +60,11 @@ export default function ResetPasswordPage() {
   if (!resetToken) {
     return (
       <AuthPageLayout
-        title="Link không hợp lệ"
-        subtitle="Token đặt lại mật khẩu bị thiếu hoặc đã hết hạn"
+        title="Invalid link"
+        subtitle="The password reset token is missing or has expired"
         footer={
           <Link to="/forgot-password" className="text-sm font-bold text-[#0058be] hover:underline">
-            Yêu cầu link mới
+            Request a new link
           </Link>
         }
       >
@@ -72,7 +72,7 @@ export default function ResetPasswordPage() {
           role="alert"
           className="rounded-lg border border-[#ffdad6] bg-[#ffdad6]/40 px-3 py-2 text-sm text-[#93000a]"
         >
-          Vui lòng mở link từ email hoặc yêu cầu gửi lại link đặt lại mật khẩu.
+          Please open the link from your email or request a new password reset link.
         </div>
       </AuthPageLayout>
     );
@@ -80,18 +80,18 @@ export default function ResetPasswordPage() {
 
   return (
     <AuthPageLayout
-      title="Đặt lại mật khẩu"
-      subtitle="Nhập mật khẩu mới cho tài khoản của bạn"
+      title="Reset password"
+      subtitle="Enter a new password for your account"
       footer={
         <Link to="/login" className="text-sm font-bold text-[#0058be] hover:underline">
-          Quay lại đăng nhập
+          Back to sign in
         </Link>
       }
     >
       <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         <PasswordField
           id="newPassword"
-          label="Mật khẩu mới"
+          label="New password"
           value={form.newPassword}
           onChange={updateField('newPassword')}
           show={showPassword}
@@ -102,7 +102,7 @@ export default function ResetPasswordPage() {
 
         <PasswordField
           id="confirmNewPassword"
-          label="Xác nhận mật khẩu mới"
+          label="Confirm new password"
           value={form.confirmNewPassword}
           onChange={updateField('confirmNewPassword')}
           show={showConfirm}
@@ -134,7 +134,7 @@ export default function ResetPasswordPage() {
           disabled={loading || Boolean(success)}
           className="w-full rounded-lg border-t border-white/10 bg-[#0058be] py-3 text-xs font-bold uppercase tracking-[0.05em] text-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+          {loading ? 'Saving...' : 'Reset password'}
         </button>
       </form>
     </AuthPageLayout>
@@ -183,7 +183,7 @@ function PasswordField({
         <button
           type="button"
           onClick={onToggle}
-          aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          aria-label={show ? 'Hide password' : 'Show password'}
           className="absolute right-3 text-[#76777d] transition-colors hover:text-[#191c1e]"
         >
           {show ? (

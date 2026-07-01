@@ -31,12 +31,12 @@ export default function UsersPage() {
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
-        title="Quản lý người dùng"
-        description="Danh sách tài khoản đồng bộ từ API /api/auth/get-list-users. Admin/Director/BM có quyền xem."
+        title="User management"
+        description="Account list synced from /api/auth/get-list-users. Visible to Admin, Director, and Branch Manager."
         actions={
           has('USER_DETAILS_EDIT') ? (
             <Link to="/users/create">
-              <Button>+ Tạo tài khoản</Button>
+              <Button>+ Create account</Button>
             </Link>
           ) : null
         }
@@ -45,13 +45,13 @@ export default function UsersPage() {
       <Card className="mb-4 !p-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
           <p className="text-sm text-[var(--admin-muted)]">
-            Tổng <strong>{users?.length ?? 0}</strong> tài khoản
+            Total <strong>{users?.length ?? 0}</strong> accounts
           </p>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm theo tên, email, SĐT, vai trò..."
+            placeholder="Search by name, email, phone, role..."
             className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
           />
         </div>
@@ -66,12 +66,12 @@ export default function UsersPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               <tr>
-                <th className="px-4 py-3">Người dùng</th>
+                <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Email / Username</th>
-                <th className="px-4 py-3">Điện thoại</th>
-                <th className="px-4 py-3">Vai trò</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3">Chi nhánh</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Branch</th>
               </tr>
             </thead>
             <tbody>
@@ -98,7 +98,7 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge tone={u.isActive !== false ? 'success' : 'danger'}>
-                          {u.isActive !== false ? 'Hoạt động' : 'Khóa'}
+                          {u.isActive !== false ? 'Active' : 'Locked'}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-[var(--admin-muted)]">
@@ -111,7 +111,7 @@ export default function UsersPage() {
 
           {!loading && filtered.length === 0 && (
             <p className="px-4 py-10 text-center text-sm text-[var(--admin-muted)]">
-              Không tìm thấy người dùng phù hợp.
+              No matching users found.
             </p>
           )}
         </div>

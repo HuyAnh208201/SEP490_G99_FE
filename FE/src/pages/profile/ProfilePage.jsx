@@ -75,9 +75,9 @@ export default function ProfilePage() {
         birthDate: form.birthDate || undefined,
       };
       await updateProfile(payload);
-      setSuccess('Cập nhật hồ sơ thành công.');
+      setSuccess('Profile updated successfully.');
     } catch (err) {
-      setError(err.message || 'Không thể cập nhật hồ sơ');
+      setError(err.message || 'Unable to update profile');
     } finally {
       setLoading(false);
     }
@@ -86,8 +86,8 @@ export default function ProfilePage() {
   return (
     <div className="mx-auto max-w-2xl">
       <PageHeader
-        title="Hồ sơ cá nhân"
-        description="Xem và chỉnh sửa thông tin tài khoản của bạn."
+        title="Profile"
+        description="View and edit your account information."
         badge={
           user?.role ? (
             <Badge tone="brand">{ROLE_LABELS[user.role] || user.role}</Badge>
@@ -103,7 +103,7 @@ export default function ProfilePage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Họ *
+                  First name *
                 </span>
                 <input
                   required
@@ -114,7 +114,7 @@ export default function ProfilePage() {
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Tên
+                  Last name
                 </span>
                 <input
                   value={form.lastName}
@@ -136,7 +136,7 @@ export default function ProfilePage() {
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Điện thoại
+                  Phone
                 </span>
                 <input
                   value={form.phone}
@@ -146,7 +146,7 @@ export default function ProfilePage() {
               </label>
               <label className="block space-y-1">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Giới tính
+                  Gender
                 </span>
                 <select
                   value={form.gender}
@@ -154,14 +154,14 @@ export default function ProfilePage() {
                   className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
                 >
                   <option value="">—</option>
-                  <option value="MALE">Nam</option>
-                  <option value="FEMALE">Nữ</option>
-                  <option value="OTHER">Khác</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
                 </select>
               </label>
               <label className="block space-y-1 sm:col-span-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Ngày sinh
+                  Date of birth
                 </span>
                 <input
                   type="date"
@@ -185,7 +185,7 @@ export default function ProfilePage() {
 
             <div className="flex justify-end">
               <Button type="submit" loading={loading}>
-                Lưu thay đổi
+                Save changes
               </Button>
             </div>
           </form>

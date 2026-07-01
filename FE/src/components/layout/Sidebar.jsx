@@ -19,7 +19,7 @@ export default function Sidebar({ collapsed = false, onNavigate }) {
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-[var(--admin-text)]">ChainStore</p>
-            <p className="truncate text-[11px] text-[var(--admin-muted)]">Quản lý chuỗi cửa hàng</p>
+            <p className="truncate text-[11px] text-[var(--admin-muted)]">Chain store management</p>
           </div>
         )}
       </div>
@@ -70,7 +70,7 @@ export default function Sidebar({ collapsed = false, onNavigate }) {
                               <span className="truncate">{item.label}</span>
                               {item.comingSoon && (
                                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">
-                                  Sắp có
+                                  Soon
                                 </span>
                               )}
                             </span>

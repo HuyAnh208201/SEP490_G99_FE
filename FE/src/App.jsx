@@ -10,7 +10,9 @@ import ProfilePage from './pages/profile/ProfilePage.jsx';
 import BranchesPage from './pages/branches/BranchesPage.jsx';
 import PromotionsPage from './pages/promotions/PromotionsPage.jsx';
 import SystemSettingsPage from './pages/system/SystemSettingsPage.jsx';
-import CatalogPlaceholderPage from './pages/catalog/CatalogPlaceholderPage.jsx';
+import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
+import ProductsPage from './pages/catalog/ProductsPage.jsx';
+import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
 import WarehouseDashboardPage, {
   WarehouseDispatchPage,
   WarehouseImportRequestsPage,
@@ -102,9 +104,16 @@ export default function App() {
           }
         />
 
-        <Route path="/catalog/categories" element={<CatalogPlaceholderPage type="categories" />} />
-        <Route path="/catalog/products" element={<CatalogPlaceholderPage type="products" />} />
-        <Route path="/catalog/suppliers" element={<CatalogPlaceholderPage type="suppliers" />} />
+        <Route
+          path="/catalog/categories"
+          element={
+            <PermissionRoute permission="CATEGORY_MANAGEMENT">
+              <CategoriesPage />
+            </PermissionRoute>
+          }
+        />
+        <Route path="/catalog/products" element={<ProductsPage />} />
+        <Route path="/catalog/suppliers" element={<SuppliersPage />} />
 
         <Route
           path="/warehouse"

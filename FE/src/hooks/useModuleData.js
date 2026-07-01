@@ -21,7 +21,7 @@ export function useModuleData(fetcher, deps = []) {
         if (!cancelled) setData(result);
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Không tải được dữ liệu');
+        if (!cancelled) setError(err?.message || 'Failed to load data');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

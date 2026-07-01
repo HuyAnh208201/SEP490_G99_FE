@@ -14,9 +14,9 @@ export default function ModulePlaceholder({
       {isPlaceholder && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="soon">Đang phát triển</Badge>
+            <Badge tone="soon">In development</Badge>
             <span>
-              {apiMessage || 'Module đang phát triển — phân quyền đã được áp dụng.'}
+              {apiMessage || 'Module in development — permissions are already enforced.'}
             </span>
           </div>
         </div>
@@ -27,7 +27,7 @@ export default function ModulePlaceholder({
       {moduleData && (
         <details className="rounded-xl border border-[var(--admin-border)] bg-white">
           <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[var(--admin-muted)]">
-            Xem dữ liệu API (debug)
+            View API payload (debug)
           </summary>
           <pre className="overflow-x-auto border-t border-[var(--admin-border)] bg-[#f7f9fb] p-4 text-xs text-[var(--admin-text)]">
             {JSON.stringify(moduleData, null, 2)}

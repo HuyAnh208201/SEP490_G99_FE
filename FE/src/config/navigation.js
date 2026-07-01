@@ -1,10 +1,10 @@
 /**
- * Menu sidebar — mỗi item gắn permission code từ BE (WebPermission).
- * `anyPermission: true` → hiện nếu user có ít nhất 1 quyền trong danh sách.
+ * Sidebar menu — each item maps to a BE permission code (WebPermission).
+ * `anyPermission: true` → visible if user has at least one listed permission.
  */
 export const NAV_GROUPS = [
   {
-    label: 'Tổng quan',
+    label: 'Overview',
     items: [
       {
         path: '/dashboard',
@@ -21,17 +21,17 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Quản trị chuỗi',
+    label: 'Chain administration',
     items: [
       {
         path: '/users',
-        label: 'Người dùng',
+        label: 'Users',
         icon: 'users',
         permissions: ['USER_MANAGEMENT_LIST'],
       },
       {
         path: '/branches',
-        label: 'Chi nhánh',
+        label: 'Branches',
         icon: 'store',
         anyPermission: true,
         permissions: [
@@ -42,75 +42,72 @@ export const NAV_GROUPS = [
       },
       {
         path: '/promotions',
-        label: 'Khuyến mãi',
+        label: 'Promotions',
         icon: 'tag',
         anyPermission: true,
         permissions: ['PROMOTION_LIST', 'PROMOTION_DETAILS', 'BRANCH_REVENUE_PROMOS'],
       },
       {
         path: '/system/settings',
-        label: 'Cấu hình hệ thống',
+        label: 'System settings',
         icon: 'settings',
         permissions: ['SYSTEM_SETTINGS_MASTER_DATA'],
       },
     ],
   },
   {
-    label: 'Danh mục & NCC',
+    label: 'Catalog & suppliers',
     items: [
       {
         path: '/catalog/categories',
-        label: 'Nhóm sản phẩm',
+        label: 'Product categories',
         icon: 'folder',
-        roles: ['ADMIN', 'DIRECTOR'],
-        comingSoon: true,
+        permissions: ['CATEGORY_MANAGEMENT'],
       },
       {
         path: '/catalog/products',
-        label: 'Sản phẩm',
+        label: 'Products',
         icon: 'package',
         roles: ['ADMIN', 'DIRECTOR'],
-        comingSoon: true,
       },
       {
         path: '/catalog/suppliers',
-        label: 'Nhà cung cấp',
+        label: 'Suppliers',
         icon: 'truck',
         roles: ['ADMIN', 'DIRECTOR'],
-        comingSoon: true,
       },
     ],
   },
   {
-    label: 'Kho & Nhập hàng',
+    label: 'Warehouse & imports',
     items: [
       {
         path: '/warehouse',
-        label: 'Kho trung tâm',
+        label: 'Central warehouse',
         icon: 'warehouse',
         permissions: ['WAREHOUSE_DASHBOARD'],
       },
       {
         path: '/warehouse/inventory',
-        label: 'Tồn kho',
+        label: 'Inventory',
         icon: 'boxes',
         permissions: ['VIEW_CENTRAL_INVENTORY'],
       },
       {
         path: '/warehouse/import-requests',
-        label: 'Yêu cầu nhập',
+        label: 'Import requests',
         icon: 'inbox',
         permissions: ['MANAGE_BRANCH_IMPORT_REQUESTS'],
       },
       {
         path: '/warehouse/dispatch',
-        label: 'Phiếu xuất kho',
+        label: 'Dispatch orders',
         icon: 'dispatch',
         permissions: ['MANAGE_DISPATCH_ORDERS'],
       },
       {
         path: '/branch-manager/import-requests',
-        label: 'Yêu cầu chi nhánh',
+        label: 'Branch requests',
         icon: 'request',
         anyPermission: true,
         permissions: ['CREATE_IMPORT_REQUEST', 'SUPPLY_IMPORT_RECEIPT_APPROVE'],
@@ -118,69 +115,69 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Vận hành chi nhánh',
+    label: 'Branch operations',
     items: [
       {
         path: '/branch-manager',
-        label: 'Chi nhánh (BM)',
+        label: 'Branch (BM)',
         icon: 'branch',
         permissions: ['BRANCH_DASHBOARD'],
       },
       {
         path: '/branch-manager/staff',
-        label: 'Nhân viên',
+        label: 'Staff',
         icon: 'staff',
         permissions: ['MANAGE_BRANCH_STAFF_INFO'],
       },
       {
         path: '/branch-manager/shifts',
-        label: 'Ca làm việc',
+        label: 'Shifts',
         icon: 'clock',
         permissions: ['SHIFT_MANAGEMENT'],
       },
       {
         path: '/branch-manager/cash-discrepancy',
-        label: 'Đối soát tiền mặt',
+        label: 'Cash reconciliation',
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },
     ],
   },
   {
-    label: 'Điều hành',
+    label: 'Executive',
     items: [
       {
         path: '/director',
-        label: 'Ban điều hành',
+        label: 'Director',
         icon: 'chart',
         permissions: ['DIRECTOR_DASHBOARD'],
       },
       {
         path: '/director/reports',
-        label: 'Báo cáo hiệu suất',
+        label: 'Performance reports',
         icon: 'report',
         permissions: ['BUSINESS_PERFORMANCE_REPORTS'],
       },
       {
         path: '/director/planning',
-        label: 'Kế hoạch chiến lược',
+        label: 'Strategic planning',
         icon: 'plan',
         permissions: ['STRATEGIC_PLANNING_OVERVIEW'],
       },
     ],
   },
   {
-    label: 'Tài khoản',
+    label: 'Account',
     items: [
       {
         path: '/profile',
-        label: 'Hồ sơ cá nhân',
+        label: 'Profile',
         icon: 'user',
         publicNav: true,
       },
       {
         path: '/change-password',
-        label: 'Đổi mật khẩu',
+        label: 'Change password',
         icon: 'lock',
         publicNav: true,
       },
@@ -189,27 +186,27 @@ export const NAV_GROUPS = [
 ];
 
 export const ROLE_LABELS = {
-  ADMIN: 'Quản trị viên',
-  DIRECTOR: 'Giám đốc',
-  BRANCH_MANAGER: 'Quản lý chi nhánh',
-  WAREHOUSE_MANAGER: 'Quản lý kho',
-  INVENTORY_STAFF: 'Nhân viên kho',
-  CASHIER: 'Thu ngân',
-  CUSTOMER: 'Khách hàng',
-  OWNER: 'Chủ chuỗi',
-  MANAGER: 'Quản lý',
-  STAFF: 'Nhân viên',
+  ADMIN: 'Administrator',
+  DIRECTOR: 'Director',
+  BRANCH_MANAGER: 'Branch manager',
+  WAREHOUSE_MANAGER: 'Warehouse manager',
+  INVENTORY_STAFF: 'Inventory staff',
+  CASHIER: 'Cashier',
+  CUSTOMER: 'Customer',
+  OWNER: 'Owner',
+  MANAGER: 'Manager',
+  STAFF: 'Staff',
 };
 
 export const SETUP_WORKFLOW = [
-  { step: 1, label: 'Nhóm sản phẩm', path: '/catalog/categories' },
-  { step: 2, label: 'Sản phẩm', path: '/catalog/products' },
-  { step: 3, label: 'Nhà cung cấp', path: '/catalog/suppliers' },
-  { step: 4, label: 'Chi nhánh', path: '/branches' },
-  { step: 5, label: 'Người dùng', path: '/users' },
-  { step: 6, label: 'Khuyến mãi', path: '/promotions' },
-  { step: 7, label: 'Yêu cầu nhập', path: '/branch-manager/import-requests' },
-  { step: 8, label: 'Tồn kho', path: '/warehouse/inventory' },
-  { step: 9, label: 'Ca làm việc', path: '/branch-manager/shifts' },
-  { step: 10, label: 'Báo cáo', path: '/director/reports' },
+  { step: 1, label: 'Categories', path: '/catalog/categories' },
+  { step: 2, label: 'Products', path: '/catalog/products' },
+  { step: 3, label: 'Suppliers', path: '/catalog/suppliers' },
+  { step: 4, label: 'Branches', path: '/branches' },
+  { step: 5, label: 'Users', path: '/users' },
+  { step: 6, label: 'Promotions', path: '/promotions' },
+  { step: 7, label: 'Import requests', path: '/branch-manager/import-requests' },
+  { step: 8, label: 'Inventory', path: '/warehouse/inventory' },
+  { step: 9, label: 'Shifts', path: '/branch-manager/shifts' },
+  { step: 10, label: 'Reports', path: '/director/reports' },
 ];
