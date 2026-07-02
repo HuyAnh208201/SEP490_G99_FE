@@ -71,7 +71,7 @@ const QUICK_LINKS = {
     { to: '/catalog/categories', label: 'Product categories' },
     { to: '/catalog/products', label: 'Products' },
     { to: '/branches', label: 'Branches' },
-    { to: '/users', label: 'User management' },
+    { to: '/users', label: 'Team & accounts' },
   ],
   DIRECTOR: [
     { to: '/director/reports', label: 'Performance reports' },
@@ -81,7 +81,7 @@ const QUICK_LINKS = {
   ],
   BRANCH_MANAGER: [
     { to: '/branch-manager/shifts', label: 'Shifts' },
-    { to: '/branch-manager/staff', label: 'Staff' },
+    { to: '/users', label: 'Team & accounts' },
     { to: '/branch-manager/import-requests', label: 'Import requests' },
     { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
   ],

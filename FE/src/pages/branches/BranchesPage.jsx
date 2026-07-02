@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import {
   createBranch,
   createBranchManager,
@@ -6,19 +6,23 @@ import {
   updateBranch,
   updateBranchStatus,
 } from '../../api/branches.js';
+import { composeAddress, parseAddress } from '../../lib/vietnamAddress.js';
+import {
+  formatOperatingHours,
+  parseOperatingHours,
+  validateOperatingHours,
+} from '../../lib/operatingHours.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import FormField from '../../components/ui/FormField.jsx';
+import OperatingHoursPicker from '../../components/ui/OperatingHoursPicker.jsx';
+import VietnamAddressPicker from '../../components/ui/VietnamAddressPicker.jsx';
 
-const EMPTY = {
-  name: '',
-  address: '',
-  phone: '',
-  operatingHours: '',
-  status: 'active',
-};
+const EMPTY_ADDRESS = { street: '', provinceId: '', districtId: '' };
+const EMPTY_HOURS = { open: '08:00', close: '22:00' };
 
 const MANAGER_EMPTY = {
   fullName: '',
@@ -43,10 +47,15 @@ export default function BranchesPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [form, setForm] = useState(EMPTY);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState(EMPTY_ADDRESS);
+  const [hours, setHours] = useState(EMPTY_HOURS);
+  const [status, setStatus] = useState('active');
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [addressError, setAddressError] = useState('');
   const [managerBranchId, setManagerBranchId] = useState(null);
   const [managerForm, setManagerForm] = useState(MANAGER_EMPTY);
   const [managerError, setManagerError] = useState('');
@@ -75,52 +84,59 @@ export default function BranchesPage() {
     load();
   }, [load]);
 
-  function update(field) {
-    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  }
-
-  function updateManager(field) {
-    return (e) => setManagerForm((f) => ({ ...f, [field]: e.target.value }));
+  function resetForm() {
+    setName('');
+    setPhone('');
+    setAddress(EMPTY_ADDRESS);
+    setHours(EMPTY_HOURS);
+    setStatus('active');
+    setEditingId(null);
+    setFormError('');
+    setAddressError('');
   }
 
   function startEdit(branch) {
     setEditingId(branch.id);
-    setForm({
-      name: branch.name || '',
-      address: branch.address || '',
-      phone: branch.phone || '',
-      operatingHours: branch.operatingHours || '',
-      status: branch.status || 'active',
-    });
+    setName(branch.name || '');
+    setPhone(branch.phone || '');
+    setAddress(parseAddress(branch.address));
+    setHours(parseOperatingHours(branch.operatingHours));
+    setStatus(branch.status || 'active');
     setFormError('');
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setForm(EMPTY);
-    setFormError('');
+    setAddressError('');
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!canManage) return;
     setFormError('');
-    setSaving(true);
+    setAddressError('');
 
+    if (!address.provinceId || !address.districtId) {
+      setAddressError('Select province/city and district.');
+      return;
+    }
+    const hoursError = validateOperatingHours(hours.open, hours.close);
+    if (hoursError) {
+      setFormError(hoursError);
+      return;
+    }
+
+    setSaving(true);
     const payload = {
-      name: form.name.trim(),
-      address: form.address.trim(),
-      phone: form.phone.trim(),
-      operatingHours: form.operatingHours.trim(),
+      name: name.trim(),
+      address: composeAddress(address),
+      phone: phone.trim(),
+      operatingHours: formatOperatingHours(hours.open, hours.close),
     };
 
     try {
       if (editingId) {
-        await updateBranch(editingId, { ...payload, status: form.status });
+        await updateBranch(editingId, { ...payload, status });
       } else {
         await createBranch(payload);
       }
-      cancelEdit();
+      resetForm();
       await load();
     } catch (err) {
       setFormError(fieldErrors(err));
@@ -141,10 +157,8 @@ export default function BranchesPage() {
     }
   }
 
-  function openManagerForm(branchId) {
-    setManagerBranchId(branchId);
-    setManagerForm(MANAGER_EMPTY);
-    setManagerError('');
+  function updateManager(field) {
+    return (e) => setManagerForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
   async function handleManagerSubmit(e) {
@@ -165,17 +179,19 @@ export default function BranchesPage() {
     }
   }
 
+  const inputClass =
+    'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Branches"
-        description="Step 4 — create branches, assign managers, and manage active/inactive status."
+        description="Store locations with structured address and operating hours."
       />
 
       {!canList && (
         <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Branch list requires Admin list permission. You can still create branches if you have
-          manage access — refresh after an Admin shares the list.
+          Branch list requires Admin permission. Create access still works if you have manage rights.
         </div>
       )}
 
@@ -185,87 +201,78 @@ export default function BranchesPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-5">
         {canManage && (
-          <Card className="lg:col-span-1">
+          <Card className="lg:col-span-2">
             <h2 className="text-base font-semibold text-[var(--admin-text)]">
               {editingId ? 'Edit branch' : 'New branch'}
             </h2>
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Branch name *
-                </span>
+            <form onSubmit={handleSubmit} className="mt-4 space-y-5">
+              <FormField label="Branch name" required>
                 <input
                   required
-                  value={form.name}
-                  onChange={update('name')}
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. ChainStore Nguyß╗àn Huß╗ç"
+                  className={inputClass}
                 />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Address *
-                </span>
-                <textarea
-                  required
-                  rows={2}
-                  value={form.address}
-                  onChange={update('address')}
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Phone * (10 digits, starts with 0)
-                </span>
+              </FormField>
+
+              <VietnamAddressPicker
+                street={address.street}
+                provinceId={address.provinceId}
+                districtId={address.districtId}
+                onChange={setAddress}
+                locationError={addressError}
+              />
+
+              <FormField
+                label="Phone"
+                required
+                hint="10 digits, starts with 0 ΓÇö store hotline."
+              >
                 <input
                   required
                   pattern="0[0-9]{9}"
-                  value={form.phone}
-                  onChange={update('phone')}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   placeholder="0912345678"
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  className={inputClass}
                 />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Operating hours *
-                </span>
-                <input
-                  required
-                  value={form.operatingHours}
-                  onChange={update('operatingHours')}
-                  placeholder="08:00 - 22:00"
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-                />
-              </label>
+              </FormField>
+
+              <OperatingHoursPicker
+                open={hours.open}
+                close={hours.close}
+                onChange={setHours}
+                error={formError && formError.includes('time') ? formError : ''}
+              />
+
               {editingId && (
-                <label className="block space-y-1">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                    Status
-                  </span>
+                <FormField label="Status">
                   <select
-                    value={form.status}
-                    onChange={update('status')}
-                    className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className={inputClass}
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </select>
-                </label>
+                </FormField>
               )}
-              {formError && (
+
+              {formError && !formError.includes('time') && (
                 <p className="text-sm text-red-600" role="alert">
                   {formError}
                 </p>
               )}
+
               <div className="flex gap-2">
                 <Button type="submit" loading={saving}>
                   {editingId ? 'Save changes' : 'Create branch'}
                 </Button>
                 {editingId && (
-                  <Button type="button" variant="secondary" onClick={cancelEdit}>
+                  <Button type="button" variant="secondary" onClick={resetForm}>
                     Cancel
                   </Button>
                 )}
@@ -274,7 +281,7 @@ export default function BranchesPage() {
           </Card>
         )}
 
-        <Card className={`${canManage ? 'lg:col-span-2' : 'lg:col-span-3'} !p-0 overflow-hidden`}>
+        <Card className={`${canManage ? 'lg:col-span-3' : 'lg:col-span-5'} !p-0 overflow-hidden`}>
           <div className="border-b border-[var(--admin-border)] px-4 py-3">
             <p className="text-sm text-[var(--admin-muted)]">
               Total <strong>{items.length}</strong> branches
@@ -286,6 +293,7 @@ export default function BranchesPage() {
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Address</th>
+                  <th className="px-4 py-3">Hours</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Manager</th>
                   <th className="px-4 py-3">Status</th>
@@ -296,7 +304,7 @@ export default function BranchesPage() {
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={6} className="px-4 py-4">
+                        <td colSpan={7} className="px-4 py-4">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
@@ -308,39 +316,38 @@ export default function BranchesPage() {
                       >
                         <td className="px-4 py-3 font-medium">{b.name}</td>
                         <td className="max-w-xs truncate px-4 py-3 text-[var(--admin-muted)]">
-                          {b.address || '—'}
+                          {b.address || 'ΓÇö'}
                         </td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">{b.phone || '—'}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-[var(--admin-muted)]">
+                          {b.operatingHours || 'ΓÇö'}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">{b.phone || 'ΓÇö'}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {b.managerName || '—'}
+                          {b.managerName || 'ΓÇö'}
                         </td>
                         <td className="px-4 py-3">
                           <Badge tone={b.status === 'active' ? 'success' : 'danger'}>
-                            {b.status || '—'}
+                            {b.status || 'ΓÇö'}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
                           {canManage && (
                             <div className="flex flex-wrap justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                className="!px-2 !py-1"
-                                onClick={() => startEdit(b)}
-                              >
+                              <Button variant="ghost" className="!px-2 !py-1" onClick={() => startEdit(b)}>
                                 Edit
                               </Button>
-                              <Button
-                                variant="ghost"
-                                className="!px-2 !py-1"
-                                onClick={() => toggleStatus(b)}
-                              >
+                              <Button variant="ghost" className="!px-2 !py-1" onClick={() => toggleStatus(b)}>
                                 Toggle status
                               </Button>
                               {!b.managerId && (
                                 <Button
                                   variant="ghost"
                                   className="!px-2 !py-1"
-                                  onClick={() => openManagerForm(b.id)}
+                                  onClick={() => {
+                                    setManagerBranchId(b.id);
+                                    setManagerForm(MANAGER_EMPTY);
+                                    setManagerError('');
+                                  }}
                                 >
                                   Assign BM
                                 </Button>
@@ -364,19 +371,14 @@ export default function BranchesPage() {
       {managerBranchId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <Card className="w-full max-w-md">
-            <h3 className="text-base font-semibold text-[var(--admin-text)]">
-              Create branch manager
-            </h3>
-            <p className="mt-1 text-sm text-[var(--admin-muted)]">
-              POST /api/branches/{managerBranchId}/manager
-            </p>
+            <h3 className="text-base font-semibold text-[var(--admin-text)]">Create branch manager</h3>
             <form onSubmit={handleManagerSubmit} className="mt-4 space-y-3">
               <input
                 required
                 placeholder="Full name"
                 value={managerForm.fullName}
                 onChange={updateManager('fullName')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                className={inputClass}
               />
               <input
                 required
@@ -384,14 +386,14 @@ export default function BranchesPage() {
                 placeholder="Email"
                 value={managerForm.email}
                 onChange={updateManager('email')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                className={inputClass}
               />
               <input
                 required
                 placeholder="Phone"
                 value={managerForm.phone}
                 onChange={updateManager('phone')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                className={inputClass}
               />
               <input
                 required
@@ -399,7 +401,7 @@ export default function BranchesPage() {
                 placeholder="Password"
                 value={managerForm.password}
                 onChange={updateManager('password')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                className={inputClass}
               />
               <input
                 required
@@ -407,7 +409,7 @@ export default function BranchesPage() {
                 placeholder="Confirm password"
                 value={managerForm.confirmPassword}
                 onChange={updateManager('confirmPassword')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                className={inputClass}
               />
               {managerError && <p className="text-sm text-red-600">{managerError}</p>}
               <div className="flex justify-end gap-2">

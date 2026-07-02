@@ -23,19 +23,6 @@ export default function BranchManagerDashboardPage() {
   );
 }
 
-export function BranchStaffPage() {
-  const { data, loading, error } = useModuleData(branchManagerApi.staff, []);
-  return (
-    <ModulePageShell
-      title="Branch staff"
-      description="View profiles and assign cashiers / inventory staff at the branch."
-      loading={loading}
-      error={error}
-      moduleData={data}
-    />
-  );
-}
-
 export function BranchShiftsPage() {
   const { data, loading, error } = useModuleData(branchManagerApi.shifts, []);
   return (
