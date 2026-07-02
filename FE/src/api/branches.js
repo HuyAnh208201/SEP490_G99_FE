@@ -1,4 +1,4 @@
-import { http } from './http.js';
+﻿import { http } from './http.js';
 
 function unwrap(body) {
   if (!body?.success) {
@@ -37,5 +37,15 @@ export async function updateBranchStatus(id, status) {
 
 export async function createBranchManager(branchId, payload) {
   const { data } = await http.post(`/branches/${branchId}/manager`, payload);
+  return unwrap(data);
+}
+
+export async function createCashier(payload) {
+  const { data } = await http.post('/branches/staff/cashier', payload);
+  return unwrap(data);
+}
+
+export async function createInventoryStaff(payload) {
+  const { data } = await http.post('/branches/staff/inventory', payload);
   return unwrap(data);
 }

@@ -25,9 +25,10 @@ export const NAV_GROUPS = [
     items: [
       {
         path: '/users',
-        label: 'Users',
+        label: 'Team & accounts',
         icon: 'users',
-        permissions: ['USER_MANAGEMENT_LIST'],
+        anyPermission: true,
+        permissions: ['USER_MANAGEMENT_LIST', 'MANAGE_BRANCH_STAFF_INFO'],
       },
       {
         path: '/branches',
@@ -125,12 +126,6 @@ export const NAV_GROUPS = [
         permissions: ['BRANCH_DASHBOARD'],
       },
       {
-        path: '/branch-manager/staff',
-        label: 'Staff',
-        icon: 'staff',
-        permissions: ['MANAGE_BRANCH_STAFF_INFO'],
-      },
-      {
         path: '/branch-manager/shifts',
         label: 'Shifts',
         icon: 'clock',
@@ -172,14 +167,8 @@ export const NAV_GROUPS = [
     items: [
       {
         path: '/profile',
-        label: 'Profile',
+        label: 'Account settings',
         icon: 'user',
-        publicNav: true,
-      },
-      {
-        path: '/change-password',
-        label: 'Change password',
-        icon: 'lock',
         publicNav: true,
       },
     ],
@@ -204,7 +193,7 @@ export const SETUP_WORKFLOW = [
   { step: 2, label: 'Products', path: '/catalog/products' },
   { step: 3, label: 'Suppliers', path: '/catalog/suppliers' },
   { step: 4, label: 'Branches', path: '/branches' },
-  { step: 5, label: 'Users', path: '/users' },
+  { step: 5, label: 'Team', path: '/users' },
   { step: 6, label: 'Promotions', path: '/promotions' },
   { step: 7, label: 'Import requests', path: '/branch-manager/import-requests' },
   { step: 8, label: 'Inventory', path: '/warehouse/inventory' },

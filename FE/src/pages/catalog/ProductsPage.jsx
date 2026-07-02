@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createProduct,
   deleteProduct,
@@ -6,27 +6,28 @@ import {
   updateProduct,
 } from '../../api/products.js';
 import { fetchCategories } from '../../api/categories.js';
+import { PRODUCT_UNITS, unitLabel } from '../../constants/productUnits.js';
+import { formatVnd } from '../../lib/money.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import FormField from '../../components/ui/FormField.jsx';
+import BarcodeInput from '../../components/ui/BarcodeInput.jsx';
+import MoneyInput from '../../components/ui/MoneyInput.jsx';
 
 const EMPTY = {
   code: '',
   name: '',
   barcode: '',
   categoryId: '',
-  unit: 'pcs',
-  referenceImportPrice: '',
-  defaultSalePrice: '',
+  unit: 'cai',
+  referenceImportPrice: null,
+  defaultSalePrice: null,
   description: '',
   status: 'active',
+  syncCodeFromBarcode: true,
 };
-
-function formatMoney(value) {
-  if (value == null || value === '') return '—';
-  return Number(value).toLocaleString('vi-VN');
-}
 
 function fieldErrors(err) {
   if (err?.errors && typeof err.errors === 'object') {
@@ -35,11 +36,18 @@ function fieldErrors(err) {
   return err?.message || 'Request failed';
 }
 
+function suggestSku(barcode) {
+  if (!barcode) return '';
+  return barcode.length >= 8 ? barcode : `SP-${barcode}`;
+}
+
 export default function ProductsPage() {
+  const barcodeRef = useRef(null);
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -64,8 +72,24 @@ export default function ProductsPage() {
     load();
   }, [load]);
 
-  function update(field) {
-    return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const filtered = items.filter((p) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      p.code?.toLowerCase().includes(q) ||
+      p.name?.toLowerCase().includes(q) ||
+      p.barcode?.toLowerCase().includes(q)
+    );
+  });
+
+  function patchForm(patch) {
+    setForm((f) => {
+      const next = { ...f, ...patch };
+      if (next.syncCodeFromBarcode && !editingId && patch.barcode !== undefined) {
+        next.code = suggestSku(patch.barcode);
+      }
+      return next;
+    });
   }
 
   function startEdit(product) {
@@ -75,11 +99,12 @@ export default function ProductsPage() {
       name: product.name || '',
       barcode: product.barcode || '',
       categoryId: product.categoryId ?? '',
-      unit: product.unit || 'pcs',
-      referenceImportPrice: product.referenceImportPrice ?? '',
-      defaultSalePrice: product.defaultSalePrice ?? '',
+      unit: product.unit || 'cai',
+      referenceImportPrice: product.referenceImportPrice ?? null,
+      defaultSalePrice: product.defaultSalePrice ?? null,
       description: product.description || '',
       status: product.status || 'active',
+      syncCodeFromBarcode: false,
     });
     setFormError('');
   }
@@ -88,20 +113,36 @@ export default function ProductsPage() {
     setEditingId(null);
     setForm(EMPTY);
     setFormError('');
+    setTimeout(() => barcodeRef.current?.focus(), 50);
+  }
+
+  function handleBarcodeScan(barcode) {
+    if (!editingId && form.syncCodeFromBarcode) {
+      patchForm({ barcode, code: suggestSku(barcode) });
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
-    setSaving(true);
 
+    if (form.referenceImportPrice == null || form.defaultSalePrice == null) {
+      setFormError('Enter valid import and retail prices.');
+      return;
+    }
+    if (form.defaultSalePrice < form.referenceImportPrice) {
+      setFormError('Retail price is lower than import cost ΓÇö check pricing.');
+      return;
+    }
+
+    setSaving(true);
     const payload = {
       name: form.name.trim(),
       barcode: form.barcode.trim() || null,
       categoryId: Number(form.categoryId),
-      unit: form.unit.trim() || 'pcs',
-      referenceImportPrice: Number(form.referenceImportPrice),
-      defaultSalePrice: Number(form.defaultSalePrice),
+      unit: form.unit,
+      referenceImportPrice: form.referenceImportPrice,
+      defaultSalePrice: form.defaultSalePrice,
       description: form.description.trim() || null,
     };
 
@@ -109,7 +150,13 @@ export default function ProductsPage() {
       if (editingId) {
         await updateProduct(editingId, { ...payload, status: form.status });
       } else {
-        await createProduct({ ...payload, code: form.code.trim() });
+        const code = (form.code.trim() || suggestSku(form.barcode)).trim();
+        if (!code) {
+          setFormError('Product code or barcode is required.');
+          setSaving(false);
+          return;
+        }
+        await createProduct({ ...payload, code });
       }
       cancelEdit();
       await load();
@@ -131,11 +178,14 @@ export default function ProductsPage() {
     }
   }
 
+  const selectClass =
+    'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Products"
-        description="Step 2 of admin setup — SKU catalog synced with POST /api/products."
+        description="Product catalog with barcode scanning, SKU codes, and retail pricing."
       />
 
       {error && (
@@ -144,127 +194,171 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <h2 className="text-base font-semibold text-[var(--admin-text)]">
-            {editingId ? 'Edit product' : 'New product'}
-          </h2>
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+      <div className="grid gap-6 xl:grid-cols-5">
+        <Card className="xl:col-span-2">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-[var(--admin-text)]">
+              {editingId ? 'Edit product' : 'Add product'}
+            </h2>
             {!editingId && (
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Product code *
-                </span>
-                <input
-                  required
-                  value={form.code}
-                  onChange={update('code')}
-                  placeholder="SKU-001"
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-                />
-              </label>
+              <span className="text-xs text-[var(--admin-subtle)]">Focus barcode ΓåÆ scan</span>
             )}
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Name *
-              </span>
-              <input
-                required
-                value={form.name}
-                onChange={update('name')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-              />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Barcode
-              </span>
-              <input
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                Identification
+              </p>
+
+              <BarcodeInput
+                ref={barcodeRef}
+                autoFocus={!editingId}
                 value={form.barcode}
-                onChange={update('barcode')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                onChange={(barcode) => patchForm({ barcode })}
+                onScan={handleBarcodeScan}
+                hint="USB scanner sends digits + Enter. Barcode is used at checkout."
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Category *
-              </span>
-              <select
-                required
-                value={form.categoryId}
-                onChange={update('categoryId')}
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+
+              {!editingId && (
+                <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={form.syncCodeFromBarcode}
+                    onChange={(e) =>
+                      patchForm({
+                        syncCodeFromBarcode: e.target.checked,
+                        code: e.target.checked ? suggestSku(form.barcode) : form.code,
+                      })
+                    }
+                    className="rounded border-[var(--admin-border)] text-[#0058be]"
+                  />
+                  Use barcode as product code (SKU)
+                </label>
+              )}
+
+              <FormField
+                label="Product code (SKU)"
+                required={!editingId}
+                hint="Internal code for reports & stock. Unique per item ΓÇö e.g. SP000123 or EAN."
               >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Import price *
-                </span>
                 <input
-                  type="number"
-                  required
-                  min="0"
-                  step="1000"
-                  value={form.referenceImportPrice}
-                  onChange={update('referenceImportPrice')}
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  required={!editingId}
+                  readOnly={!editingId && form.syncCodeFromBarcode}
+                  value={form.code}
+                  onChange={(e) => patchForm({ code: e.target.value.toUpperCase(), syncCodeFromBarcode: false })}
+                  placeholder="SP000123"
+                  className={`${selectClass} font-mono uppercase tracking-wide ${!editingId && form.syncCodeFromBarcode ? 'bg-[#f0f6ff]' : ''}`}
                 />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Sale price *
-                </span>
+              </FormField>
+
+              <FormField label="Product name" required>
                 <input
-                  type="number"
                   required
-                  min="0"
-                  step="1000"
-                  value={form.defaultSalePrice}
-                  onChange={update('defaultSalePrice')}
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  value={form.name}
+                  onChange={(e) => patchForm({ name: e.target.value })}
+                  placeholder="e.g. Aquafina 500ml"
+                  className={selectClass}
                 />
-              </label>
-            </div>
-            <label className="block space-y-1">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                Unit *
-              </span>
-              <input
-                required
-                value={form.unit}
-                onChange={update('unit')}
-                placeholder="pcs, box, kg"
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-              />
-            </label>
+              </FormField>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                Category & unit
+              </p>
+
+              <FormField label="Category" required>
+                <select
+                  required
+                  value={form.categoryId}
+                  onChange={(e) => patchForm({ categoryId: e.target.value })}
+                  className={selectClass}
+                >
+                  <option value="">Select category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField label="Unit of measure" required hint="Standard unit for POS & inventory.">
+                <select
+                  required
+                  value={form.unit}
+                  onChange={(e) => patchForm({ unit: e.target.value })}
+                  className={selectClass}
+                >
+                  {PRODUCT_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                Pricing (VND)
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Cost / import price" required hint="Gi├í vß╗æn ΓÇö for margin reports.">
+                  <MoneyInput
+                    required
+                    value={form.referenceImportPrice}
+                    onChange={(v) => patchForm({ referenceImportPrice: v })}
+                  />
+                </FormField>
+                <FormField label="Retail price" required hint="Gi├í b├ín lß║╗ ΓÇö shown at POS.">
+                  <MoneyInput
+                    required
+                    value={form.defaultSalePrice}
+                    onChange={(v) => patchForm({ defaultSalePrice: v })}
+                  />
+                </FormField>
+              </div>
+
+              {form.referenceImportPrice != null &&
+                form.defaultSalePrice != null &&
+                form.defaultSalePrice >= form.referenceImportPrice && (
+                  <p className="text-xs text-[var(--admin-muted)]">
+                    Margin:{' '}
+                    <strong className="text-[var(--admin-success)]">
+                      {formatVnd(form.defaultSalePrice - form.referenceImportPrice)}
+                    </strong>{' '}
+                    (
+                    {Math.round(
+                      ((form.defaultSalePrice - form.referenceImportPrice) / form.defaultSalePrice) *
+                        100,
+                    )}
+                    %)
+                  </p>
+                )}
+            </section>
+
             {editingId && (
-              <label className="block space-y-1">
-                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Status
-                </span>
+              <FormField label="Status">
                 <select
                   value={form.status}
-                  onChange={update('status')}
-                  className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  onChange={(e) => patchForm({ status: e.target.value })}
+                  className={selectClass}
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="active">Active ΓÇö sell at POS</option>
+                  <option value="inactive">Inactive ΓÇö hidden from POS</option>
                 </select>
-              </label>
+              </FormField>
             )}
+
             {formError && (
-              <p className="text-sm text-red-600" role="alert">
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {formError}
-              </p>
+              </div>
             )}
+
             <div className="flex gap-2">
               <Button type="submit" loading={saving}>
                 {editingId ? 'Save changes' : 'Create product'}
@@ -278,20 +372,28 @@ export default function ProductsPage() {
           </form>
         </Card>
 
-        <Card className="lg:col-span-2 !p-0 overflow-hidden">
-          <div className="border-b border-[var(--admin-border)] px-4 py-3">
+        <Card className="xl:col-span-3 !p-0 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
             <p className="text-sm text-[var(--admin-muted)]">
-              Total <strong>{items.length}</strong> products
+              <strong>{filtered.length}</strong> / {items.length} products
             </p>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search SKU, barcode, nameΓÇª"
+              className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                 <tr>
-                  <th className="px-4 py-3">Code</th>
+                  <th className="px-4 py-3">SKU</th>
+                  <th className="px-4 py-3">Barcode</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Sale price</th>
+                  <th className="px-4 py-3">Retail</th>
                   <th className="px-4 py-3">Unit</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -301,35 +403,36 @@ export default function ProductsPage() {
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={7} className="px-4 py-4">
+                        <td colSpan={8} className="px-4 py-4">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
                     ))
-                  : items.map((p) => (
+                  : filtered.map((p) => (
                       <tr
                         key={p.id}
                         className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
                       >
-                        <td className="px-4 py-3 font-medium">{p.code}</td>
-                        <td className="px-4 py-3">{p.name}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {p.categoryName || '—'}
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
+                          {p.code}
                         </td>
-                        <td className="px-4 py-3">{formatMoney(p.defaultSalePrice)}</td>
-                        <td className="px-4 py-3">{p.unit}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-[var(--admin-muted)]">
+                          {p.barcode || 'ΓÇö'}
+                        </td>
+                        <td className="px-4 py-3 font-medium">{p.name}</td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {p.categoryName || 'ΓÇö'}
+                        </td>
+                        <td className="px-4 py-3 tabular-nums">{formatVnd(p.defaultSalePrice)}</td>
+                        <td className="px-4 py-3">{unitLabel(p.unit)}</td>
                         <td className="px-4 py-3">
                           <Badge tone={p.status === 'active' ? 'success' : 'danger'}>
-                            {p.status || '—'}
+                            {p.status || 'ΓÇö'}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              className="!px-2 !py-1"
-                              onClick={() => startEdit(p)}
-                            >
+                            <Button variant="ghost" className="!px-2 !py-1" onClick={() => startEdit(p)}>
                               Edit
                             </Button>
                             <Button
@@ -345,9 +448,9 @@ export default function ProductsPage() {
                     ))}
               </tbody>
             </table>
-            {!loading && items.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <p className="px-4 py-10 text-center text-sm text-[var(--admin-muted)]">
-                No products yet. Create categories first, then add SKUs.
+                No products match your search.
               </p>
             )}
           </div>
