@@ -28,8 +28,7 @@ export const directorApi = {
 };
 
 export const branchApi = {
-  list: () => fetchModule('/branches'),
-  manage: () => fetchModule('/branches/manage'),
+  list: () => fetchModule('/director/branches'),
 };
 
 export const branchManagerApi = {

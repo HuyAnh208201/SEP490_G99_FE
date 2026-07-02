@@ -112,8 +112,22 @@ export default function App() {
             </PermissionRoute>
           }
         />
-        <Route path="/catalog/products" element={<ProductsPage />} />
-        <Route path="/catalog/suppliers" element={<SuppliersPage />} />
+        <Route
+          path="/catalog/products"
+          element={
+            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']}>
+              <ProductsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/catalog/suppliers"
+          element={
+            <PermissionRoute anyOf={['SUPPLIER_MANAGEMENT', 'CHOOSE_EXTERNAL_SUPPLIER']}>
+              <SuppliersPage />
+            </PermissionRoute>
+          }
+        />
 
         <Route
           path="/warehouse"
