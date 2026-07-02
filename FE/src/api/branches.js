@@ -1,0 +1,41 @@
+import { http } from './http.js';
+
+function unwrap(body) {
+  if (!body?.success) {
+    const err = new Error(body?.message || 'Request failed');
+    err.errors = body?.errors ?? body?.data;
+    err.status = body?.statusCode;
+    throw err;
+  }
+  return body.data;
+}
+
+export async function fetchBranches() {
+  const { data } = await http.get('/branches');
+  return unwrap(data);
+}
+
+export async function fetchBranchById(id) {
+  const { data } = await http.get(`/branches/${id}`);
+  return unwrap(data);
+}
+
+export async function createBranch(payload) {
+  const { data } = await http.post('/branches', payload);
+  return unwrap(data);
+}
+
+export async function updateBranch(id, payload) {
+  const { data } = await http.put(`/branches/${id}`, payload);
+  return unwrap(data);
+}
+
+export async function updateBranchStatus(id, status) {
+  const { data } = await http.patch(`/branches/${id}/status`, { status });
+  return unwrap(data);
+}
+
+export async function createBranchManager(branchId, payload) {
+  const { data } = await http.post(`/branches/${branchId}/manager`, payload);
+  return unwrap(data);
+}
