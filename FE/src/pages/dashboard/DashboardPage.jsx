@@ -12,6 +12,7 @@ import { fetchCategories } from '../../api/categories.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchSuppliers } from '../../api/suppliers.js';
 import { fetchUsers } from '../../api/users.js';
+import { fetchCampaigns } from '../../api/campaigns.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import StatCard from '../../components/ui/StatCard.jsx';
 import Card from '../../components/ui/Card.jsx';
@@ -29,6 +30,7 @@ const ROLE_DASHBOARD = {
       { key: 'users', label: 'Users', icon: 'users', hint: 'System accounts' },
       { key: 'products', label: 'Products', icon: 'package', hint: 'SKU catalog' },
       { key: 'categories', label: 'Categories', icon: 'folder', hint: 'Product groups' },
+      { key: 'campaigns', label: 'Campaigns', icon: 'tag', hint: 'Promotions' },
     ],
   },
   DIRECTOR: {
@@ -72,6 +74,7 @@ const QUICK_LINKS = {
     { to: '/catalog/products', label: 'Products' },
     { to: '/branches', label: 'Branches' },
     { to: '/users', label: 'Team & accounts' },
+    { to: '/promotions', label: 'Promotions' },
   ],
   DIRECTOR: [
     { to: '/director/reports', label: 'Performance reports' },
@@ -141,6 +144,7 @@ export default function DashboardPage() {
         ['products', fetchProducts()],
         ['categories', fetchCategories()],
         ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
       ];
 
       const results = await Promise.allSettled(tasks.map(([, fn]) => fn));

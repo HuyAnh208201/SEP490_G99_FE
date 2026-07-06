@@ -11,6 +11,7 @@ export default function BranchManagerDashboardPage() {
       description="Revenue, shifts, staff, and import requests at your branch."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -28,9 +29,10 @@ export function BranchShiftsPage() {
   return (
     <ModulePageShell
       title="Shifts"
-      description="Create shifts, assign staff, and record opening cash balance — Shift Management UC."
+      description="Create shifts, assign staff, opening cash. Planned: open/close shift flows (SRS 1.2.5–1.2.7)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
@@ -41,9 +43,10 @@ export function BranchImportRequestsPage() {
   return (
     <ModulePageShell
       title="Import requests"
-      description="Branch manager creates purchase requests sent to central warehouse / Admin approval."
+      description="Create purchase requests for central approval. BE contract TBD: list + POST create (SRS 2.6.4)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
@@ -57,9 +60,10 @@ export function CashDiscrepancyPage() {
   return (
     <ModulePageShell
       title="Cash reconciliation"
-      description="Branch manager approves expected vs actual cash variance when closing a shift."
+      description="Approve expected vs actual cash at shift close. Planned: variance list + approve (SRS 2.6.14)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );

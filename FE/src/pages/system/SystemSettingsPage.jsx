@@ -9,7 +9,8 @@ export default function SystemSettingsPage() {
   return (
     <ModulePageShell
       title="System settings"
-      description="Master data, loyalty rules, and global configuration for the chain."
+      description="Master data and loyalty configuration. Planned: point rules, tiers (SRS 2.8.2)."
+      comingSoon
       loading={loading}
       error={error}
       moduleData={data}

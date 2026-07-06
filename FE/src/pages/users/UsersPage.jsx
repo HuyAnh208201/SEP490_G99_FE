@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import CreateUserModal from '../../components/domain/CreateUserModal.jsx';
+import UserDetailDrawer from '../../components/domain/UserDetailDrawer.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
 
 const ROLE_FILTERS = [
@@ -31,6 +32,7 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,13 +160,14 @@ export default function UsersPage() {
                 <th className="px-4 py-3">Role</th>
                 <th className="px-4 py-3">Branch</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -188,6 +191,15 @@ export default function UsersPage() {
                           {u.isActive !== false ? 'Active' : 'Locked'}
                         </Badge>
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          variant="ghost"
+                          className="!px-2 !py-1"
+                          onClick={() => setSelectedUserId(u.id)}
+                        >
+                          View
+                        </Button>
+                      </td>
                     </tr>
                   ))}
             </tbody>
@@ -205,6 +217,12 @@ export default function UsersPage() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={load}
+      />
+
+      <UserDetailDrawer
+        userId={selectedUserId}
+        branchMap={branchMap}
+        onClose={() => setSelectedUserId(null)}
       />
     </div>
   );
