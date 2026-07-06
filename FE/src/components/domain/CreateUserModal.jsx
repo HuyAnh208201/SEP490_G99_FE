@@ -94,6 +94,16 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
       setError('Full name and phone are required.');
       return;
     }
+    if (BRANCH_ROLES.includes(form.role) && !form.branchId) {
+      setError('Select a branch for this role.');
+      return;
+    }
+    if (['CASHIER', 'INVENTORY_STAFF'].includes(form.role)) {
+      setError(
+        'Cashier and inventory staff must be created from Branches (+ Cashier / + Inventory) so they are bound to a branch.',
+      );
+      return;
+    }
     setStep('confirm');
   }
 
@@ -202,15 +212,22 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
             {BRANCH_ROLES.includes(form.role) && branches.length > 0 && (
               <FormField
                 label="Branch"
-                hint="For reference — assign branch in branch settings when supported."
+                required={form.role === 'BRANCH_MANAGER'}
+                hint={
+                  ['CASHIER', 'INVENTORY_STAFF'].includes(form.role)
+                    ? 'Use Branches page → + Cashier / + Inventory to create branch-bound staff.'
+                    : 'Required for branch manager accounts.'
+                }
                 className="sm:col-span-2"
               >
                 <select
                   value={form.branchId}
                   onChange={(e) => patch({ branchId: e.target.value })}
+                  required={form.role === 'BRANCH_MANAGER'}
+                  disabled={['CASHIER', 'INVENTORY_STAFF'].includes(form.role)}
                   className={inputClass}
                 >
-                  <option value="">Select branch (optional)</option>
+                  <option value="">Select branch</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}

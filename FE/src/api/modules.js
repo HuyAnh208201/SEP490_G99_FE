@@ -52,11 +52,6 @@ export const warehouseApi = {
     http.post('/warehouse/suppliers/choose').then((r) => unwrap(r.data)),
 };
 
-export const promotionApi = {
-  list: () => fetchModule('/promotions'),
-  detail: (id) => fetchModule(`/promotions/${id}`),
-};
-
 export const systemApi = {
   settings: () => fetchModule('/system/settings'),
 };

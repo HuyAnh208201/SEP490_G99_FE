@@ -20,6 +20,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import FormField from '../../components/ui/FormField.jsx';
 import OperatingHoursPicker from '../../components/ui/OperatingHoursPicker.jsx';
 import VietnamAddressPicker from '../../components/ui/VietnamAddressPicker.jsx';
+import BranchStaffModal from '../../components/domain/BranchStaffModal.jsx';
 
 const EMPTY_ADDRESS = { street: '', provinceId: '', districtId: '' };
 const EMPTY_HOURS = { open: '08:00', close: '22:00' };
@@ -60,6 +61,7 @@ export default function BranchesPage() {
   const [managerForm, setManagerForm] = useState(MANAGER_EMPTY);
   const [managerError, setManagerError] = useState('');
   const [managerSaving, setManagerSaving] = useState(false);
+  const [staffModal, setStaffModal] = useState(null);
 
   const load = useCallback(async () => {
     if (!canList) {
@@ -352,6 +354,20 @@ export default function BranchesPage() {
                                   Assign BM
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1"
+                                onClick={() => setStaffModal({ branch: b, type: 'cashier' })}
+                              >
+                                + Cashier
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1"
+                                onClick={() => setStaffModal({ branch: b, type: 'inventory' })}
+                              >
+                                + Inventory
+                              </Button>
                             </div>
                           )}
                         </td>
@@ -424,6 +440,14 @@ export default function BranchesPage() {
           </Card>
         </div>
       )}
+
+      <BranchStaffModal
+        open={Boolean(staffModal)}
+        branch={staffModal?.branch}
+        staffType={staffModal?.type}
+        onClose={() => setStaffModal(null)}
+        onCreated={load}
+      />
     </div>
   );
 }
