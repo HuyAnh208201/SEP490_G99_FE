@@ -6,6 +6,17 @@ export function parseMoneyInput(raw) {
   return Number.isFinite(num) && num >= 0 ? num : null;
 }
 
+/**
+ * Convenience for VND: small whole numbers are treated as thousands.
+ * e.g. typing "50" on blur becomes 50_000 ₫.
+ */
+export function normalizeVndInput(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return value;
+  if (Number.isInteger(num) && num > 0 && num < 1000) return num * 1000;
+  return num;
+}
+
 /** Format number as Vietnamese currency display (no symbol). */
 export function formatMoneyInput(value) {
   if (value == null || value === '') return '';

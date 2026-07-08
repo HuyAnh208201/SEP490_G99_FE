@@ -142,6 +142,9 @@ export default function CategoriesPage() {
                     </option>
                   ))}
               </select>
+              <p className="text-xs text-[var(--admin-subtle)]">
+                Optional — use only when you need sub-groups (e.g. Đồ uống → Nước ngọt).
+              </p>
             </label>
             <label className="block space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">

@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
-import { fetchUserById } from '../../api/users.js';
+import { deleteUser, fetchUserById, updateUserStatus } from '../../api/users.js';
+import { canManageTeamMember } from '../../lib/teamPermissions.js';
 import { ROLE_LABELS } from '../../config/navigation.js';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
 
-export default function UserDetailDrawer({ userId, branchMap, onClose }) {
+export default function UserDetailDrawer({
+  userId,
+  branchMap,
+  actorRole,
+  actorBranchId,
+  currentUserId,
+  onClose,
+  onChanged,
+}) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -33,6 +43,54 @@ export default function UserDetailDrawer({ userId, branchMap, onClose }) {
   }, [userId]);
 
   if (!userId) return null;
+
+  const canManage = canManageTeamMember(actorRole, actorBranchId, user, currentUserId);
+
+  async function handleDeactivate() {
+    if (!user || !window.confirm(`Deactivate account for ${user.name}?`)) return;
+    setActionLoading('deactivate');
+    setError('');
+    try {
+      await updateUserStatus(user.id, false);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to deactivate user');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
+  async function handleActivate() {
+    if (!user) return;
+    setActionLoading('activate');
+    setError('');
+    try {
+      await updateUserStatus(user.id, true);
+      const refreshed = await fetchUserById(user.id);
+      setUser(refreshed);
+      onChanged?.();
+    } catch (err) {
+      setError(err.message || 'Failed to activate user');
+    } finally {
+      setActionLoading('');
+    }
+  }
+
+  async function handleDelete() {
+    if (!user || !window.confirm(`Delete account for ${user.name}? This cannot be undone.`)) return;
+    setActionLoading('delete');
+    setError('');
+    try {
+      await deleteUser(user.id);
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to delete user');
+    } finally {
+      setActionLoading('');
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
@@ -78,52 +136,38 @@ export default function UserDetailDrawer({ userId, branchMap, onClose }) {
           {user && !loading && (
             <dl className="space-y-4 text-sm">
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Name
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Name</dt>
                 <dd className="mt-1 font-medium text-[var(--admin-text)]">{user.name}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Username
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Username</dt>
                 <dd className="mt-1 font-mono">{user.username || user.userName || '—'}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Email
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Email</dt>
                 <dd className="mt-1">{user.email || '—'}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Phone
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Phone</dt>
                 <dd className="mt-1">{user.phone || '—'}</dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Role
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Role</dt>
                 <dd className="mt-1">
                   <Badge tone="brand">{ROLE_LABELS[user.role] || user.role}</Badge>
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Branch
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Branch</dt>
                 <dd className="mt-1">
                   {user.branchId ? branchMap[user.branchId] || `#${user.branchId}` : '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Status
-                </dt>
+                <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">Status</dt>
                 <dd className="mt-1">
                   <Badge tone={user.isActive !== false ? 'success' : 'danger'}>
-                    {user.isActive !== false ? 'Active' : 'Locked'}
+                    {user.isActive !== false ? 'Active' : 'Deactivated'}
                   </Badge>
                 </dd>
               </div>
@@ -132,9 +176,39 @@ export default function UserDetailDrawer({ userId, branchMap, onClose }) {
         </div>
 
         <div className="border-t border-[var(--admin-border)] px-5 py-4">
-          <Button variant="secondary" className="w-full" onClick={onClose}>
-            Close
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {canManage && user?.isActive !== false && (
+              <Button
+                variant="secondary"
+                loading={actionLoading === 'deactivate'}
+                onClick={handleDeactivate}
+              >
+                Deactivate
+              </Button>
+            )}
+            {canManage && user?.isActive === false && (
+              <Button
+                variant="secondary"
+                loading={actionLoading === 'activate'}
+                onClick={handleActivate}
+              >
+                Activate
+              </Button>
+            )}
+            {canManage && (
+              <Button
+                variant="ghost"
+                className="!text-red-600"
+                loading={actionLoading === 'delete'}
+                onClick={handleDelete}
+              >
+                Delete
+              </Button>
+            )}
+            <Button variant="secondary" className="ml-auto" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
       </aside>
     </div>

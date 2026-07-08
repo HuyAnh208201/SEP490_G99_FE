@@ -322,10 +322,17 @@ export function cancelRequestMock(id) {
 export function approveRequestMock(id, { items = [] } = {}) {
   const raw = findRaw(id);
   if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
-  const qtyMap = new Map(items.map((it) => [Number(it.itemId ?? it.id), Number(it.approvedQuantity)]));
+  const qtyMap = new Map(
+    items.map((it) => [
+      Number(it.productId ?? it.itemId ?? it.id),
+      Number(it.approvedQuantity),
+    ]),
+  );
   raw.items = raw.items.map((it) => ({
     ...it,
-    approvedQuantity: qtyMap.has(it.id) ? qtyMap.get(it.id) : it.approvedQuantity ?? it.requestedQuantity,
+    approvedQuantity: qtyMap.has(it.productId)
+      ? qtyMap.get(it.productId)
+      : it.approvedQuantity ?? it.requestedQuantity,
   }));
   raw.status = 'approved';
   raw.approvedBy = 2;

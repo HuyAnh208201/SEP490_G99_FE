@@ -1,3 +1,5 @@
+import { PRODUCT_UNITS, unitLabel } from './productUnits.js';
+
 export const CAMPAIGN_TYPES = [
   { value: 'PERCENT', label: 'Percentage off' },
   { value: 'FIXED_AMOUNT', label: 'Fixed discount' },
@@ -9,17 +11,39 @@ export const CAMPAIGN_SCOPES = [
   { value: 'BRANCH', label: 'Single branch' },
 ];
 
+/** Director/Admin: all branches vs pick specific branches (both use CHAIN scope on BE). */
+export const CHAIN_SCOPE_MODES = [
+  { value: 'ALL', label: 'Entire chain' },
+  { value: 'SUBSET', label: 'Specific branches' },
+];
+
 export const CAMPAIGN_STATUS_LABELS = {
   DRAFT: 'Draft',
   ACTIVE: 'Active',
-  SUSPENDED: 'Suspended',
+  SUSPENDED: 'Deactivated',
+  DEACTIVATED: 'Deactivated',
 };
 
 export const CAMPAIGN_STATUS_TONE = {
   DRAFT: 'warning',
   ACTIVE: 'success',
   SUSPENDED: 'danger',
+  DEACTIVATED: 'default',
 };
+
+export const CAMPAIGN_STATUS_FILTERS = [
+  { id: 'all', label: 'All statuses' },
+  { id: 'ACTIVE', label: 'Active' },
+  { id: 'DEACTIVATED', label: 'Deactivated' },
+  { id: 'DRAFT', label: 'Draft' },
+  { id: 'SUSPENDED', label: 'Deactivated' },
+];
+
+export const CREATOR_FILTERS = [
+  { id: 'all', label: 'All creators' },
+  { id: 'chain', label: 'Director / Admin' },
+  { id: 'branch', label: 'Branch manager' },
+];
 
 export function formatCampaignType(type) {
   return CAMPAIGN_TYPES.find((t) => t.value === type)?.label || type;
@@ -36,7 +60,11 @@ export function formatDiscount(campaign) {
   if (type === 'BUY_X_GET_Y') {
     const buy = conditions?.buyQuantity ?? conditions?.buyQty;
     const get = conditions?.getQuantity ?? conditions?.getQty;
-    if (buy && get) return `Buy ${buy} get ${get}`;
+    const unit = conditions?.unit ? unitLabel(conditions.unit) : '';
+    if (buy && get) {
+      const base = `Buy ${buy} get ${get}`;
+      return unit ? `${base} (${unit})` : base;
+    }
     return `Value: ${discountValue}`;
   }
   return String(discountValue ?? '—');
@@ -57,7 +85,10 @@ export function buildConditions(type, form) {
     const buyQuantity = Number(form.buyQuantity);
     const getQuantity = Number(form.getQuantity);
     if (buyQuantity > 0 && getQuantity > 0) {
-      return { buyQuantity, getQuantity };
+      const cond = { buyQuantity, getQuantity };
+      if (form.categoryId) cond.categoryId = Number(form.categoryId);
+      if (form.unit) cond.unit = form.unit;
+      return cond;
     }
     return null;
   }
@@ -70,11 +101,13 @@ export function buildConditions(type, form) {
 
 export function parseConditionsToForm(conditions) {
   if (!conditions || typeof conditions !== 'object') {
-    return { minOrderAmount: '', buyQuantity: '', getQuantity: '' };
+    return { minOrderAmount: '', buyQuantity: '', getQuantity: '', categoryId: '', unit: 'cai' };
   }
   return {
     minOrderAmount: conditions.minOrderAmount ?? '',
     buyQuantity: conditions.buyQuantity ?? conditions.buyQty ?? '',
     getQuantity: conditions.getQuantity ?? conditions.getQty ?? '',
+    categoryId: conditions.categoryId != null ? String(conditions.categoryId) : '',
+    unit: conditions.unit ?? 'cai',
   };
 }

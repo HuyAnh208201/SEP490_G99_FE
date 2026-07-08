@@ -1,39 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createUser } from '../../api/users.js';
-import { fetchBranches } from '../../api/branches.js';
+import { createUser, fetchMe } from '../../api/users.js';
+import { fetchBranches, fetchBranchById } from '../../api/branches.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import {
+  PHONE_PATTERN,
+  buildCreateUserPayload,
+  getAssignableRoles,
+  normalizeWebRole,
+  requiresBranch,
+  roleLabel,
+} from '../../constants/userRoles.js';
 import Modal from '../ui/Modal.jsx';
 import Button from '../ui/Button.jsx';
 import FormField from '../ui/FormField.jsx';
-import { ROLE_LABELS } from '../../config/navigation.js';
-
-const ASSIGNABLE_ROLES = {
-  ADMIN: [
-    'DIRECTOR',
-    'WAREHOUSE_MANAGER',
-    'BRANCH_MANAGER',
-    'INVENTORY_STAFF',
-    'CASHIER',
-    'CUSTOMER',
-  ],
-  DIRECTOR: [
-    'DIRECTOR',
-    'WAREHOUSE_MANAGER',
-    'BRANCH_MANAGER',
-    'INVENTORY_STAFF',
-    'CASHIER',
-    'CUSTOMER',
-  ],
-  BRANCH_MANAGER: ['INVENTORY_STAFF', 'CASHIER'],
-};
-
-const BRANCH_ROLES = ['BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'];
-
-function getAssignableRoles(actorRole) {
-  const web =
-    actorRole === 'MANAGER' ? 'BRANCH_MANAGER' : actorRole === 'OWNER' ? 'DIRECTOR' : actorRole;
-  return ASSIGNABLE_ROLES[web] || [];
-}
 
 const EMPTY = {
   email: '',
@@ -54,24 +34,54 @@ function emailToUsername(email) {
 }
 
 export default function CreateUserModal({ open, onClose, onCreated }) {
+  const { user } = useAuth();
   const { role: actorRole } = usePermissions();
-  const roles = useMemo(() => getAssignableRoles(actorRole), [actorRole]);
+  const webRole = normalizeWebRole(actorRole);
+  const roles = useMemo(() => {
+    const list = getAssignableRoles(actorRole);
+    if (webRole === 'BRANCH_MANAGER') {
+      return list.filter((r) => r === 'CASHIER' || r === 'INVENTORY_STAFF');
+    }
+    return list;
+  }, [actorRole, webRole]);
+  const actorBranchId = user?.branchId ?? user?.branch_id ?? null;
 
   const [step, setStep] = useState('details');
   const [form, setForm] = useState(EMPTY);
   const [branches, setBranches] = useState([]);
+  const [lockedBranchName, setLockedBranchName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setStep('details');
-    setForm({ ...EMPTY, role: roles[0] || 'CASHIER' });
     setError('');
+    const resolvedBranchId =
+      webRole === 'BRANCH_MANAGER' && actorBranchId ? String(actorBranchId) : '';
+    setForm({
+      ...EMPTY,
+      role: roles[0] || 'CASHIER',
+      branchId: resolvedBranchId,
+    });
+    if (webRole === 'BRANCH_MANAGER' && resolvedBranchId) {
+      fetchBranchById(resolvedBranchId)
+        .then((b) => setLockedBranchName(b?.name || ''))
+        .catch(() =>
+          fetchMe().then((me) => {
+            if (me?.branchId) {
+              return fetchBranchById(me.branchId).then((b) => setLockedBranchName(b?.name || ''));
+            }
+            return null;
+          }),
+        );
+    } else {
+      setLockedBranchName('');
+    }
     fetchBranches()
       .then((data) => setBranches(Array.isArray(data) ? data : []))
       .catch(() => setBranches([]));
-  }, [open, roles]);
+  }, [open, roles, webRole, actorBranchId]);
 
   function patch(updates) {
     setForm((f) => {
@@ -91,17 +101,15 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
       return;
     }
     if (!form.firstName.trim() || !form.phone.trim()) {
-      setError('Full name and phone are required.');
+      setError('First name and phone are required.');
       return;
     }
-    if (BRANCH_ROLES.includes(form.role) && !form.branchId) {
+    if (!new RegExp(PHONE_PATTERN).test(form.phone.trim())) {
+      setError('Invalid phone. Use 0912345678 or +84912345678.');
+      return;
+    }
+    if (requiresBranch(form.role) && !form.branchId) {
       setError('Select a branch for this role.');
-      return;
-    }
-    if (['CASHIER', 'INVENTORY_STAFF'].includes(form.role)) {
-      setError(
-        'Cashier and inventory staff must be created from Branches (+ Cashier / + Inventory) so they are bound to a branch.',
-      );
       return;
     }
     setStep('confirm');
@@ -111,14 +119,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
     setError('');
     setLoading(true);
     try {
-      await createUser({
-        userName: form.userName.trim() || emailToUsername(form.email),
-        email: form.email.trim(),
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim() || undefined,
-        phone: form.phone.trim(),
-        role: form.role,
-      });
+      await createUser(buildCreateUserPayload(form));
       setStep('success');
       onCreated?.();
     } catch (err) {
@@ -130,16 +131,18 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
     }
   }
 
-  const branchName = branches.find((b) => String(b.id) === String(form.branchId))?.name;
+  const branchName =
+    lockedBranchName || branches.find((b) => String(b.id) === String(form.branchId))?.name;
+  const branchLocked = webRole === 'BRANCH_MANAGER';
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={step === 'success' ? 'Invitation sent' : 'Add team member'}
+      title={step === 'success' ? 'Account created' : 'Add team member'}
       description={
         step === 'success'
-          ? 'The new member can sign in using the credentials sent to their inbox.'
+          ? 'Temporary password was sent to their email. They should change it after first login.'
           : 'Create accounts for directors, warehouse managers, branch staff, and more.'
       }
       size={step === 'confirm' ? 'md' : 'lg'}
@@ -176,10 +179,10 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               />
             </FormField>
 
-            <FormField label="Phone" required hint="e.g. 0912345678">
+            <FormField label="Phone" required hint="0912345678 or +84912345678">
               <input
                 required
-                pattern="0[0-9]{9}"
+                pattern={PHONE_PATTERN}
                 value={form.phone}
                 onChange={(e) => patch({ phone: e.target.value })}
                 className={inputClass}
@@ -190,12 +193,20 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               <select
                 required
                 value={form.role}
-                onChange={(e) => patch({ role: e.target.value, branchId: '' })}
+                onChange={(e) =>
+                  patch({
+                    role: e.target.value,
+                    branchId:
+                      webRole === 'BRANCH_MANAGER' && actorBranchId
+                        ? String(actorBranchId)
+                        : '',
+                  })
+                }
                 className={inputClass}
               >
                 {roles.map((r) => (
                   <option key={r} value={r}>
-                    {ROLE_LABELS[r] || r}
+                    {roleLabel(r)}
                   </option>
                 ))}
               </select>
@@ -209,31 +220,38 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               />
             </FormField>
 
-            {BRANCH_ROLES.includes(form.role) && branches.length > 0 && (
+            {requiresBranch(form.role) && (
               <FormField
                 label="Branch"
-                required={form.role === 'BRANCH_MANAGER'}
+                required
                 hint={
-                  ['CASHIER', 'INVENTORY_STAFF'].includes(form.role)
-                    ? 'Use Branches page → + Cashier / + Inventory to create branch-bound staff.'
-                    : 'Required for branch manager accounts.'
+                  branchLocked
+                    ? 'Branch managers can only add staff to their own branch.'
+                    : 'Required for branch-bound roles.'
                 }
                 className="sm:col-span-2"
               >
-                <select
-                  value={form.branchId}
-                  onChange={(e) => patch({ branchId: e.target.value })}
-                  required={form.role === 'BRANCH_MANAGER'}
-                  disabled={['CASHIER', 'INVENTORY_STAFF'].includes(form.role)}
-                  className={inputClass}
-                >
-                  <option value="">Select branch</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
+                {branchLocked ? (
+                  <input
+                    readOnly
+                    value={branchName || (form.branchId ? `Branch #${form.branchId}` : '—')}
+                    className={`${inputClass} bg-[#f7f9fb]`}
+                  />
+                ) : (
+                  <select
+                    value={form.branchId}
+                    onChange={(e) => patch({ branchId: e.target.value })}
+                    required
+                    className={inputClass}
+                  >
+                    <option value="">Select branch</option>
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </FormField>
             )}
           </div>
@@ -256,7 +274,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
       {step === 'confirm' && (
         <div className="space-y-4">
           <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] p-4 text-sm">
-            <p className="mb-3 font-medium text-[var(--admin-text)]">Confirm before sending invitation</p>
+            <p className="mb-3 font-medium text-[var(--admin-text)]">Confirm before creating account</p>
             <dl className="space-y-2">
               <div className="flex justify-between gap-4">
                 <dt className="text-[var(--admin-muted)]">Email</dt>
@@ -270,9 +288,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-[var(--admin-muted)]">Role</dt>
-                <dd className="font-medium text-[var(--admin-text)]">
-                  {ROLE_LABELS[form.role] || form.role}
-                </dd>
+                <dd className="font-medium text-[var(--admin-text)]">{roleLabel(form.role)}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-[var(--admin-muted)]">Username</dt>
@@ -288,7 +304,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
           </div>
 
           <p className="text-sm text-[var(--admin-muted)]">
-            An email with a temporary password and sign-in instructions will be sent to{' '}
+            A temporary password will be emailed to{' '}
             <strong className="text-[var(--admin-text)]">{form.email}</strong>.
           </p>
 
@@ -303,7 +319,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               Back
             </Button>
             <Button onClick={handleCreate} loading={loading}>
-              Send invitation
+              Create account
             </Button>
           </div>
         </div>
@@ -317,8 +333,8 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
             </svg>
           </div>
           <p className="text-sm text-[var(--admin-muted)]">
-            Invitation email sent to <strong className="text-[var(--admin-text)]">{form.email}</strong>.
-            They will receive login credentials and should change their password after the first sign-in.
+            Account created for <strong className="text-[var(--admin-text)]">{form.email}</strong>.
+            They will receive login credentials by email.
           </p>
           <div className="flex justify-center pt-2">
             <Button onClick={onClose}>Done</Button>

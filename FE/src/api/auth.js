@@ -22,9 +22,11 @@ function toProfile(dto) {
   const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
   return {
     ...dto,
+    id: dto.id,
     name: fullName || dto.userName || 'User',
     username: dto.userName,
     role: dto.role,
+    branchId: dto.branchId ?? dto.branch_id ?? null,
     avatar: dto.avatar ?? null,
   };
 }

@@ -30,8 +30,18 @@ export async function updateBranch(id, payload) {
   return unwrap(data);
 }
 
-export async function updateBranchStatus(id, status) {
-  const { data } = await http.patch(`/branches/${id}/status`, { status });
+export async function updateBranchStatus(id, status, extras = {}) {
+  const { data } = await http.patch(`/branches/${id}/status`, { status, ...extras });
+  return unwrap(data);
+}
+
+export async function sendBranchSuspendCode(branchId, email) {
+  const { data } = await http.post(`/branches/${branchId}/suspend/send-code`, { email });
+  return unwrap(data);
+}
+
+export async function assignStaffToBranch(branchId, payload) {
+  const { data } = await http.post(`/branches/${branchId}/assign-staff`, payload);
   return unwrap(data);
 }
 

@@ -1,29 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUser } from '../../api/users.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { fetchBranches } from '../../api/branches.js';
+import {
+  PHONE_PATTERN,
+  buildCreateUserPayload,
+  getAssignableRoles,
+  normalizeWebRole,
+  requiresBranch,
+  roleLabel,
+} from '../../constants/userRoles.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { ROLE_LABELS } from '../../config/navigation.js';
-
-const ASSIGNABLE_ROLES = {
-  ADMIN: ['ADMIN', 'DIRECTOR', 'BRANCH_MANAGER', 'WAREHOUSE_MANAGER', 'INVENTORY_STAFF', 'CASHIER', 'CUSTOMER'],
-  DIRECTOR: ['DIRECTOR', 'BRANCH_MANAGER', 'WAREHOUSE_MANAGER', 'INVENTORY_STAFF', 'CASHIER', 'CUSTOMER'],
-  BRANCH_MANAGER: ['BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'],
-};
-
-function getAssignableRoles(actorRole) {
-  const web =
-    actorRole === 'MANAGER' ? 'BRANCH_MANAGER' : actorRole === 'OWNER' ? 'DIRECTOR' : actorRole;
-  return ASSIGNABLE_ROLES[web] || [];
-}
 
 export default function CreateUserPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { role } = usePermissions();
   const roles = getAssignableRoles(role);
+  const webRole = normalizeWebRole(role);
+  const actorBranchId = user?.branchId ?? user?.branch_id ?? null;
   const [branches, setBranches] = useState([]);
 
   const [form, setForm] = useState({
@@ -33,7 +32,7 @@ export default function CreateUserPage() {
     lastName: '',
     phone: '',
     role: roles[0] || 'CASHIER',
-    branchNote: '',
+    branchId: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,7 +42,10 @@ export default function CreateUserPage() {
     fetchBranches()
       .then((data) => setBranches(Array.isArray(data) ? data : []))
       .catch(() => setBranches([]));
-  }, []);
+    if (webRole === 'BRANCH_MANAGER' && actorBranchId) {
+      setForm((f) => ({ ...f, branchId: String(actorBranchId) }));
+    }
+  }, [webRole, actorBranchId]);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -53,19 +55,18 @@ export default function CreateUserPage() {
     e.preventDefault();
     setError('');
     setSuccess('');
+    if (requiresBranch(form.role) && !form.branchId) {
+      setError('Select a branch for this role.');
+      return;
+    }
+    if (!new RegExp(PHONE_PATTERN).test(form.phone.trim())) {
+      setError('Invalid phone. Use 0912345678 or +84912345678.');
+      return;
+    }
     setLoading(true);
     try {
-      await createUser({
-        userName: form.userName,
-        email: form.email,
-        firstName: form.firstName,
-        lastName: form.lastName,
-        phone: form.phone,
-        role: form.role,
-      });
-      setSuccess(
-        'Account created. Default password was emailed if mail is configured. Assign branch when the API supports branchId.',
-      );
+      await createUser(buildCreateUserPayload(form));
+      setSuccess('Account created. Temporary password was sent by email.');
       setTimeout(() => navigate('/users'), 1500);
     } catch (err) {
       const fieldErrors = err.errors ? Object.values(err.errors).join('. ') : '';
@@ -75,7 +76,8 @@ export default function CreateUserPage() {
     }
   }
 
-  const isBranchRole = ['BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'].includes(form.role);
+  const showBranch = requiresBranch(form.role);
+  const branchLocked = webRole === 'BRANCH_MANAGER';
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -165,32 +167,31 @@ export default function CreateUserPage() {
               >
                 {roles.map((r) => (
                   <option key={r} value={r}>
-                    {ROLE_LABELS[r] || r}
+                    {roleLabel(r)}
                   </option>
                 ))}
               </select>
             </label>
 
-            {isBranchRole && (
+            {showBranch && (
               <label className="block space-y-1 sm:col-span-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                  Branch assignment (reference)
+                  Branch *
                 </span>
                 <select
-                  value={form.branchNote}
-                  onChange={update('branchNote')}
+                  required
+                  value={form.branchId}
+                  onChange={update('branchId')}
+                  disabled={branchLocked}
                   className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
                 >
-                  <option value="">Select branch (reference)</option>
+                  <option value="">Select branch</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-[var(--admin-muted)]">
-                  Create branches first, then assign BM / Cashier / Inventory staff to them.
-                </p>
               </label>
             )}
           </div>

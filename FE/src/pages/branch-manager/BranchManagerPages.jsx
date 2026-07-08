@@ -24,34 +24,6 @@ export default function BranchManagerDashboardPage() {
   );
 }
 
-export function BranchShiftsPage() {
-  const { data, loading, error } = useModuleData(branchManagerApi.shifts, []);
-  return (
-    <ModulePageShell
-      title="Shifts"
-      description="Create shifts, assign staff, opening cash. Planned: open/close shift flows (SRS 1.2.5–1.2.7)."
-      loading={loading}
-      error={error}
-      comingSoon
-      moduleData={data}
-    />
-  );
-}
-
-export function BranchImportRequestsPage() {
-  const { data, loading, error } = useModuleData(branchManagerApi.importRequests, []);
-  return (
-    <ModulePageShell
-      title="Import requests"
-      description="Create purchase requests for central approval. BE contract TBD: list + POST create (SRS 2.6.4)."
-      loading={loading}
-      error={error}
-      comingSoon
-      moduleData={data}
-    />
-  );
-}
-
 export function CashDiscrepancyPage() {
   const { data, loading, error } = useModuleData(
     () => Promise.resolve({ module: 'branch-manager', screen: 'cash-discrepancy', status: 'placeholder' }),

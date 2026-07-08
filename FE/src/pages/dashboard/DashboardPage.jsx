@@ -19,6 +19,7 @@ import Card from '../../components/ui/Card.jsx';
 import SetupWorkflowBanner from '../../components/domain/SetupWorkflowBanner.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
+import { normalizeWebRole } from '../../constants/userRoles.js';
 
 const ROLE_DASHBOARD = {
   ADMIN: {
@@ -85,12 +86,12 @@ const QUICK_LINKS = {
   BRANCH_MANAGER: [
     { to: '/branch-manager/shifts', label: 'Shifts' },
     { to: '/users', label: 'Team & accounts' },
-    { to: '/branch-manager/import-requests', label: 'Import requests' },
+    { to: '/purchase-requests', label: 'Supply import' },
     { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
   ],
   WAREHOUSE_MANAGER: [
     { to: '/warehouse/inventory', label: 'Inventory' },
-    { to: '/warehouse/import-requests', label: 'Import requests' },
+    { to: '/purchase-requests', label: 'Supply import' },
     { to: '/warehouse/dispatch', label: 'Dispatch orders' },
     { to: '/catalog/suppliers', label: 'Suppliers' },
   ],
@@ -98,8 +99,7 @@ const QUICK_LINKS = {
 
 export default function DashboardPage() {
   const { role, has } = usePermissions();
-  const webRole =
-    role === 'MANAGER' ? 'BRANCH_MANAGER' : role === 'OWNER' ? 'DIRECTOR' : role;
+  const webRole = normalizeWebRole(role);
 
   const config = ROLE_DASHBOARD[webRole];
   const [moduleData, setModuleData] = useState(null);
