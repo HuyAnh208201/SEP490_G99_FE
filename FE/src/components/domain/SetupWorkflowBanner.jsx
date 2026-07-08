@@ -1,9 +1,76 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { fetchBranches } from '../../api/branches.js';
+import { fetchCampaigns } from '../../api/campaigns.js';
+import { fetchCategories } from '../../api/categories.js';
+import { fetchProducts } from '../../api/products.js';
+import { fetchSuppliers } from '../../api/suppliers.js';
+import { fetchUsers } from '../../api/users.js';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import Card from '../ui/Card.jsx';
 import Badge from '../ui/Badge.jsx';
 import { SETUP_WORKFLOW } from '../../config/navigation.js';
 
+const STEP_CHECKS = {
+  1: (counts) => counts.categories > 0,
+  2: (counts) => counts.products > 0,
+  3: (counts) => counts.suppliers > 0,
+  4: (counts) => counts.branches > 0,
+  5: (counts) => counts.users > 0,
+  6: (counts) => counts.campaigns > 0,
+};
+
 export default function SetupWorkflowBanner() {
+  const { has } = usePermissions();
+  const [counts, setCounts] = useState({
+    categories: 0,
+    products: 0,
+    suppliers: 0,
+    branches: 0,
+    users: 0,
+    campaigns: 0,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProgress() {
+      const tasks = [
+        ['categories', fetchCategories()],
+        ['products', fetchProducts()],
+        ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
+        ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
+        ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
+      ];
+
+      const results = await Promise.allSettled(tasks.map(([, fn]) => fn));
+      const next = {
+        categories: 0,
+        products: 0,
+        suppliers: 0,
+        branches: 0,
+        users: 0,
+        campaigns: 0,
+      };
+      tasks.forEach(([key], idx) => {
+        const result = results[idx];
+        next[key] =
+          result.status === 'fulfilled' && Array.isArray(result.value) ? result.value.length : 0;
+      });
+      if (!cancelled) setCounts(next);
+    }
+
+    loadProgress();
+    return () => {
+      cancelled = true;
+    };
+  }, [has]);
+
+  const completedSetupSteps = SETUP_WORKFLOW.filter((step) =>
+    STEP_CHECKS[step.step]?.(counts),
+  ).length;
+
   return (
     <Card className="!bg-gradient-to-r from-[#0058be]/5 to-white">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -13,27 +80,46 @@ export default function SetupWorkflowBanner() {
               System setup workflow
             </h2>
             <Badge tone="brand">Per tracking</Badge>
+            {completedSetupSteps >= 6 ? (
+              <Badge tone="success">Setup complete</Badge>
+            ) : (
+              <Badge tone="soon">
+                {completedSetupSteps}/6 core steps
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-sm text-[var(--admin-muted)]">
-            Categories → Products → Suppliers → Branches → Users → Promotions → Purchase → Stock → Shift → Reports
+            Categories → Products → Suppliers → Branches → Users → Promotions → Purchase → Stock →
+            Shift → Reports
           </p>
         </div>
       </div>
 
       <ol className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {SETUP_WORKFLOW.map((step) => (
-          <li key={step.step}>
-            <Link
-              to={step.path}
-              className="flex items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm transition hover:border-[#0058be]/40 hover:shadow-sm"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--admin-brand)] text-[10px] font-bold text-white">
-                {step.step}
-              </span>
-              <span className="truncate font-medium text-[var(--admin-text)]">{step.label}</span>
-            </Link>
-          </li>
-        ))}
+        {SETUP_WORKFLOW.map((step) => {
+          const done = STEP_CHECKS[step.step]?.(counts);
+          return (
+            <li key={step.step}>
+              <Link
+                to={step.path}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition hover:shadow-sm ${
+                  done
+                    ? 'border-emerald-200 bg-emerald-50/80 hover:border-emerald-300'
+                    : 'border-[var(--admin-border)] bg-white hover:border-[#0058be]/40'
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                    done ? 'bg-emerald-600' : 'bg-[var(--admin-brand)]'
+                  }`}
+                >
+                  {done ? '✓' : step.step}
+                </span>
+                <span className="truncate font-medium text-[var(--admin-text)]">{step.label}</span>
+              </Link>
+            </li>
+          );
+        })}
       </ol>
     </Card>
   );

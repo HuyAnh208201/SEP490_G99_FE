@@ -11,6 +11,7 @@ export default function DirectorDashboardPage() {
       description="Monitor chain-wide business performance and strategic decisions."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -28,9 +29,10 @@ export function DirectorReportsPage() {
   return (
     <ModulePageShell
       title="Performance reports"
-      description="Revenue, orders, top products, and promotion effectiveness by branch."
+      description="Revenue, orders, top products by branch. Planned: charts + export (SRS 2.7.2 Business Analytics)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
@@ -44,6 +46,7 @@ export function DirectorPlanningPage() {
       description="Overview of import planning and branch expansion."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
