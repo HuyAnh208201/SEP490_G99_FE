@@ -25,9 +25,10 @@ export const NAV_GROUPS = [
     items: [
       {
         path: '/users',
-        label: 'Users',
+        label: 'Team & accounts',
         icon: 'users',
-        permissions: ['USER_MANAGEMENT_LIST'],
+        anyPermission: true,
+        permissions: ['USER_MANAGEMENT_LIST', 'MANAGE_BRANCH_STAFF_INFO'],
       },
       {
         path: '/branches',
@@ -68,13 +69,14 @@ export const NAV_GROUPS = [
         path: '/catalog/products',
         label: 'Products',
         icon: 'package',
-        roles: ['ADMIN', 'DIRECTOR'],
+        permissions: ['PRODUCT_MANAGEMENT'],
       },
       {
         path: '/catalog/suppliers',
         label: 'Suppliers',
         icon: 'truck',
-        roles: ['ADMIN', 'DIRECTOR'],
+        anyPermission: true,
+        permissions: ['SUPPLIER_MANAGEMENT', 'CHOOSE_EXTERNAL_SUPPLIER'],
       },
     ],
   },
@@ -112,6 +114,24 @@ export const NAV_GROUPS = [
         anyPermission: true,
         permissions: ['CREATE_IMPORT_REQUEST', 'SUPPLY_IMPORT_RECEIPT_APPROVE'],
       },
+      {
+        path: '/purchase-requests',
+        label: 'Purchase requests',
+        icon: 'request',
+        roles: [
+          'ADMIN',
+          'DIRECTOR',
+          'BRANCH_MANAGER',
+          'WAREHOUSE_MANAGER',
+          'INVENTORY_STAFF',
+        ],
+      },
+      {
+        path: '/purchase-requests/consolidated',
+        label: 'Consolidated orders',
+        icon: 'boxes',
+        roles: ['ADMIN', 'DIRECTOR', 'WAREHOUSE_MANAGER'],
+      },
     ],
   },
   {
@@ -122,12 +142,6 @@ export const NAV_GROUPS = [
         label: 'Branch (BM)',
         icon: 'branch',
         permissions: ['BRANCH_DASHBOARD'],
-      },
-      {
-        path: '/branch-manager/staff',
-        label: 'Staff',
-        icon: 'staff',
-        permissions: ['MANAGE_BRANCH_STAFF_INFO'],
       },
       {
         path: '/branch-manager/shifts',
@@ -171,14 +185,8 @@ export const NAV_GROUPS = [
     items: [
       {
         path: '/profile',
-        label: 'Profile',
+        label: 'Account settings',
         icon: 'user',
-        publicNav: true,
-      },
-      {
-        path: '/change-password',
-        label: 'Change password',
-        icon: 'lock',
         publicNav: true,
       },
     ],
@@ -203,7 +211,7 @@ export const SETUP_WORKFLOW = [
   { step: 2, label: 'Products', path: '/catalog/products' },
   { step: 3, label: 'Suppliers', path: '/catalog/suppliers' },
   { step: 4, label: 'Branches', path: '/branches' },
-  { step: 5, label: 'Users', path: '/users' },
+  { step: 5, label: 'Team', path: '/users' },
   { step: 6, label: 'Promotions', path: '/promotions' },
   { step: 7, label: 'Import requests', path: '/branch-manager/import-requests' },
   { step: 8, label: 'Inventory', path: '/warehouse/inventory' },

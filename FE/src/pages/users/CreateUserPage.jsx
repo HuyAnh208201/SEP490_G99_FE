@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUser } from '../../api/users.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
-import { listDraft } from '../../lib/setupDraft.js';
+import { fetchBranches } from '../../api/branches.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -40,7 +40,9 @@ export default function CreateUserPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    setBranches(listDraft('branches'));
+    fetchBranches()
+      .then((data) => setBranches(Array.isArray(data) ? data : []))
+      .catch(() => setBranches([]));
   }, []);
 
   function update(field) {
@@ -179,9 +181,9 @@ export default function CreateUserPage() {
                   onChange={update('branchNote')}
                   className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
                 >
-                  <option value="">Select branch (saved when API supports branchId)</option>
+                  <option value="">Select branch (reference)</option>
                   {branches.map((b) => (
-                    <option key={b.id} value={b.name}>
+                    <option key={b.id} value={b.id}>
                       {b.name}
                     </option>
                   ))}

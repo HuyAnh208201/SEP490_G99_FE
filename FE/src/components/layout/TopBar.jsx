@@ -60,7 +60,7 @@ export default function TopBar({ onMenuToggle, showMenuButton }) {
             {initials}
           </span>
           <span className="hidden text-sm font-medium text-[var(--admin-text)] sm:block">
-            Profile
+            Account
           </span>
         </Link>
 

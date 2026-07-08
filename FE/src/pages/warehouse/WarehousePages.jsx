@@ -9,9 +9,10 @@ export default function WarehouseDashboardPage() {
   return (
     <ModulePageShell
       title="Central warehouse"
-      description="Monitor central inventory, branch import requests, and dispatch orders."
+      description="Monitor central inventory, branch import requests, and dispatch orders. SRS: Import Process 1.2.3, Inventory 1.2.4."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -29,9 +30,10 @@ export function WarehouseInventoryPage() {
   return (
     <ModulePageShell
       title="Central inventory"
-      description="View and manage central warehouse stock before dispatching to branches."
+      description="View central warehouse stock. Planned: product/branch filters, stock levels, audit actions (SRS 2.3.3)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
@@ -42,9 +44,10 @@ export function WarehouseImportRequestsPage() {
   return (
     <ModulePageShell
       title="Import requests (warehouse)"
-      description="Aggregate and process import requests from branches."
+      description="Compile branch import requests. Planned: queue, approve/reject, status workflow (SRS 2.3.1)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );
@@ -55,9 +58,10 @@ export function WarehouseDispatchPage() {
   return (
     <ModulePageShell
       title="Dispatch orders"
-      description="Create and track dispatch orders from central warehouse to branches."
+      description="Create and track dispatch to branches. Planned: create order, status updates (SRS 2.3.4–2.3.6)."
       loading={loading}
       error={error}
+      comingSoon
       moduleData={data}
     />
   );

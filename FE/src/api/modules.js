@@ -28,8 +28,7 @@ export const directorApi = {
 };
 
 export const branchApi = {
-  list: () => fetchModule('/branches'),
-  manage: () => fetchModule('/branches/manage'),
+  list: () => fetchModule('/director/branches'),
 };
 
 export const branchManagerApi = {
@@ -51,11 +50,6 @@ export const warehouseApi = {
   dispatchOrders: () => fetchModule('/warehouse/dispatch-orders'),
   chooseSupplier: () =>
     http.post('/warehouse/suppliers/choose').then((r) => unwrap(r.data)),
-};
-
-export const promotionApi = {
-  list: () => fetchModule('/promotions'),
-  detail: (id) => fetchModule(`/promotions/${id}`),
 };
 
 export const systemApi = {
