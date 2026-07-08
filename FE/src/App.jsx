@@ -16,6 +16,8 @@ import WarehouseDashboardPage, {
   WarehouseImportRequestsPage,
   WarehouseInventoryPage,
 } from './pages/warehouse/WarehousePages.jsx';
+import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
+import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import BranchManagerDashboardPage, {
   BranchImportRequestsPage,
   BranchShiftsPage,
@@ -47,6 +49,8 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/purchase-requests" element={<PurchaseRequestsPage />} />
+        <Route path="/purchase-requests/consolidated" element={<ConsolidatedPage />} />
         <Route path="/change-password" element={<Navigate to="/profile?tab=security" replace />} />
 
         <Route
