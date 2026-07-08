@@ -114,6 +114,24 @@ export const NAV_GROUPS = [
         anyPermission: true,
         permissions: ['CREATE_IMPORT_REQUEST', 'SUPPLY_IMPORT_RECEIPT_APPROVE'],
       },
+      {
+        path: '/purchase-requests',
+        label: 'Purchase requests',
+        icon: 'request',
+        roles: [
+          'ADMIN',
+          'DIRECTOR',
+          'BRANCH_MANAGER',
+          'WAREHOUSE_MANAGER',
+          'INVENTORY_STAFF',
+        ],
+      },
+      {
+        path: '/purchase-requests/consolidated',
+        label: 'Consolidated orders',
+        icon: 'boxes',
+        roles: ['ADMIN', 'DIRECTOR', 'WAREHOUSE_MANAGER'],
+      },
     ],
   },
   {
