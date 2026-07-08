@@ -7,6 +7,12 @@ import {
   directorApi,
   warehouseApi,
 } from '../../api/modules.js';
+import { fetchBranches } from '../../api/branches.js';
+import { fetchCategories } from '../../api/categories.js';
+import { fetchProducts } from '../../api/products.js';
+import { fetchSuppliers } from '../../api/suppliers.js';
+import { fetchUsers } from '../../api/users.js';
+import { fetchCampaigns } from '../../api/campaigns.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import StatCard from '../../components/ui/StatCard.jsx';
 import Card from '../../components/ui/Card.jsx';
@@ -20,10 +26,11 @@ const ROLE_DASHBOARD = {
     title: 'Admin Dashboard',
     fetch: adminApi.dashboard,
     stats: [
-      { label: 'Branches', value: '—', icon: 'store', hint: 'Branches API pending' },
-      { label: 'Users', value: '—', icon: 'users', hint: 'Open Users' },
-      { label: 'Promotions', value: '—', icon: 'tag', hint: 'Promotions API pending' },
-      { label: 'Settings', value: '—', icon: 'settings', hint: 'Master data' },
+      { key: 'branches', label: 'Branches', icon: 'store', hint: 'Active chain locations' },
+      { key: 'users', label: 'Users', icon: 'users', hint: 'System accounts' },
+      { key: 'products', label: 'Products', icon: 'package', hint: 'SKU catalog' },
+      { key: 'categories', label: 'Categories', icon: 'folder', hint: 'Product groups' },
+      { key: 'campaigns', label: 'Campaigns', icon: 'tag', hint: 'Promotions' },
     ],
   },
   DIRECTOR: {
@@ -66,7 +73,8 @@ const QUICK_LINKS = {
     { to: '/catalog/categories', label: 'Product categories' },
     { to: '/catalog/products', label: 'Products' },
     { to: '/branches', label: 'Branches' },
-    { to: '/users', label: 'User management' },
+    { to: '/users', label: 'Team & accounts' },
+    { to: '/promotions', label: 'Promotions' },
   ],
   DIRECTOR: [
     { to: '/director/reports', label: 'Performance reports' },
@@ -76,7 +84,7 @@ const QUICK_LINKS = {
   ],
   BRANCH_MANAGER: [
     { to: '/branch-manager/shifts', label: 'Shifts' },
-    { to: '/branch-manager/staff', label: 'Staff' },
+    { to: '/users', label: 'Team & accounts' },
     { to: '/branch-manager/import-requests', label: 'Import requests' },
     { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
   ],
@@ -96,6 +104,7 @@ export default function DashboardPage() {
   const config = ROLE_DASHBOARD[webRole];
   const [moduleData, setModuleData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState({});
 
   useEffect(() => {
     const cfg = ROLE_DASHBOARD[webRole];
@@ -123,6 +132,39 @@ export default function DashboardPage() {
     };
   }, [webRole, has]);
 
+  useEffect(() => {
+    if (webRole !== 'ADMIN') return undefined;
+    let cancelled = false;
+
+    async function loadCounts() {
+      const next = {};
+      const tasks = [
+        ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
+        ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
+        ['products', fetchProducts()],
+        ['categories', fetchCategories()],
+        ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
+      ];
+
+      const results = await Promise.allSettled(tasks.map(([, fn]) => fn));
+      tasks.forEach(([key], idx) => {
+        const result = results[idx];
+        next[key] =
+          result.status === 'fulfilled' && Array.isArray(result.value)
+            ? result.value.length
+            : '—';
+      });
+
+      if (!cancelled) setCounts(next);
+    }
+
+    loadCounts();
+    return () => {
+      cancelled = true;
+    };
+  }, [webRole, has]);
+
   const quickLinks = QUICK_LINKS[webRole] || [];
 
   return (
@@ -143,7 +185,11 @@ export default function DashboardPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {config.stats.map((s) => (
-              <StatCard key={s.label} {...s} />
+              <StatCard
+                key={s.label}
+                {...s}
+                value={s.key && counts[s.key] != null ? counts[s.key] : s.value}
+              />
             ))}
           </div>
 
