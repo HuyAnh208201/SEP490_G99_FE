@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import PageHeader from '../../components/ui/PageHeader.jsx';
+import { fetchMe } from '../../api/users.js';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -12,7 +12,7 @@ import {
   canCreateRequest,
   canFilterByBranch,
 } from '../../constants/purchaseRequests.js';
-import { listRequests, fetchRequestBranches } from '../../api/purchaseRequests.js';
+import { listRequests, fetchRequestBranches, getRequest } from '../../api/purchaseRequests.js';
 import RequestFormModal from './components/RequestFormModal.jsx';
 import RequestDetailModal from './components/RequestDetailModal.jsx';
 
@@ -21,10 +21,10 @@ const selectClass =
 
 export default function PurchaseRequestsPage() {
   const { user } = useAuth();
-  const { role } = usePermissions();
+  const { has } = usePermissions();
 
   const currentUserId = user?.id ?? null;
-  const userBranchId = user?.branchId ?? user?.branch_id ?? null;
+  const [userBranchId, setUserBranchId] = useState(user?.branchId ?? user?.branch_id ?? null);
 
   const [rows, setRows] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -36,9 +36,10 @@ export default function PurchaseRequestsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [openingId, setOpeningId] = useState(null);
 
-  const showBranchFilter = canFilterByBranch(role);
-  const showCreate = canCreateRequest(role);
+  const showBranchFilter = canFilterByBranch(has);
+  const showCreate = canCreateRequest(has);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +59,15 @@ export default function PurchaseRequestsPage() {
   }, [statusFilter, branchFilter, showBranchFilter]);
 
   useEffect(() => {
+    if (userBranchId) return;
+    fetchMe()
+      .then((me) => {
+        if (me?.branchId) setUserBranchId(me.branchId);
+      })
+      .catch(() => {});
+  }, [userBranchId]);
+
+  useEffect(() => {
     load();
   }, [load]);
 
@@ -65,16 +75,29 @@ export default function PurchaseRequestsPage() {
     if (showBranchFilter) fetchRequestBranches().then(setBranches).catch(() => {});
   }, [showBranchFilter]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setFormOpen(true);
-  };
+  async function openDetail(request) {
+    setOpeningId(request.id);
+    setError('');
+    try {
+      const full = await getRequest(request.id);
+      setDetail(full);
+    } catch (err) {
+      setError(err?.message || 'Failed to load request details');
+    } finally {
+      setOpeningId(null);
+    }
+  }
 
-  const openEdit = (request) => {
+  async function openEdit(request) {
     setDetail(null);
-    setEditing(request);
-    setFormOpen(true);
-  };
+    try {
+      const full = await getRequest(request.id);
+      setEditing(full);
+      setFormOpen(true);
+    } catch (err) {
+      setError(err?.message || 'Failed to load request for editing');
+    }
+  }
 
   const summary = useMemo(() => {
     const counts = { total: rows.length };
@@ -85,16 +108,19 @@ export default function PurchaseRequestsPage() {
   }, [rows]);
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Purchase requests"
-        description="Manage branch purchase requests — create, approve, and receive goods."
-        actions={
-          showCreate && (
-            <Button onClick={openCreate}>+ Create purchase request</Button>
-          )
-        }
-      />
+    <>
+      {showCreate && (
+        <div className="mb-4 flex justify-end">
+          <Button
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            + Create request
+          </Button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -162,10 +188,11 @@ export default function PurchaseRequestsPage() {
                     return (
                       <tr
                         key={r.id}
-                        onClick={() => setDetail(r)}
-                        className="cursor-pointer border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
+                        className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
                       >
-                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">{r.code}</td>
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
+                          {r.code}
+                        </td>
                         <td className="px-4 py-3 font-medium">{r.branchName}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">{formatDate(r.createdAt)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{r.itemCount}</td>
@@ -176,10 +203,8 @@ export default function PurchaseRequestsPage() {
                           <Button
                             variant="secondary"
                             className="!px-3 !py-1 !text-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDetail(r);
-                            }}
+                            loading={openingId === r.id}
+                            onClick={() => openDetail(r)}
                           >
                             Open
                           </Button>
@@ -191,7 +216,7 @@ export default function PurchaseRequestsPage() {
           </table>
           {!loading && rows.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
-              No purchase requests yet.
+              No supply import requests yet.
             </p>
           )}
         </div>
@@ -209,12 +234,11 @@ export default function PurchaseRequestsPage() {
       <RequestDetailModal
         open={Boolean(detail)}
         request={detail}
-        role={role}
         currentUserId={currentUserId}
         onClose={() => setDetail(null)}
         onEdit={openEdit}
         onChanged={load}
       />
-    </div>
+    </>
   );
 }

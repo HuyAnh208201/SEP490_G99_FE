@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchUsers } from '../../api/users.js';
+import { deleteUser, fetchUsers, updateUserStatus } from '../../api/users.js';
 import { fetchBranches } from '../../api/branches.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { canManageTeamMember } from '../../lib/teamPermissions.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -12,17 +14,22 @@ import { ROLE_LABELS } from '../../config/navigation.js';
 
 const ROLE_FILTERS = [
   { id: 'all', label: 'All roles' },
+  { id: 'ADMIN', label: 'Admin' },
   { id: 'DIRECTOR', label: 'Director' },
+  { id: 'PROMOTION_DIRECTOR', label: 'Promotion director' },
   { id: 'WAREHOUSE_MANAGER', label: 'Warehouse' },
   { id: 'BRANCH_MANAGER', label: 'Branch manager' },
   { id: 'INVENTORY_STAFF', label: 'Inventory' },
   { id: 'CASHIER', label: 'Cashier' },
-  { id: 'ADMIN', label: 'Admin' },
 ];
 
 export default function UsersPage() {
-  const { has } = usePermissions();
+  const { user: currentUser } = useAuth();
+  const { has, role } = usePermissions();
   const canCreate = has('USER_DETAILS_EDIT') || has('MANAGE_BRANCH_STAFF_INFO');
+  const actorBranchId = currentUser?.branchId ?? currentUser?.branch_id ?? null;
+  const currentUserId = currentUser?.id ?? null;
+  const [actionLoading, setActionLoading] = useState(null);
 
   const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -67,7 +74,12 @@ export default function UsersPage() {
   const filtered = useMemo(() => {
     let list = users || [];
     if (roleFilter !== 'all') {
-      list = list.filter((u) => u.role === roleFilter);
+      list = list.filter((u) => {
+        if (roleFilter === 'DIRECTOR') {
+          return ['DIRECTOR', 'PROMOTION_DIRECTOR', 'OWNER'].includes(u.role);
+        }
+        return u.role === roleFilter;
+      });
     }
     if (branchFilter !== 'all') {
       list = list.filter((u) => String(u.branchId) === String(branchFilter));
@@ -83,6 +95,34 @@ export default function UsersPage() {
         ROLE_LABELS[u.role]?.toLowerCase().includes(q),
     );
   }, [users, query, roleFilter, branchFilter]);
+
+  async function handleDeactivate(targetUser) {
+    if (!window.confirm(`Deactivate account for ${targetUser.name}?`)) return;
+    setActionLoading(`deactivate-${targetUser.id}`);
+    setError('');
+    try {
+      await updateUserStatus(targetUser.id, false);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Failed to deactivate user');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDelete(targetUser) {
+    if (!window.confirm(`Delete account for ${targetUser.name}? This cannot be undone.`)) return;
+    setActionLoading(`delete-${targetUser.id}`);
+    setError('');
+    try {
+      await deleteUser(targetUser.id);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Failed to delete user');
+    } finally {
+      setActionLoading(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -188,17 +228,39 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         <Badge tone={u.isActive !== false ? 'success' : 'danger'}>
-                          {u.isActive !== false ? 'Active' : 'Locked'}
+                          {u.isActive !== false ? 'Active' : 'Deactivated'}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          className="!px-2 !py-1"
-                          onClick={() => setSelectedUserId(u.id)}
-                        >
-                          View
-                        </Button>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            className="!px-2 !py-1"
+                            onClick={() => setSelectedUserId(u.id)}
+                          >
+                            View
+                          </Button>
+                          {canManageTeamMember(role, actorBranchId, u, currentUserId) && u.isActive !== false && (
+                            <Button
+                              variant="ghost"
+                              className="!px-2 !py-1"
+                              loading={actionLoading === `deactivate-${u.id}`}
+                              onClick={() => handleDeactivate(u)}
+                            >
+                              Deactivate
+                            </Button>
+                          )}
+                          {canManageTeamMember(role, actorBranchId, u, currentUserId) && (
+                            <Button
+                              variant="ghost"
+                              className="!px-2 !py-1 !text-red-600"
+                              loading={actionLoading === `delete-${u.id}`}
+                              onClick={() => handleDelete(u)}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -222,7 +284,11 @@ export default function UsersPage() {
       <UserDetailDrawer
         userId={selectedUserId}
         branchMap={branchMap}
+        actorRole={role}
+        actorBranchId={actorBranchId}
+        currentUserId={currentUserId}
         onClose={() => setSelectedUserId(null)}
+        onChanged={load}
       />
     </div>
   );

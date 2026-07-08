@@ -20,7 +20,7 @@ function normalizeUser(u) {
     username: u.userName || u.email,
     role: u.role,
     status: u.status,
-    isActive: u.isActive ?? u.status === 'active',
+    isActive: u.isActive ?? u.active ?? u.status === 'active',
     branchId: u.branchId,
   };
 }
@@ -46,15 +46,26 @@ export async function updateProfile(payload) {
   return normalizeUser(unwrap(data));
 }
 
+export async function updateUserStatus(id, active) {
+  const { data } = await http.patch(`/auth/admin/users/${id}/status`, { active });
+  return normalizeUser(unwrap(data));
+}
+
+export async function deleteUser(id) {
+  await http.delete(`/auth/admin/users/${id}`);
+}
+
 export async function fetchMe() {
   const { data } = await http.get('/auth/me');
   const dto = unwrap(data);
   const fullName = [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim();
   return {
     ...dto,
+    id: dto.id,
     name: fullName || dto.userName || 'User',
     username: dto.userName,
     role: dto.role,
+    branchId: dto.branchId,
     avatar: dto.avatar ?? null,
   };
 }

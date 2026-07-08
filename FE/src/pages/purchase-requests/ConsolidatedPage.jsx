@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import StatCard from '../../components/ui/StatCard.jsx';
@@ -87,19 +86,13 @@ export default function ConsolidatedPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <PageHeader
-        title="Consolidated import orders"
-        description="Total quantities to prepare by branch and category. View, print, and export only."
-        actions={
-          <div className="flex gap-2 print:hidden">
-            <Button variant="secondary" onClick={() => window.print()}>
-              Print
-            </Button>
-            <Button onClick={exportCsv}>Export Excel</Button>
-          </div>
-        }
-      />
+    <>
+      <div className="mb-4 flex justify-end gap-2 print:hidden">
+        <Button variant="secondary" onClick={() => window.print()}>
+          Print
+        </Button>
+        <Button onClick={exportCsv}>Export Excel</Button>
+      </div>
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -153,7 +146,7 @@ export default function ConsolidatedPage() {
           </table>
         </div>
       </Card>
-    </div>
+    </>
   );
 }
 
