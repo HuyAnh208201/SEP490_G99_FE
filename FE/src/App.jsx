@@ -2,10 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import LoginPage from './pages/login/LoginPage.jsx';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx';
-import ChangePasswordPage from './pages/auth/ChangePasswordPage.jsx';
 import DashboardPage from './pages/dashboard/DashboardPage.jsx';
 import UsersPage from './pages/users/UsersPage.jsx';
-import CreateUserPage from './pages/users/CreateUserPage.jsx';
 import ProfilePage from './pages/profile/ProfilePage.jsx';
 import BranchesPage from './pages/branches/BranchesPage.jsx';
 import PromotionsPage from './pages/promotions/PromotionsPage.jsx';
@@ -18,10 +16,11 @@ import WarehouseDashboardPage, {
   WarehouseImportRequestsPage,
   WarehouseInventoryPage,
 } from './pages/warehouse/WarehousePages.jsx';
+import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
+import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import BranchManagerDashboardPage, {
   BranchImportRequestsPage,
   BranchShiftsPage,
-  BranchStaffPage,
   CashDiscrepancyPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
 import DirectorDashboardPage, {
@@ -50,25 +49,19 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/change-password" element={<ChangePasswordPage />} />
+        <Route path="/purchase-requests" element={<PurchaseRequestsPage />} />
+        <Route path="/purchase-requests/consolidated" element={<ConsolidatedPage />} />
+        <Route path="/change-password" element={<Navigate to="/profile?tab=security" replace />} />
 
         <Route
           path="/users"
           element={
-            <PermissionRoute permission="USER_MANAGEMENT_LIST">
+            <PermissionRoute anyOf={['USER_MANAGEMENT_LIST', 'MANAGE_BRANCH_STAFF_INFO']}>
               <UsersPage />
             </PermissionRoute>
           }
         />
-        <Route
-          path="/users/create"
-          element={
-            <PermissionRoute permission="USER_DETAILS_EDIT">
-              <CreateUserPage />
-            </PermissionRoute>
-          }
-        />
-
+        <Route path="/users/create" element={<Navigate to="/users" replace />} />
         <Route
           path="/branches"
           element={
@@ -112,8 +105,22 @@ export default function App() {
             </PermissionRoute>
           }
         />
-        <Route path="/catalog/products" element={<ProductsPage />} />
-        <Route path="/catalog/suppliers" element={<SuppliersPage />} />
+        <Route
+          path="/catalog/products"
+          element={
+            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']}>
+              <ProductsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/catalog/suppliers"
+          element={
+            <PermissionRoute anyOf={['SUPPLIER_MANAGEMENT', 'CHOOSE_EXTERNAL_SUPPLIER']}>
+              <SuppliersPage />
+            </PermissionRoute>
+          }
+        />
 
         <Route
           path="/warehouse"
@@ -156,14 +163,7 @@ export default function App() {
             </PermissionRoute>
           }
         />
-        <Route
-          path="/branch-manager/staff"
-          element={
-            <PermissionRoute permission="MANAGE_BRANCH_STAFF_INFO">
-              <BranchStaffPage />
-            </PermissionRoute>
-          }
-        />
+        <Route path="/branch-manager/staff" element={<Navigate to="/users" replace />} />
         <Route
           path="/branch-manager/shifts"
           element={
