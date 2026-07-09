@@ -1,10 +1,16 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_GROUPS } from '../../config/navigation.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { isNavItemActive } from '../../lib/navActive.js';
 import NavIcon from './NavIcon.jsx';
 
 export default function Sidebar({ collapsed = false, onNavigate }) {
   const { canSeeNavItem } = usePermissions();
+  const location = useLocation();
+
+  const allNavPaths = NAV_GROUPS.flatMap((group) =>
+    group.items.filter(canSeeNavItem).map((item) => item.path),
+  );
 
   return (
     <aside
@@ -37,49 +43,48 @@ export default function Sidebar({ collapsed = false, onNavigate }) {
                 </p>
               )}
               <ul className="space-y-0.5">
-                {visibleItems.map((item) => (
-                  <li key={item.path}>
-                    <NavLink
-                      to={item.path}
-                      end={item.path === '/dashboard'}
-                      onClick={onNavigate}
-                      title={collapsed ? item.label : undefined}
-                      className={({ isActive }) =>
-                        [
-                          'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
-                          isActive
-                            ? 'bg-[#0058be]/10 text-[var(--admin-brand)]'
-                            : 'text-[var(--admin-muted)] hover:bg-[#f0f4f8] hover:text-[var(--admin-text)]',
-                        ].join(' ')
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          <span
-                            className={[
-                              'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-[#f7f9fb] transition',
-                              isActive
-                                ? 'border-[#0058be]/20 bg-white text-[var(--admin-brand)]'
-                                : 'border-transparent text-[var(--admin-subtle)]',
-                            ].join(' ')}
-                          >
-                            <NavIcon name={item.icon} className="h-[18px] w-[18px] stroke-current" />
+                {visibleItems.map((item) => {
+                  const active = isNavItemActive(location.pathname, item.path, allNavPaths);
+                  return (
+                    <li key={item.path}>
+                      <NavLink
+                        to={item.path}
+                        end={item.path === '/dashboard'}
+                        onClick={onNavigate}
+                        title={collapsed ? item.label : undefined}
+                        className={() =>
+                          [
+                            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
+                            active
+                              ? 'bg-[#0058be]/10 text-[var(--admin-brand)]'
+                              : 'text-[var(--admin-muted)] hover:bg-[#f0f4f8] hover:text-[var(--admin-text)]',
+                          ].join(' ')
+                        }
+                      >
+                        <span
+                          className={[
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-[#f7f9fb] transition',
+                            active
+                              ? 'border-[#0058be]/20 bg-white text-[var(--admin-brand)]'
+                              : 'border-transparent text-[var(--admin-subtle)]',
+                          ].join(' ')}
+                        >
+                          <NavIcon name={item.icon} className="h-[18px] w-[18px] stroke-current" />
+                        </span>
+                        {!collapsed && (
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            <span className="truncate">{item.label}</span>
+                            {item.comingSoon && (
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">
+                                Soon
+                              </span>
+                            )}
                           </span>
-                          {!collapsed && (
-                            <span className="flex min-w-0 flex-1 items-center gap-2">
-                              <span className="truncate">{item.label}</span>
-                              {item.comingSoon && (
-                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-amber-700">
-                                  Soon
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </NavLink>
-                  </li>
-                ))}
+                        )}
+                      </NavLink>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );

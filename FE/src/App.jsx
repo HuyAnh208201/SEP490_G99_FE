@@ -13,16 +13,15 @@ import ProductsPage from './pages/catalog/ProductsPage.jsx';
 import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
 import WarehouseDashboardPage, {
   WarehouseDispatchPage,
-  WarehouseImportRequestsPage,
   WarehouseInventoryPage,
 } from './pages/warehouse/WarehousePages.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
+import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
 import BranchManagerDashboardPage, {
-  BranchImportRequestsPage,
-  BranchShiftsPage,
   CashDiscrepancyPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
+import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
 import DirectorDashboardPage, {
   DirectorPlanningPage,
   DirectorReportsPage,
@@ -49,8 +48,24 @@ export default function App() {
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/purchase-requests" element={<PurchaseRequestsPage />} />
-        <Route path="/purchase-requests/consolidated" element={<ConsolidatedPage />} />
+        <Route
+          path="/purchase-requests"
+          element={
+            <PermissionRoute
+              anyOf={[
+                'CREATE_IMPORT_REQUEST',
+                'APPROVE_IMPORT_REQUEST',
+                'MANAGE_BRANCH_IMPORT_REQUESTS',
+                'SUPPLY_IMPORT_RECEIPT_APPROVE',
+              ]}
+            >
+              <SupplyImportLayout />
+            </PermissionRoute>
+          }
+        >
+          <Route index element={<PurchaseRequestsPage />} />
+          <Route path="consolidated" element={<ConsolidatedPage />} />
+        </Route>
         <Route path="/change-password" element={<Navigate to="/profile?tab=security" replace />} />
 
         <Route
@@ -140,11 +155,7 @@ export default function App() {
         />
         <Route
           path="/warehouse/import-requests"
-          element={
-            <PermissionRoute permission="MANAGE_BRANCH_IMPORT_REQUESTS">
-              <WarehouseImportRequestsPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/purchase-requests" replace />}
         />
         <Route
           path="/warehouse/dispatch"
@@ -168,17 +179,13 @@ export default function App() {
           path="/branch-manager/shifts"
           element={
             <PermissionRoute permission="SHIFT_MANAGEMENT">
-              <BranchShiftsPage />
+              <ShiftsPage />
             </PermissionRoute>
           }
         />
         <Route
           path="/branch-manager/import-requests"
-          element={
-            <PermissionRoute anyOf={['CREATE_IMPORT_REQUEST', 'SUPPLY_IMPORT_RECEIPT_APPROVE']}>
-              <BranchImportRequestsPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/purchase-requests" replace />}
         />
         <Route
           path="/branch-manager/cash-discrepancy"

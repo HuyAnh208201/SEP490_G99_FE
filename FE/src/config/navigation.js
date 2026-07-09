@@ -2,6 +2,10 @@
  * Sidebar menu — each item maps to a BE permission code (WebPermission).
  * `anyPermission: true` → visible if user has at least one listed permission.
  */
+import { ROLE_LABELS } from '../constants/userRoles.js';
+
+export { ROLE_LABELS };
+
 export const NAV_GROUPS = [
   {
     label: 'Overview',
@@ -108,29 +112,26 @@ export const NAV_GROUPS = [
         permissions: ['MANAGE_DISPATCH_ORDERS'],
       },
       {
-        path: '/branch-manager/import-requests',
-        label: 'Branch requests',
+        path: '/purchase-requests',
+        label: 'Supply import',
         icon: 'request',
         anyPermission: true,
-        permissions: ['CREATE_IMPORT_REQUEST', 'SUPPLY_IMPORT_RECEIPT_APPROVE'],
-      },
-      {
-        path: '/purchase-requests',
-        label: 'Purchase requests',
-        icon: 'request',
-        roles: [
-          'ADMIN',
-          'DIRECTOR',
-          'BRANCH_MANAGER',
-          'WAREHOUSE_MANAGER',
-          'INVENTORY_STAFF',
+        permissions: [
+          'CREATE_IMPORT_REQUEST',
+          'APPROVE_IMPORT_REQUEST',
+          'MANAGE_BRANCH_IMPORT_REQUESTS',
         ],
       },
+    ],
+  },
+  {
+    label: 'Branch staff',
+    items: [
       {
-        path: '/purchase-requests/consolidated',
-        label: 'Consolidated orders',
-        icon: 'boxes',
-        roles: ['ADMIN', 'DIRECTOR', 'WAREHOUSE_MANAGER'],
+        path: '/purchase-requests',
+        label: 'Receive goods',
+        icon: 'request',
+        permissions: ['SUPPLY_IMPORT_RECEIPT_APPROVE'],
       },
     ],
   },
@@ -193,19 +194,6 @@ export const NAV_GROUPS = [
   },
 ];
 
-export const ROLE_LABELS = {
-  ADMIN: 'Administrator',
-  DIRECTOR: 'Director',
-  BRANCH_MANAGER: 'Branch manager',
-  WAREHOUSE_MANAGER: 'Warehouse manager',
-  INVENTORY_STAFF: 'Inventory staff',
-  CASHIER: 'Cashier',
-  CUSTOMER: 'Customer',
-  OWNER: 'Owner',
-  MANAGER: 'Manager',
-  STAFF: 'Staff',
-};
-
 export const SETUP_WORKFLOW = [
   { step: 1, label: 'Categories', path: '/catalog/categories' },
   { step: 2, label: 'Products', path: '/catalog/products' },
@@ -213,7 +201,7 @@ export const SETUP_WORKFLOW = [
   { step: 4, label: 'Branches', path: '/branches' },
   { step: 5, label: 'Team', path: '/users' },
   { step: 6, label: 'Promotions', path: '/promotions' },
-  { step: 7, label: 'Import requests', path: '/branch-manager/import-requests' },
+  { step: 7, label: 'Import requests', path: '/purchase-requests' },
   { step: 8, label: 'Inventory', path: '/warehouse/inventory' },
   { step: 9, label: 'Shifts', path: '/branch-manager/shifts' },
   { step: 10, label: 'Reports', path: '/director/reports' },

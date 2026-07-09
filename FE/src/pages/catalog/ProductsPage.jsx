@@ -6,7 +6,7 @@ import {
   updateProduct,
 } from '../../api/products.js';
 import { fetchCategories } from '../../api/categories.js';
-import { PRODUCT_UNITS, unitLabel } from '../../constants/productUnits.js';
+import { PRODUCT_UNITS, normalizeUnitValue, unitLabel } from '../../constants/productUnits.js';
 import { formatVnd } from '../../lib/money.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
@@ -99,7 +99,7 @@ export default function ProductsPage() {
       name: product.name || '',
       barcode: product.barcode || '',
       categoryId: product.categoryId ?? '',
-      unit: product.unit || 'cai',
+      unit: normalizeUnitValue(product.unit || 'cai'),
       referenceImportPrice: product.referenceImportPrice ?? null,
       defaultSalePrice: product.defaultSalePrice ?? null,
       description: product.description || '',
@@ -140,7 +140,7 @@ export default function ProductsPage() {
       name: form.name.trim(),
       barcode: form.barcode.trim() || null,
       categoryId: Number(form.categoryId),
-      unit: form.unit,
+      unit: normalizeUnitValue(form.unit),
       referenceImportPrice: form.referenceImportPrice,
       defaultSalePrice: form.defaultSalePrice,
       description: form.description.trim() || null,
@@ -306,14 +306,14 @@ export default function ProductsPage() {
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Cost / import price" required hint="Gi├í vß╗æn ΓÇö for margin reports.">
+                <FormField label="Cost / import price" required hint="Giá vốn — for margin reports.">
                   <MoneyInput
                     required
                     value={form.referenceImportPrice}
                     onChange={(v) => patchForm({ referenceImportPrice: v })}
                   />
                 </FormField>
-                <FormField label="Retail price" required hint="Gi├í b├ín lß║╗ ΓÇö shown at POS.">
+                <FormField label="Retail price" required hint="Giá bán lẻ — shown at POS.">
                   <MoneyInput
                     required
                     value={form.defaultSalePrice}
@@ -381,7 +381,7 @@ export default function ProductsPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search SKU, barcode, nameΓÇª"
+              placeholder="Search SKU, barcode, name…"
               className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
             />
           </div>

@@ -1,5 +1,12 @@
 import { http } from './http.js';
 import * as mock from './purchaseRequestsMock.js';
+import {
+  flattenConsolidated,
+  normalizeRequestDetail,
+  normalizeRequestSummary,
+  toApprovePayload,
+  toDraftPayload,
+} from '../lib/purchaseRequestMappers.js';
 
 /**
  * API layer cho luồng Yêu cầu nhập hàng (Purchase Requests).
@@ -22,9 +29,16 @@ function unwrap(body) {
   return body.data;
 }
 
+function unwrapList(data) {
+  const inner = unwrap(data);
+  if (Array.isArray(inner)) return inner;
+  if (inner?.listObjects) return inner.listObjects;
+  return [];
+}
+
 /** Endpoint chưa có / BE chưa chạy → cho phép fallback mock. */
 function isUnavailable(err) {
-  if (!err?.response) return true; // network / CORS / timeout
+  if (!err?.response) return true;
   const s = err.response.status;
   return s === 404 || s === 501 || (s >= 502 && s <= 504);
 }
@@ -43,7 +57,7 @@ export function listRequests(params = {}) {
   return withFallback(
     async () => {
       const { data } = await http.get(BASE, { params });
-      return unwrap(data);
+      return unwrapList(data).map(normalizeRequestSummary);
     },
     () => mock.listRequestsMock(params),
   );
@@ -53,7 +67,7 @@ export function getRequest(id) {
   return withFallback(
     async () => {
       const { data } = await http.get(`${BASE}/${id}`);
-      return unwrap(data);
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.getRequestMock(id),
   );
@@ -62,10 +76,53 @@ export function getRequest(id) {
 export function getRecommendedProducts(branchId) {
   return withFallback(
     async () => {
-      const { data } = await http.get(`${BASE}/recommended-products`, { params: { branchId } });
-      return unwrap(data);
+      const { data } = await http.get(`${BASE}/recommended-products`, {
+        params: branchId ? { branchId } : undefined,
+      });
+      const rows = unwrap(data);
+      return rows.map((r) => ({
+        productId: r.productId ?? r.id,
+        name: r.productName ?? r.name,
+        code: r.productCode ?? r.code,
+        unit: r.unit,
+        currentStock: r.currentStock ?? r.stock,
+        reorderPoint: r.reorderPoint ?? r.reorder,
+        suggestedQty: r.suggestedQty ?? r.suggestedQuantity,
+      }));
     },
     () => mock.getRecommendedProductsMock(branchId),
+  );
+}
+
+export function searchRequestProducts(keyword, params = {}) {
+  return withFallback(
+    async () => {
+      const { data } = await http.get(`${BASE}/search-products`, {
+        params: { keyword, ...params },
+      });
+      const rows = unwrapList(data);
+      return rows.map((p) => ({
+        id: p.productId ?? p.id,
+        code: p.productCode ?? p.code,
+        name: p.productName ?? p.name,
+        unit: p.unit,
+        categoryId: p.categoryId,
+        categoryName: p.categoryName,
+      }));
+    },
+    async () => {
+      const all = await mock.getRecommendedProductsMock();
+      const q = String(keyword || '').trim().toLowerCase();
+      if (!q) return [];
+      return all
+        .filter((p) => p.name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q))
+        .map((p) => ({
+          id: p.productId,
+          code: p.code,
+          name: p.name,
+          unit: p.unit,
+        }));
+    },
   );
 }
 
@@ -73,7 +130,11 @@ export function getConsolidated(params = {}) {
   return withFallback(
     async () => {
       const { data } = await http.get(`${BASE}/consolidated`, { params });
-      return unwrap(data);
+      const raw = unwrap(data);
+      if (Array.isArray(raw) && raw.length && raw[0]?.categories) {
+        return flattenConsolidated(raw);
+      }
+      return Array.isArray(raw) ? raw : [];
     },
     () => mock.getConsolidatedMock(params),
   );
@@ -82,10 +143,11 @@ export function getConsolidated(params = {}) {
 export function saveDraft(payload) {
   return withFallback(
     async () => {
+      const body = toDraftPayload(payload);
       const url = payload.id ? `${BASE}/${payload.id}/draft` : `${BASE}/draft`;
       const method = payload.id ? http.put : http.post;
-      const { data } = await method(url, payload);
-      return unwrap(data);
+      const { data } = await method(url, body);
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.saveDraftMock(payload),
   );
@@ -94,9 +156,15 @@ export function saveDraft(payload) {
 export function submitRequest(payload) {
   return withFallback(
     async () => {
-      const url = payload.id ? `${BASE}/${payload.id}/submit` : `${BASE}/submit`;
-      const { data } = await http.post(url, payload);
-      return unwrap(data);
+      let id = payload.id;
+      if (!id) {
+        const draft = await saveDraft(payload);
+        id = draft.id;
+      } else {
+        await saveDraft(payload);
+      }
+      const { data } = await http.patch(`${BASE}/${id}/submit`, {});
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.submitRequestMock(payload),
   );
@@ -105,8 +173,8 @@ export function submitRequest(payload) {
 export function cancelRequest(id) {
   return withFallback(
     async () => {
-      const { data } = await http.post(`${BASE}/${id}/cancel`, {});
-      return unwrap(data);
+      const { data } = await http.patch(`${BASE}/${id}/cancel`, {});
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.cancelRequestMock(id),
   );
@@ -115,8 +183,8 @@ export function cancelRequest(id) {
 export function approveRequest(id, items) {
   return withFallback(
     async () => {
-      const { data } = await http.post(`${BASE}/${id}/approve`, { items });
-      return unwrap(data);
+      const { data } = await http.patch(`${BASE}/${id}/approve`, toApprovePayload(items));
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.approveRequestMock(id, { items }),
   );
@@ -125,8 +193,8 @@ export function approveRequest(id, items) {
 export function rejectRequest(id, reason) {
   return withFallback(
     async () => {
-      const { data } = await http.post(`${BASE}/${id}/reject`, { reason });
-      return unwrap(data);
+      const { data } = await http.patch(`${BASE}/${id}/reject`, { reason });
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.rejectRequestMock(id, reason),
   );
@@ -136,7 +204,7 @@ export function receiveRequest(id) {
   return withFallback(
     async () => {
       const { data } = await http.post(`${BASE}/${id}/receive`, {});
-      return unwrap(data);
+      return normalizeRequestDetail(unwrap(data));
     },
     () => mock.receiveRequestMock(id),
   );
