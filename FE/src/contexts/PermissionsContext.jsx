@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { fetchMyPermissions } from '../api/permissions.js';
+import { normalizeWebRole } from '../constants/userRoles.js';
 import { useAuth } from './AuthContext.jsx';
 
 const PermissionsContext = createContext(null);
@@ -58,7 +59,7 @@ export function PermissionsProvider({ children }) {
     (item) => {
       if (item.publicNav) return true;
       if (item.roles?.length) {
-        const webRole = role === 'MANAGER' ? 'BRANCH_MANAGER' : role === 'OWNER' ? 'DIRECTOR' : role;
+        const webRole = normalizeWebRole(role);
         return item.roles.includes(webRole);
       }
       if (!item.permissions?.length) return true;

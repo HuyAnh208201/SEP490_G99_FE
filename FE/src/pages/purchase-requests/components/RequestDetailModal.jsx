@@ -11,21 +11,24 @@ import {
   canReceiveRequest,
   canCreateRequest,
 } from '../../../constants/purchaseRequests.js';
+import { usePermissions } from '../../../contexts/PermissionsContext.jsx';
 import {
   approveRequest,
   rejectRequest,
   receiveRequest,
   cancelRequest,
 } from '../../../api/purchaseRequests.js';
+import { unitLabel } from '../../../constants/productUnits.js';
 
-export default function RequestDetailModal({ open, onClose, request, role, currentUserId, onEdit, onChanged }) {
+export default function RequestDetailModal({ open, onClose, request, currentUserId, onEdit, onChanged }) {
+  const { has } = usePermissions();
   const [approvedQty, setApprovedQty] = useState({});
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [rejectOpen, setRejectOpen] = useState(false);
 
   useEffect(() => {
-    if (request) {
+    if (request?.items) {
       const seed = {};
       request.items.forEach((it) => {
         seed[it.id] = it.approvedQuantity ?? it.requestedQuantity ?? 0;
@@ -39,11 +42,11 @@ export default function RequestDetailModal({ open, onClose, request, role, curre
 
   const mode = useMemo(() => {
     if (!request) return 'view';
-    if (request.status === PR_STATUS.DRAFT && canCreateRequest(role)) return 'draft';
-    if (request.status === PR_STATUS.PENDING && canApproveRequest(role)) return 'approve';
-    if (request.status === PR_STATUS.APPROVED && canReceiveRequest(role)) return 'receive';
+    if (request.status === PR_STATUS.DRAFT && canCreateRequest(has)) return 'draft';
+    if (request.status === PR_STATUS.PENDING && canApproveRequest(has)) return 'approve';
+    if (request.status === PR_STATUS.APPROVED && canReceiveRequest(has)) return 'receive';
     return 'view';
-  }, [request, role]);
+  }, [request, has]);
 
   if (!request) return null;
   const meta = statusMeta(request.status);
@@ -64,7 +67,7 @@ export default function RequestDetailModal({ open, onClose, request, role, curre
 
   function handleApprove() {
     const items = request.items.map((it) => ({
-      itemId: it.id,
+      productId: it.productId,
       approvedQuantity: Number(approvedQty[it.id]) || 0,
     }));
     run('approve', () => approveRequest(request.id, items));
@@ -114,14 +117,14 @@ export default function RequestDetailModal({ open, onClose, request, role, curre
                 </tr>
               </thead>
               <tbody>
-                {request.items.map((it) => (
+                {request.items?.map((it) => (
                   <tr key={it.id} className="border-t border-[var(--admin-border)]">
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-[var(--admin-text)]">{it.productName}</div>
                       <div className="font-mono text-xs text-[var(--admin-subtle)]">{it.productCode}</div>
                     </td>
                     <td className="px-4 py-2.5 text-[var(--admin-muted)]">{it.categoryName}</td>
-                    <td className="px-4 py-2.5 text-[var(--admin-muted)]">{it.unit}</td>
+                    <td className="px-4 py-2.5 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{it.requestedQuantity}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {mode === 'approve' ? (

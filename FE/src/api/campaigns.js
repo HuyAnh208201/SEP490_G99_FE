@@ -48,3 +48,8 @@ export async function deactivateCampaignForBranch(id) {
   const { data } = await http.patch(`/campaigns/${id}/deactivate-for-branch`);
   return unwrap(data);
 }
+
+export async function activateCampaignForBranch(id) {
+  const { data } = await http.patch(`/campaigns/${id}/activate-for-branch`);
+  return unwrap(data);
+}

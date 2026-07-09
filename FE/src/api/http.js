@@ -21,6 +21,13 @@ http.interceptors.response.use(
     if (err?.response?.status === 401) {
       localStorage.removeItem('chainstore_token');
     }
+    const body = err?.response?.data;
+    if (body?.message) {
+      const apiErr = new Error(body.message);
+      apiErr.status = err.response?.status ?? body.statusCode;
+      apiErr.errors = body?.errors ?? body?.data;
+      return Promise.reject(apiErr);
+    }
     return Promise.reject(err);
   },
 );

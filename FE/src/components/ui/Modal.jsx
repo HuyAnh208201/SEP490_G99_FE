@@ -1,4 +1,4 @@
-export default function Modal({ open, onClose, title, description, children, size = 'md' }) {
+export default function Modal({ open, onClose, title, description, children, size = 'md', footer }) {
   if (!open) return null;
 
   const widths = {
@@ -22,9 +22,9 @@ export default function Modal({ open, onClose, title, description, children, siz
         onClick={onClose}
       />
       <div
-        className={`relative w-full ${widths[size] || widths.md} rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]`}
+        className={`relative flex max-h-[min(92vh,900px)] w-full flex-col ${widths[size] || widths.md} rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]`}
       >
-        <div className="border-b border-[var(--admin-border)] px-6 py-4">
+        <div className="shrink-0 border-b border-[var(--admin-border)] px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 id="modal-title" className="text-lg font-semibold text-[var(--admin-text)]">
@@ -46,7 +46,10 @@ export default function Modal({ open, onClose, title, description, children, siz
             </button>
           </div>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {footer ? (
+          <div className="shrink-0 border-t border-[var(--admin-border)] px-6 py-4">{footer}</div>
+        ) : null}
       </div>
     </div>
   );
