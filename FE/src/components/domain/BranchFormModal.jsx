@@ -108,7 +108,7 @@ export default function BranchFormModal({ open, onClose, onSaved, editing }) {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. ChainStore Nguyễn Huệ"
+            placeholder="e.g. ChainStore Downtown"
             className={inputClass}
           />
         </FormField>

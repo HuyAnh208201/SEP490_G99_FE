@@ -306,14 +306,14 @@ export default function ProductsPage() {
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Cost / import price" required hint="Giá vốn — for margin reports.">
+                <FormField label="Cost / import price" required hint="Cost price — used for margin reports.">
                   <MoneyInput
                     required
                     value={form.referenceImportPrice}
                     onChange={(v) => patchForm({ referenceImportPrice: v })}
                   />
                 </FormField>
-                <FormField label="Retail price" required hint="Giá bán lẻ — shown at POS.">
+                <FormField label="Retail price" required hint="Retail price — shown at POS.">
                   <MoneyInput
                     required
                     value={form.defaultSalePrice}

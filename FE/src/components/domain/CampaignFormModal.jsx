@@ -565,7 +565,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
                         ))}
                       </select>
                     </FormField>
-                    <FormField label="Unit" required hint="e.g. bottle (chai) or case (thùng)">
+                    <FormField label="Unit" required hint="e.g. bottle or case">
                       <select
                         required
                         value={form.unit}
@@ -612,7 +612,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
                       required
 
-                      hint="Nhập số ngắn (vd. 50) sẽ tự chuyển thành 50.000 ₫"
+                      hint="Short numbers auto-scale on blur (e.g. 50 → 50,000 ₫)"
 
                     />
 
@@ -662,7 +662,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
                     onChange={(v) => patch({ minOrderAmount: v })}
 
-                    hint="Áp dụng khi đơn hàng đạt mức tối thiểu"
+                    hint="Applied when the order reaches the minimum amount"
 
                   />
 

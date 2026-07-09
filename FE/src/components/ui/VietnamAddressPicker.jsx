@@ -65,7 +65,7 @@ export default function VietnamAddressPicker({
           required
           value={street}
           onChange={(e) => onChange({ street: e.target.value, provinceId, districtId })}
-          placeholder="e.g. 123 Nguyễn Huệ"
+          placeholder="e.g. 123 Main Street"
           className={selectClass}
         />
       </FormField>

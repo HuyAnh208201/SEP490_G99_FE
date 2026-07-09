@@ -19,9 +19,9 @@ const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 const STATUS_META = {
-  DRAFT: { label: 'Nháp', tone: 'default' },
-  PUBLISHED: { label: 'Đã phát hành', tone: 'success' },
-  CANCELLED: { label: 'Đã hủy', tone: 'danger' },
+  DRAFT: { label: 'Draft', tone: 'default' },
+  PUBLISHED: { label: 'Published', tone: 'success' },
+  CANCELLED: { label: 'Cancelled', tone: 'danger' },
 };
 
 function toIso(value) {

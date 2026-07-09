@@ -7,6 +7,7 @@ import { formatDateTime } from '../../../lib/datetime.js';
 import {
   PR_STATUS,
   statusMeta,
+  normalizeStatus,
   canApproveRequest,
   canReceiveRequest,
   canCreateRequest,
@@ -42,9 +43,10 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
 
   const mode = useMemo(() => {
     if (!request) return 'view';
-    if (request.status === PR_STATUS.DRAFT && canCreateRequest(has)) return 'draft';
-    if (request.status === PR_STATUS.PENDING && canApproveRequest(has)) return 'approve';
-    if (request.status === PR_STATUS.APPROVED && canReceiveRequest(has)) return 'receive';
+    const status = normalizeStatus(request.status);
+    if (status === PR_STATUS.DRAFT && canCreateRequest(has)) return 'draft';
+    if (status === PR_STATUS.PENDING && canApproveRequest(has)) return 'approve';
+    if (status === PR_STATUS.APPROVED && canReceiveRequest(has)) return 'receive';
     return 'view';
   }, [request, has]);
 
@@ -98,7 +100,7 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
             </p>
           )}
 
-          {request.status === PR_STATUS.REJECTED && request.rejectReason && (
+          {normalizeStatus(request.status) === PR_STATUS.REJECTED && request.rejectReason && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               <span className="font-semibold">Rejection reason: </span>
               {request.rejectReason}
