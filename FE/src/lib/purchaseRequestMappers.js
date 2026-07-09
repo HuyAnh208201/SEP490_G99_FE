@@ -1,11 +1,14 @@
 /** Normalize BE purchase-request payloads to FE view models. */
 
+import { normalizeStatus } from '../constants/purchaseRequests.js';
+
 export function normalizeRequestSummary(row) {
   if (!row) return row;
   return {
     ...row,
     code: row.code || row.requestNumber,
     reason: row.reason ?? row.notes ?? '',
+    status: normalizeStatus(row.status) || row.status,
   };
 }
 

@@ -1,55 +1,53 @@
 /**
- * In-memory mock cho luồng Purchase Request.
+ * In-memory mock for the Purchase Request flow.
  *
- * Dùng khi BE chưa sẵn sàng (network error / 404 / 501...). Dữ liệu seed bám sát
- * schema `convenience_store_db` + file DB đã bổ sung thêm sản phẩm. Store có state
- * (module-level) nên các thao tác draft/submit/approve/reject/receive phản ánh ngay
- * trên danh sách trong phiên làm việc.
+ * Used when the BE is unavailable (network error / 404 / 501...). Seed data mirrors
+ * the convenience_store_db schema. Module-level state so draft/submit/approve/reject/receive
+ * reflect immediately in the session list.
  */
 
 const BRANCHES = [
-  { id: 1, name: 'ChainStore Quận 1', address: '123 Nguyễn Huệ, Quận 1, TP.HCM' },
-  { id: 2, name: 'ChainStore Cầu Giấy', address: '25 Xuân Thủy, Cầu Giấy, Hà Nội' },
-  { id: 3, name: 'ChainStore Đà Nẵng', address: '88 Nguyễn Văn Linh, Hải Châu, Đà Nẵng' },
+  { id: 1, name: 'ChainStore District 1', address: '123 Main Street, District 1, Ho Chi Minh City' },
+  { id: 2, name: 'ChainStore Cau Giay', address: '25 Xuan Thuy, Cau Giay, Hanoi' },
+  { id: 3, name: 'ChainStore Da Nang', address: '88 Nguyen Van Linh, Hai Chau, Da Nang' },
 ];
 
 const CATEGORIES = [
-  { id: 1, name: 'Đồ uống' },
-  { id: 2, name: 'Thực phẩm nhanh' },
-  { id: 3, name: 'Sữa & sản phẩm từ sữa' },
-  { id: 4, name: 'Gia dụng tiện ích' },
+  { id: 1, name: 'Beverages' },
+  { id: 2, name: 'Fast food' },
+  { id: 3, name: 'Milk & dairy' },
+  { id: 4, name: 'Household essentials' },
 ];
 
-// code, name, categoryId, unit, currentStock (branch 1), reorderPoint, supplierId
 const PRODUCTS = [
-  { id: 1, code: 'DRINK001', name: 'Nước suối Lavie 500ml', categoryId: 1, unit: 'chai', stock: 12, reorder: 30, supplierId: 1 },
-  { id: 2, code: 'DRINK002', name: 'Coca-Cola lon 320ml', categoryId: 1, unit: 'lon', stock: 8, reorder: 20, supplierId: 1 },
-  { id: 3, code: 'FOOD001', name: 'Mì Hảo Hảo tôm chua cay', categoryId: 2, unit: 'gói', stock: 200, reorder: 60, supplierId: 2 },
-  { id: 4, code: 'MILK001', name: 'Sữa tươi Vinamilk 180ml', categoryId: 3, unit: 'hộp', stock: 6, reorder: 20, supplierId: 3 },
-  { id: 5, code: 'HOUSE001', name: 'Khăn giấy bỏ túi', categoryId: 4, unit: 'gói', stock: 5, reorder: 15, supplierId: 2 },
-  { id: 6, code: 'DRINK003', name: 'Trà xanh không độ 500ml', categoryId: 1, unit: 'chai', stock: 18, reorder: 40, supplierId: 1 },
-  { id: 7, code: 'DRINK004', name: 'Cà phê lon Highlands 235ml', categoryId: 1, unit: 'lon', stock: 25, reorder: 30, supplierId: 1 },
-  { id: 8, code: 'FOOD002', name: 'Bánh mì tươi ruốc', categoryId: 2, unit: 'cái', stock: 3, reorder: 25, supplierId: 2 },
-  { id: 9, code: 'FOOD003', name: 'Xúc xích Đức Việt 200g', categoryId: 2, unit: 'gói', stock: 14, reorder: 20, supplierId: 2 },
-  { id: 10, code: 'MILK002', name: 'Sữa chua Vinamilk có đường', categoryId: 3, unit: 'hộp', stock: 40, reorder: 50, supplierId: 3 },
-  { id: 11, code: 'MILK003', name: 'Sữa đặc Ông Thọ 380g', categoryId: 3, unit: 'lon', stock: 9, reorder: 15, supplierId: 3 },
-  { id: 12, code: 'HOUSE002', name: 'Pin Con Ó AA (vỉ 4)', categoryId: 4, unit: 'vỉ', stock: 22, reorder: 20, supplierId: 2 },
-  { id: 13, code: 'HOUSE003', name: 'Nước rửa tay Lifebuoy 250ml', categoryId: 4, unit: 'chai', stock: 4, reorder: 12, supplierId: 2 },
-  { id: 14, code: 'FOOD004', name: 'Snack khoai tây Lays 52g', categoryId: 2, unit: 'gói', stock: 30, reorder: 40, supplierId: 2 },
-  { id: 15, code: 'DRINK005', name: 'Bia Tiger lon 330ml', categoryId: 1, unit: 'lon', stock: 16, reorder: 48, supplierId: 1 },
+  { id: 1, code: 'DRINK001', name: 'Lavie Mineral Water 500ml', categoryId: 1, unit: 'chai', stock: 12, reorder: 30, supplierId: 1 },
+  { id: 2, code: 'DRINK002', name: 'Coca-Cola Can 320ml', categoryId: 1, unit: 'lon', stock: 8, reorder: 20, supplierId: 1 },
+  { id: 3, code: 'FOOD001', name: 'Hao Hao Spicy Shrimp Noodles', categoryId: 2, unit: 'goi', stock: 200, reorder: 60, supplierId: 2 },
+  { id: 4, code: 'MILK001', name: 'Vinamilk Fresh Milk 180ml', categoryId: 3, unit: 'hop', stock: 6, reorder: 20, supplierId: 3 },
+  { id: 5, code: 'HOUSE001', name: 'Pocket Tissues', categoryId: 4, unit: 'goi', stock: 5, reorder: 15, supplierId: 2 },
+  { id: 6, code: 'DRINK003', name: 'Unsweetened Green Tea 500ml', categoryId: 1, unit: 'chai', stock: 18, reorder: 40, supplierId: 1 },
+  { id: 7, code: 'DRINK004', name: 'Highlands Coffee Can 235ml', categoryId: 1, unit: 'lon', stock: 25, reorder: 30, supplierId: 1 },
+  { id: 8, code: 'FOOD002', name: 'Fresh Pork Floss Bread', categoryId: 2, unit: 'cai', stock: 3, reorder: 25, supplierId: 2 },
+  { id: 9, code: 'FOOD003', name: 'Duc Viet Sausage 200g', categoryId: 2, unit: 'goi', stock: 14, reorder: 20, supplierId: 2 },
+  { id: 10, code: 'MILK002', name: 'Vinamilk Sweetened Yogurt', categoryId: 3, unit: 'hop', stock: 40, reorder: 50, supplierId: 3 },
+  { id: 11, code: 'MILK003', name: 'Ong Tho Condensed Milk 380g', categoryId: 3, unit: 'lon', stock: 9, reorder: 15, supplierId: 3 },
+  { id: 12, code: 'HOUSE002', name: 'Con O AA Batteries (pack of 4)', categoryId: 4, unit: 'vi', stock: 22, reorder: 20, supplierId: 2 },
+  { id: 13, code: 'HOUSE003', name: 'Lifebuoy Hand Wash 250ml', categoryId: 4, unit: 'chai', stock: 4, reorder: 12, supplierId: 2 },
+  { id: 14, code: 'FOOD004', name: 'Lays Potato Chips 52g', categoryId: 2, unit: 'goi', stock: 30, reorder: 40, supplierId: 2 },
+  { id: 15, code: 'DRINK005', name: 'Tiger Beer Can 330ml', categoryId: 1, unit: 'lon', stock: 16, reorder: 48, supplierId: 1 },
 ];
 
 const USERS = {
-  3: 'Trần Minh Quản Lý Q1',
-  4: 'Lê Anh Quản Lý Cầu Giấy',
-  2: 'Nguyễn Văn Director',
+  3: 'Tran Minh — Branch Manager D1',
+  4: 'Le Anh — Branch Manager Cau Giay',
+  2: 'Nguyen Van — Director',
 };
 
 function productById(id) {
   return PRODUCTS.find((p) => p.id === id);
 }
 function branchById(id) {
-  return BRANCHES.find((b) => b.id === id) || { id, name: `Chi nhánh #${id}`, address: '' };
+  return BRANCHES.find((b) => b.id === id) || { id, name: `Branch #${id}`, address: '' };
 }
 function categoryById(id) {
   return CATEGORIES.find((c) => c.id === id) || { id, name: '—' };
@@ -61,7 +59,7 @@ function buildItem(raw) {
     id: raw.id,
     productId: raw.productId,
     productCode: p.code || '',
-    productName: p.name || `SP #${raw.productId}`,
+    productName: p.name || `Product #${raw.productId}`,
     categoryId: p.categoryId,
     categoryName: categoryById(p.categoryId).name,
     unit: p.unit || '',
@@ -81,13 +79,12 @@ function reqCode(id, createdAt) {
   return `REQ-${year}-${String(id).padStart(4, '0')}`;
 }
 
-// Seed danh sách yêu cầu
 let REQUESTS = [
   {
     id: 1,
     branchId: 1,
     createdBy: 3,
-    reason: 'Bổ sung hàng bán chạy cuối tuần',
+    reason: 'Restock fast-moving items for the weekend',
     status: 'approved',
     approvedBy: 2,
     rejectReason: null,
@@ -102,7 +99,7 @@ let REQUESTS = [
     id: 2,
     branchId: 2,
     createdBy: 4,
-    reason: 'Bổ sung tồn kho đồ uống',
+    reason: 'Replenish beverage inventory',
     status: 'pending',
     approvedBy: null,
     rejectReason: null,
@@ -118,7 +115,7 @@ let REQUESTS = [
     id: 3,
     branchId: 1,
     createdBy: 3,
-    reason: 'Đơn nháp chờ hoàn thiện',
+    reason: 'Draft request pending completion',
     status: 'draft',
     approvedBy: null,
     rejectReason: null,
@@ -133,7 +130,7 @@ let REQUESTS = [
     id: 4,
     branchId: 3,
     createdBy: 2,
-    reason: 'Khai trương mở rộng gian hàng sữa',
+    reason: 'Expand dairy section for store opening',
     status: 'received',
     approvedBy: 2,
     rejectReason: null,
@@ -149,10 +146,10 @@ let REQUESTS = [
     id: 5,
     branchId: 2,
     createdBy: 4,
-    reason: 'Đặt thử nhà cung cấp mới',
+    reason: 'Trial order from new supplier',
     status: 'rejected',
     approvedBy: 2,
-    rejectReason: 'Ngân sách quý này đã đầy, đề nghị gửi lại tháng sau.',
+    rejectReason: 'Quarterly budget is full — please resubmit next month.',
     createdAt: '2026-06-18T11:20:00',
     approvedAt: '2026-06-19T08:30:00',
     items: [{ id: 11, productId: 15, supplierId: 1, requestedQuantity: 200, approvedQuantity: null }],
@@ -201,7 +198,7 @@ export function listRequestsMock({ status, branchId } = {}) {
 
 export function getRequestMock(id) {
   const raw = findRaw(id);
-  if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+  if (!raw) return Promise.reject(new Error('Request not found'));
   return delay(hydrate(raw));
 }
 
@@ -221,7 +218,6 @@ export function getRecommendedProductsMock(branchId = 1) {
 }
 
 export function getConsolidatedMock() {
-  // Gom theo (chi nhánh + danh mục), cộng dồn approvedQuantity (fallback requested) của đơn approved/received.
   const map = new Map();
   REQUESTS.filter((r) => r.status === 'approved' || r.status === 'received').forEach((r) => {
     r.items.forEach((it) => {
@@ -273,7 +269,7 @@ export function saveDraftMock(payload) {
   const items = normalizeItemsInput(payload.items);
   if (payload.id) {
     const raw = findRaw(payload.id);
-    if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+    if (!raw) return Promise.reject(new Error('Request not found'));
     raw.branchId = Number(payload.branchId) || raw.branchId;
     raw.reason = payload.reason ?? raw.reason;
     raw.items = items;
@@ -314,14 +310,14 @@ export function submitRequestMock(payload) {
 
 export function cancelRequestMock(id) {
   const raw = findRaw(id);
-  if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+  if (!raw) return Promise.reject(new Error('Request not found'));
   raw.status = 'cancelled';
   return delay(hydrate(raw));
 }
 
 export function approveRequestMock(id, { items = [] } = {}) {
   const raw = findRaw(id);
-  if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+  if (!raw) return Promise.reject(new Error('Request not found'));
   const qtyMap = new Map(
     items.map((it) => [
       Number(it.productId ?? it.itemId ?? it.id),
@@ -342,7 +338,7 @@ export function approveRequestMock(id, { items = [] } = {}) {
 
 export function rejectRequestMock(id, reason) {
   const raw = findRaw(id);
-  if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+  if (!raw) return Promise.reject(new Error('Request not found'));
   raw.status = 'rejected';
   raw.rejectReason = reason;
   raw.approvedBy = 2;
@@ -352,7 +348,7 @@ export function rejectRequestMock(id, reason) {
 
 export function receiveRequestMock(id) {
   const raw = findRaw(id);
-  if (!raw) return Promise.reject(new Error('Không tìm thấy yêu cầu'));
+  if (!raw) return Promise.reject(new Error('Request not found'));
   raw.status = 'received';
   return delay(hydrate(raw));
 }
