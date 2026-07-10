@@ -1,0 +1,196 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Card from '../../components/ui/Card.jsx';
+import Button from '../../components/ui/Button.jsx';
+import Badge from '../../components/ui/Badge.jsx';
+import PageHeader from '../../components/ui/PageHeader.jsx';
+import {
+  DISPATCH_STATUS_OPTIONS,
+  DISPATCH_STATUS_META,
+  dispatchStatusMeta,
+  nextDispatchStatus,
+  normalizeDispatchStatus,
+} from '../../constants/dispatch.js';
+import { listDispatchOrders, updateDispatchStatus } from '../../api/dispatch.js';
+import DispatchOrderDetailModal from './components/DispatchOrderDetailModal.jsx';
+
+const selectClass =
+  'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+
+export default function DispatchOrdersPage() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [detail, setDetail] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await listDispatchOrders();
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err?.message || 'Failed to load dispatch orders');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (statusFilter && normalizeDispatchStatus(r.status) !== statusFilter) return false;
+      return true;
+    });
+  }, [rows, statusFilter]);
+
+  async function advance(order) {
+    const next = nextDispatchStatus(order.status);
+    if (!next) return;
+    setUpdatingId(order.id);
+    setError('');
+    try {
+      await updateDispatchStatus(order.id, next);
+      await load();
+    } catch (err) {
+      setError(err?.message || 'Failed to update status');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  function storesOf(order) {
+    return [...new Set((order.requests || []).map((r) => r.branchName).filter(Boolean))];
+  }
+
+  return (
+    <div className="mx-auto max-w-7xl">
+      <PageHeader
+        title="Dispatch Orders"
+        description="Monitor outbound dispatch orders, update shipment status, and view delivery progress."
+      />
+
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <Card className="!p-0 overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={selectClass}
+          >
+            {DISPATCH_STATUS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <span className="ml-auto text-sm text-[var(--admin-muted)]">
+            <strong>{filteredRows.length}</strong> dispatch orders
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
+              <tr>
+                <th className="px-4 py-3">Dispatch ID</th>
+                <th className="px-4 py-3">Related Requests</th>
+                <th className="px-4 py-3">Stores</th>
+                <th className="px-4 py-3">Vehicle</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i} className="border-t border-[var(--admin-border)]">
+                      <td colSpan={6} className="px-4 py-4">
+                        <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
+                      </td>
+                    </tr>
+                  ))
+                : filteredRows.map((r) => {
+                    const meta = dispatchStatusMeta(r.status);
+                    const next = nextDispatchStatus(r.status);
+                    return (
+                      <tr
+                        key={r.id}
+                        className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
+                          {r.dispatchNumber}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          <div className="flex flex-col gap-0.5">
+                            {(r.requests || []).map((req) => (
+                              <span key={req.requestId} className="font-mono text-xs">
+                                {req.requestNumber}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">{storesOf(r).join(', ') || '—'}</td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.vehicle || '—'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <Badge tone={meta.tone}>{meta.display}</Badge>
+                            {next && (
+                              <span className="text-xs text-[var(--admin-subtle)]">
+                                → {DISPATCH_STATUS_META[next].label}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="secondary"
+                              className="!px-3 !py-1 !text-xs"
+                              onClick={() => setDetail(r)}
+                            >
+                              View Details
+                            </Button>
+                            {next && (
+                              <Button
+                                className="!px-3 !py-1 !text-xs"
+                                loading={updatingId === r.id}
+                                onClick={() => advance(r)}
+                              >
+                                Update Status
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+            </tbody>
+          </table>
+          {!loading && filteredRows.length === 0 && (
+            <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
+              No dispatch orders yet.
+            </p>
+          )}
+        </div>
+      </Card>
+
+      <DispatchOrderDetailModal
+        open={Boolean(detail)}
+        order={detail}
+        onClose={() => setDetail(null)}
+        onChanged={load}
+      />
+    </div>
+  );
+}

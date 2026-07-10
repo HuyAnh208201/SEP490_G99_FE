@@ -9,6 +9,9 @@ export const PR_STATUS = {
   DRAFT: 'draft',
   PENDING: 'pending',
   APPROVED: 'approved',
+  AWAITING_STOCK: 'awaiting_stock',
+  DISPATCHING: 'dispatching',
+  IN_TRANSIT: 'in_transit',
   RECEIVED: 'received',
   REJECTED: 'rejected',
   CANCELLED: 'cancelled',
@@ -19,6 +22,9 @@ export const PR_STATUS_META = {
   [PR_STATUS.DRAFT]: { label: 'Draft', display: 'DRAFT', tone: 'default' },
   [PR_STATUS.PENDING]: { label: 'Pending', display: 'PENDING', tone: 'warning' },
   [PR_STATUS.APPROVED]: { label: 'Approved', display: 'APPROVED', tone: 'brand' },
+  [PR_STATUS.AWAITING_STOCK]: { label: 'Awaiting stock', display: 'AWAITING STOCK', tone: 'soon' },
+  [PR_STATUS.DISPATCHING]: { label: 'Dispatching', display: 'DISPATCHING', tone: 'brand' },
+  [PR_STATUS.IN_TRANSIT]: { label: 'In transit', display: 'IN TRANSIT', tone: 'warning' },
   [PR_STATUS.RECEIVED]: { label: 'Received', display: 'RECEIVED', tone: 'success' },
   [PR_STATUS.REJECTED]: { label: 'Rejected', display: 'REJECTED', tone: 'danger' },
   [PR_STATUS.CANCELLED]: { label: 'Cancelled', display: 'CANCELLED', tone: 'default' },
@@ -79,6 +85,12 @@ export function canFilterByBranch(has) {
 export function canViewConsolidatedImports(has) {
   if (typeof has !== 'function') return false;
   return has('APPROVE_IMPORT_REQUEST') || has('MANAGE_BRANCH_IMPORT_REQUESTS');
+}
+
+/** Warehouse incoming requests screen (2.2) — review & approve branch requests. */
+export function canManageIncomingRequests(has) {
+  if (typeof has !== 'function') return false;
+  return has('MANAGE_BRANCH_IMPORT_REQUESTS') || has('APPROVE_IMPORT_REQUEST');
 }
 
 /** Can access the supply import module. */

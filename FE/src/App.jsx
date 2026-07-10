@@ -12,9 +12,12 @@ import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
 import ProductsPage from './pages/catalog/ProductsPage.jsx';
 import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
 import WarehouseDashboardPage, {
-  WarehouseDispatchPage,
   WarehouseInventoryPage,
 } from './pages/warehouse/WarehousePages.jsx';
+import IncomingRequestsPage from './pages/warehouse/IncomingRequestsPage.jsx';
+import DispatchPlanningPage from './pages/warehouse/DispatchPlanningPage.jsx';
+import DispatchOrdersPage from './pages/warehouse/DispatchOrdersPage.jsx';
+import PurchaseOrdersPage from './pages/warehouse/PurchaseOrdersPage.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
@@ -154,14 +157,38 @@ export default function App() {
           }
         />
         <Route
+          path="/warehouse/incoming-requests"
+          element={
+            <PermissionRoute anyOf={['MANAGE_BRANCH_IMPORT_REQUESTS', 'APPROVE_IMPORT_REQUEST']}>
+              <IncomingRequestsPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
           path="/warehouse/import-requests"
-          element={<Navigate to="/purchase-requests" replace />}
+          element={<Navigate to="/warehouse/incoming-requests" replace />}
+        />
+        <Route
+          path="/warehouse/dispatch-planning"
+          element={
+            <PermissionRoute permission="MANAGE_DISPATCH_ORDERS">
+              <DispatchPlanningPage />
+            </PermissionRoute>
+          }
         />
         <Route
           path="/warehouse/dispatch"
           element={
             <PermissionRoute permission="MANAGE_DISPATCH_ORDERS">
-              <WarehouseDispatchPage />
+              <DispatchOrdersPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/warehouse/purchase-orders"
+          element={
+            <PermissionRoute permission="CHOOSE_EXTERNAL_SUPPLIER">
+              <PurchaseOrdersPage />
             </PermissionRoute>
           }
         />

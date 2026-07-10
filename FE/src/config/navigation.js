@@ -100,16 +100,29 @@ export const NAV_GROUPS = [
         permissions: ['VIEW_CENTRAL_INVENTORY'],
       },
       {
-        path: '/warehouse/import-requests',
-        label: 'Import requests',
+        path: '/warehouse/incoming-requests',
+        label: 'Incoming requests',
         icon: 'inbox',
-        permissions: ['MANAGE_BRANCH_IMPORT_REQUESTS'],
+        anyPermission: true,
+        permissions: ['MANAGE_BRANCH_IMPORT_REQUESTS', 'APPROVE_IMPORT_REQUEST'],
+      },
+      {
+        path: '/warehouse/dispatch-planning',
+        label: 'Dispatch planning',
+        icon: 'plan',
+        permissions: ['MANAGE_DISPATCH_ORDERS'],
       },
       {
         path: '/warehouse/dispatch',
         label: 'Dispatch orders',
         icon: 'dispatch',
         permissions: ['MANAGE_DISPATCH_ORDERS'],
+      },
+      {
+        path: '/warehouse/purchase-orders',
+        label: 'Purchase orders',
+        icon: 'truck',
+        permissions: ['CHOOSE_EXTERNAL_SUPPLIER'],
       },
       {
         path: '/purchase-requests',
