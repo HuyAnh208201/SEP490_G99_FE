@@ -17,6 +17,7 @@ import {
  */
 
 const FORCE_MOCK = import.meta.env.VITE_PR_MOCK === 'true';
+const ALLOW_MOCK_FALLBACK = import.meta.env.VITE_PR_MOCK_FALLBACK !== 'false';
 const BASE = '/purchase-requests';
 
 function unwrap(body) {
@@ -48,7 +49,7 @@ async function withFallback(realFn, mockFn) {
   try {
     return await realFn();
   } catch (err) {
-    if (isUnavailable(err)) return mockFn();
+    if (ALLOW_MOCK_FALLBACK && isUnavailable(err)) return mockFn();
     throw err;
   }
 }

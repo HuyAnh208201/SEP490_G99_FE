@@ -141,10 +141,16 @@ export const NAV_GROUPS = [
     label: 'Branch staff',
     items: [
       {
-        path: '/purchase-requests',
+        path: '/branch-manager/receive',
         label: 'Receive goods',
-        icon: 'request',
+        icon: 'boxes',
         permissions: ['SUPPLY_IMPORT_RECEIPT_APPROVE'],
+      },
+      {
+        path: '/my-shifts',
+        label: 'My shifts',
+        icon: 'clock',
+        permissions: ['MY_SHIFTS'],
       },
     ],
   },

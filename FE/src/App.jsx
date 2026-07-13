@@ -11,9 +11,8 @@ import SystemSettingsPage from './pages/system/SystemSettingsPage.jsx';
 import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
 import ProductsPage from './pages/catalog/ProductsPage.jsx';
 import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
-import WarehouseDashboardPage, {
-  WarehouseInventoryPage,
-} from './pages/warehouse/WarehousePages.jsx';
+import WarehouseDashboardPage from './pages/warehouse/WarehousePages.jsx';
+import WarehouseInventoryPage from './pages/warehouse/WarehouseInventoryPage.jsx';
 import IncomingRequestsPage from './pages/warehouse/IncomingRequestsPage.jsx';
 import DispatchPlanningPage from './pages/warehouse/DispatchPlanningPage.jsx';
 import DispatchOrdersPage from './pages/warehouse/DispatchOrdersPage.jsx';
@@ -24,6 +23,8 @@ import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx
 import BranchManagerDashboardPage, {
   CashDiscrepancyPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
+import BranchReceivePage from './pages/branch-manager/BranchReceivePage.jsx';
+import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
 import DirectorDashboardPage, {
   DirectorPlanningPage,
@@ -213,6 +214,22 @@ export default function App() {
         <Route
           path="/branch-manager/import-requests"
           element={<Navigate to="/purchase-requests" replace />}
+        />
+        <Route
+          path="/branch-manager/receive"
+          element={
+            <PermissionRoute permission="SUPPLY_IMPORT_RECEIPT_APPROVE">
+              <BranchReceivePage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/my-shifts"
+          element={
+            <PermissionRoute permission="MY_SHIFTS">
+              <MyShiftsPage />
+            </PermissionRoute>
+          }
         />
         <Route
           path="/branch-manager/cash-discrepancy"

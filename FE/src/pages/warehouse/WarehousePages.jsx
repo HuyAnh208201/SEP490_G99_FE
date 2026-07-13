@@ -30,7 +30,7 @@ export function WarehouseInventoryPage() {
   return (
     <ModulePageShell
       title="Central inventory"
-      description="View central warehouse stock. Planned: product/branch filters, stock levels, audit actions (SRS 2.3.3)."
+      description="Legacy stub — use /warehouse/inventory route for live data."
       loading={loading}
       error={error}
       comingSoon

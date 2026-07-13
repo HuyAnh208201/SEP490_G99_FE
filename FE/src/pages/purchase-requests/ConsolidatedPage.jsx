@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import StatCard from '../../components/ui/StatCard.jsx';
@@ -88,6 +89,9 @@ export default function ConsolidatedPage() {
   return (
     <>
       <div className="mb-4 flex justify-end gap-2 print:hidden">
+        <Link to="/warehouse/dispatch-planning">
+          <Button variant="secondary">→ Dispatch planning</Button>
+        </Link>
         <Button variant="secondary" onClick={() => window.print()}>
           Print
         </Button>
