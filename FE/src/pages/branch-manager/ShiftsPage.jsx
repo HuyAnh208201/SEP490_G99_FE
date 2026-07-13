@@ -6,6 +6,7 @@ import {
   deleteShift,
   fetchAvailableEmployees,
   fetchShifts,
+  fetchWeeklySchedule,
   publishShift,
 } from '../../api/shifts.js';
 import Card from '../../components/ui/Card.jsx';
@@ -52,7 +53,16 @@ const emptyForm = () => ({
 
 export default function ShiftsPage() {
   const [branchId, setBranchId] = useState(null);
+  const [view, setView] = useState('list');
   const [rows, setRows] = useState([]);
+  const [weekly, setWeekly] = useState(null);
+  const [weekStart, setWeekStart] = useState(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    return monday.toISOString().slice(0, 10);
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -91,6 +101,22 @@ export default function ShiftsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!branchId || view !== 'weekly') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchWeeklySchedule(branchId, weekStart);
+        if (!cancelled) setWeekly(data);
+      } catch (err) {
+        if (!cancelled) setError(err?.message || 'Failed to load weekly schedule');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId, view, weekStart]);
 
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => new Date(b.startTime) - new Date(a.startTime)),
@@ -179,11 +205,52 @@ export default function ShiftsPage() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button variant={view === 'list' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('list')}>
+          List view
+        </Button>
+        <Button variant={view === 'weekly' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('weekly')}>
+          Weekly view
+        </Button>
+        {view === 'weekly' && (
+          <input
+            type="date"
+            value={weekStart}
+            onChange={(e) => setWeekStart(e.target.value)}
+            className={inputClass + ' !w-auto'}
+          />
+        )}
+      </div>
+
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
 
       <Card className="!p-0 overflow-hidden">
+        {view === 'weekly' ? (
+          <div className="grid gap-0 md:grid-cols-7">
+            {(weekly?.days || []).map((day) => (
+              <div key={day.date} className="border-b border-r border-[var(--admin-border)] p-3 md:border-b-0">
+                <p className="text-xs font-semibold uppercase text-[var(--admin-subtle)]">{day.date}</p>
+                <ul className="mt-2 space-y-2">
+                  {(day.shifts || []).length === 0 ? (
+                    <li className="text-xs text-[var(--admin-muted)]">—</li>
+                  ) : (
+                    day.shifts.map((shift) => (
+                      <li key={shift.id} className="rounded-lg bg-[#f7f9fb] p-2 text-xs">
+                        <p className="font-medium">{formatDateTime(shift.startTime).slice(11)}</p>
+                        <p className="text-[var(--admin-muted)]">
+                          {shift.assignedEmployees?.map((e) => e.fullName).join(', ') || 'Unassigned'}
+                        </p>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            ))}
+            {!weekly && <p className="p-6 text-sm text-[var(--admin-muted)]">Loading weekly schedule…</p>}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
@@ -266,6 +333,7 @@ export default function ShiftsPage() {
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">No shifts yet.</p>
           )}
         </div>
+        )}
       </Card>
 
       <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Create shift" size="md">
