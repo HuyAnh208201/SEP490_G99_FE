@@ -127,7 +127,7 @@ export default function App() {
         <Route
           path="/catalog/products"
           element={
-            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']}>
+            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']} roles={['INVENTORY_STAFF']}>
               <ProductsPage />
             </PermissionRoute>
           }

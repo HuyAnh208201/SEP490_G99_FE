@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { usePermissions } from '../contexts/PermissionsContext.jsx';
+import { normalizeWebRole } from '../constants/userRoles.js';
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -12,8 +13,8 @@ export default function ProtectedRoute({ children }) {
   return children;
 }
 
-export function PermissionRoute({ permission, anyOf, children }) {
-  const { loading, has, hasAny } = usePermissions();
+export function PermissionRoute({ permission, anyOf, roles, children }) {
+  const { loading, has, hasAny, role } = usePermissions();
 
   if (loading) {
     return (
@@ -23,7 +24,10 @@ export function PermissionRoute({ permission, anyOf, children }) {
     );
   }
 
-  const allowed = anyOf?.length ? hasAny(anyOf) : has(permission);
+  const webRole = normalizeWebRole(role);
+  const roleOk = Boolean(roles?.length && roles.includes(webRole));
+  const permOk = anyOf?.length ? hasAny(anyOf) : permission ? has(permission) : false;
+  const allowed = roleOk || permOk;
 
   if (!allowed) {
     return (

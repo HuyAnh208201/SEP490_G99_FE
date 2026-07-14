@@ -69,7 +69,7 @@ export default function DispatchOrdersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Dispatch Orders"
         description="Monitor outbound dispatch orders, update shipment status, and view delivery progress."

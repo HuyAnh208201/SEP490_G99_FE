@@ -1,4 +1,6 @@
-import { http } from './http.js';
+﻿import { http } from './http.js';
+
+/** Central warehouse + branch stock — BE: /api/inventory/* */
 
 function unwrap(body) {
   if (!body?.success) {

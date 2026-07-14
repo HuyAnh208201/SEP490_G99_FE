@@ -65,7 +65,7 @@ export default function WarehouseInventoryPage() {
         <Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">Total units</p>
           <p className="mt-1 text-2xl font-semibold text-[var(--admin-text)]">
-            {rows.reduce((sum, r) => sum + (r.quantity || 0), 0).toLocaleString('vi-VN')}
+            {rows.reduce((sum, r) => sum + (r.quantity || 0), 0).toLocaleString('en-US')}
           </p>
         </Card>
       </div>

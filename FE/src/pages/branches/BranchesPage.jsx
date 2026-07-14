@@ -84,7 +84,7 @@ export default function BranchesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Branches"
         description="Store locations with structured address and operating hours."

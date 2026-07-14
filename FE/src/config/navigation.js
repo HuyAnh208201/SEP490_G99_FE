@@ -74,6 +74,8 @@ export const NAV_GROUPS = [
         label: 'Products',
         icon: 'package',
         permissions: ['PRODUCT_MANAGEMENT'],
+        // Inventory staff: catalog browse (BE GET /products is open; CRUD still needs PRODUCT_MANAGEMENT)
+        alsoRoles: ['INVENTORY_STAFF'],
       },
       {
         path: '/catalog/suppliers',

@@ -125,7 +125,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Team & accounts"
         description="Directors, warehouse managers, branch managers, cashiers, and inventory staff — one directory for your chain."

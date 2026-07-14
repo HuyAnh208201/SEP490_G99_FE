@@ -58,8 +58,10 @@ export function PermissionsProvider({ children }) {
   const canSeeNavItem = useCallback(
     (item) => {
       if (item.publicNav) return true;
+      const webRole = normalizeWebRole(role);
+      // Optional OR: allow role even without the usual permission codes.
+      if (item.alsoRoles?.length && item.alsoRoles.includes(webRole)) return true;
       if (item.roles?.length) {
-        const webRole = normalizeWebRole(role);
         return item.roles.includes(webRole);
       }
       if (!item.permissions?.length) return true;

@@ -189,7 +189,7 @@ export default function ShiftsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">

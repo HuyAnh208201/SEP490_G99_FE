@@ -168,7 +168,7 @@ export default function DashboardPage() {
   const quickLinks = QUICK_LINKS[webRole] || [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader
         title={config?.title || 'Overview'}
         description={`Role: ${ROLE_LABELS[webRole] || webRole || '—'}. ChainStore convenience chain management system.`}
@@ -179,7 +179,9 @@ export default function DashboardPage() {
         }
       />
 
-      {(webRole === 'ADMIN' || webRole === 'DIRECTOR') && <SetupWorkflowBanner />}
+      {(webRole === 'ADMIN' || webRole === 'DIRECTOR') && (
+        <SetupWorkflowBanner counts={webRole === 'ADMIN' ? counts : undefined} />
+      )}
 
       {config ? (
         <>
