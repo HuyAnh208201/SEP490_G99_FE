@@ -8,6 +8,7 @@ import {
 import { fetchCategories } from '../../api/categories.js';
 import { PRODUCT_UNITS, normalizeUnitValue, unitLabel } from '../../constants/productUnits.js';
 import { formatVnd } from '../../lib/money.js';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -42,6 +43,8 @@ function suggestSku(barcode) {
 }
 
 export default function ProductsPage() {
+  const { has } = usePermissions();
+  const canManage = has('PRODUCT_MANAGEMENT');
   const barcodeRef = useRef(null);
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -93,6 +96,7 @@ export default function ProductsPage() {
   }
 
   function startEdit(product) {
+    if (!canManage) return;
     setEditingId(product.id);
     setForm({
       code: product.code || '',
@@ -124,6 +128,7 @@ export default function ProductsPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!canManage) return;
     setFormError('');
 
     if (form.referenceImportPrice == null || form.defaultSalePrice == null) {
@@ -131,7 +136,7 @@ export default function ProductsPage() {
       return;
     }
     if (form.defaultSalePrice < form.referenceImportPrice) {
-      setFormError('Retail price is lower than import cost ΓÇö check pricing.');
+      setFormError('Retail price is lower than import cost — check pricing.');
       return;
     }
 
@@ -168,6 +173,7 @@ export default function ProductsPage() {
   }
 
   async function handleDelete(id) {
+    if (!canManage) return;
     if (!window.confirm('Delete this product?')) return;
     try {
       await deleteProduct(id);
@@ -182,10 +188,14 @@ export default function ProductsPage() {
     'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Products"
-        description="Product catalog with barcode scanning, SKU codes, and retail pricing."
+        description={
+          canManage
+            ? 'Product catalog with barcode scanning, SKU codes, and retail pricing.'
+            : 'Browse the product catalog (SKU, barcode, pricing). Editing requires catalog management permission.'
+        }
       />
 
       {error && (
@@ -194,185 +204,194 @@ export default function ProductsPage() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-5">
-        <Card className="xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold text-[var(--admin-text)]">
-              {editingId ? 'Edit product' : 'Add product'}
-            </h2>
-            {!editingId && (
-              <span className="text-xs text-[var(--admin-subtle)]">Focus barcode ΓåÆ scan</span>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
-                Identification
-              </p>
-
-              <BarcodeInput
-                ref={barcodeRef}
-                autoFocus={!editingId}
-                value={form.barcode}
-                onChange={(barcode) => patchForm({ barcode })}
-                onScan={handleBarcodeScan}
-                hint="USB scanner sends digits + Enter. Barcode is used at checkout."
-              />
-
+      <div className={`grid gap-4 ${canManage ? 'xl:grid-cols-12' : ''}`}>
+        {canManage && (
+          <Card className="xl:col-span-4">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-[var(--admin-text)]">
+                {editingId ? 'Edit product' : 'Add product'}
+              </h2>
               {!editingId && (
-                <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
-                  <input
-                    type="checkbox"
-                    checked={form.syncCodeFromBarcode}
-                    onChange={(e) =>
-                      patchForm({
-                        syncCodeFromBarcode: e.target.checked,
-                        code: e.target.checked ? suggestSku(form.barcode) : form.code,
-                      })
-                    }
-                    className="rounded border-[var(--admin-border)] text-[#0058be]"
-                  />
-                  Use barcode as product code (SKU)
-                </label>
-              )}
-
-              <FormField
-                label="Product code (SKU)"
-                required={!editingId}
-                hint="Internal code for reports & stock. Unique per item ΓÇö e.g. SP000123 or EAN."
-              >
-                <input
-                  required={!editingId}
-                  readOnly={!editingId && form.syncCodeFromBarcode}
-                  value={form.code}
-                  onChange={(e) => patchForm({ code: e.target.value.toUpperCase(), syncCodeFromBarcode: false })}
-                  placeholder="SP000123"
-                  className={`${selectClass} font-mono uppercase tracking-wide ${!editingId && form.syncCodeFromBarcode ? 'bg-[#f0f6ff]' : ''}`}
-                />
-              </FormField>
-
-              <FormField label="Product name" required>
-                <input
-                  required
-                  value={form.name}
-                  onChange={(e) => patchForm({ name: e.target.value })}
-                  placeholder="e.g. Aquafina 500ml"
-                  className={selectClass}
-                />
-              </FormField>
-            </section>
-
-            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
-                Category & unit
-              </p>
-
-              <FormField label="Category" required>
-                <select
-                  required
-                  value={form.categoryId}
-                  onChange={(e) => patchForm({ categoryId: e.target.value })}
-                  className={selectClass}
-                >
-                  <option value="">Select category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Unit of measure" required hint="Standard unit for POS & inventory.">
-                <select
-                  required
-                  value={form.unit}
-                  onChange={(e) => patchForm({ unit: e.target.value })}
-                  className={selectClass}
-                >
-                  {PRODUCT_UNITS.map((u) => (
-                    <option key={u.value} value={u.value}>
-                      {u.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-            </section>
-
-            <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
-                Pricing (VND)
-              </p>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Cost / import price" required hint="Cost price — used for margin reports.">
-                  <MoneyInput
-                    required
-                    value={form.referenceImportPrice}
-                    onChange={(v) => patchForm({ referenceImportPrice: v })}
-                  />
-                </FormField>
-                <FormField label="Retail price" required hint="Retail price — shown at POS.">
-                  <MoneyInput
-                    required
-                    value={form.defaultSalePrice}
-                    onChange={(v) => patchForm({ defaultSalePrice: v })}
-                  />
-                </FormField>
-              </div>
-
-              {form.referenceImportPrice != null &&
-                form.defaultSalePrice != null &&
-                form.defaultSalePrice >= form.referenceImportPrice && (
-                  <p className="text-xs text-[var(--admin-muted)]">
-                    Margin:{' '}
-                    <strong className="text-[var(--admin-success)]">
-                      {formatVnd(form.defaultSalePrice - form.referenceImportPrice)}
-                    </strong>{' '}
-                    (
-                    {Math.round(
-                      ((form.defaultSalePrice - form.referenceImportPrice) / form.defaultSalePrice) *
-                        100,
-                    )}
-                    %)
-                  </p>
-                )}
-            </section>
-
-            {editingId && (
-              <FormField label="Status">
-                <select
-                  value={form.status}
-                  onChange={(e) => patchForm({ status: e.target.value })}
-                  className={selectClass}
-                >
-                  <option value="active">Active ΓÇö sell at POS</option>
-                  <option value="inactive">Inactive ΓÇö hidden from POS</option>
-                </select>
-              </FormField>
-            )}
-
-            {formError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {formError}
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button type="submit" loading={saving}>
-                {editingId ? 'Save changes' : 'Create product'}
-              </Button>
-              {editingId && (
-                <Button type="button" variant="secondary" onClick={cancelEdit}>
-                  Cancel
-                </Button>
+                <span className="text-xs text-[var(--admin-subtle)]">Focus barcode → scan</span>
               )}
             </div>
-          </form>
-        </Card>
 
-        <Card className="xl:col-span-3 !p-0 overflow-hidden">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <section className="space-y-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                  Identification
+                </p>
+
+                <BarcodeInput
+                  ref={barcodeRef}
+                  autoFocus={!editingId}
+                  value={form.barcode}
+                  onChange={(barcode) => patchForm({ barcode })}
+                  onScan={handleBarcodeScan}
+                  hint="USB scanner sends digits + Enter. Barcode is used at checkout."
+                />
+
+                {!editingId && (
+                  <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
+                    <input
+                      type="checkbox"
+                      checked={form.syncCodeFromBarcode}
+                      onChange={(e) =>
+                        patchForm({
+                          syncCodeFromBarcode: e.target.checked,
+                          code: e.target.checked ? suggestSku(form.barcode) : form.code,
+                        })
+                      }
+                      className="rounded border-[var(--admin-border)] text-[#0058be]"
+                    />
+                    Use barcode as product code (SKU)
+                  </label>
+                )}
+
+                <FormField
+                  label="Product code (SKU)"
+                  required={!editingId}
+                  hint="Internal code for reports & stock. Unique per item — e.g. SP000123 or EAN."
+                >
+                  <input
+                    required={!editingId}
+                    readOnly={!editingId && form.syncCodeFromBarcode}
+                    value={form.code}
+                    onChange={(e) =>
+                      patchForm({ code: e.target.value.toUpperCase(), syncCodeFromBarcode: false })
+                    }
+                    placeholder="SP000123"
+                    className={`${selectClass} font-mono uppercase tracking-wide ${!editingId && form.syncCodeFromBarcode ? 'bg-[#f0f6ff]' : ''}`}
+                  />
+                </FormField>
+
+                <FormField label="Product name" required>
+                  <input
+                    required
+                    value={form.name}
+                    onChange={(e) => patchForm({ name: e.target.value })}
+                    placeholder="e.g. Aquafina 500ml"
+                    className={selectClass}
+                  />
+                </FormField>
+              </section>
+
+              <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                  Category & unit
+                </p>
+
+                <FormField label="Category" required>
+                  <select
+                    required
+                    value={form.categoryId}
+                    onChange={(e) => patchForm({ categoryId: e.target.value })}
+                    className={selectClass}
+                  >
+                    <option value="">Select category</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label="Unit of measure" required hint="Standard unit for POS & inventory.">
+                  <select
+                    required
+                    value={form.unit}
+                    onChange={(e) => patchForm({ unit: e.target.value })}
+                    className={selectClass}
+                  >
+                    {PRODUCT_UNITS.map((u) => (
+                      <option key={u.value} value={u.value}>
+                        {u.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </section>
+
+              <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#0058be]">
+                  Pricing (VND)
+                </p>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    label="Cost / import price"
+                    required
+                    hint="Cost price — used for margin reports."
+                  >
+                    <MoneyInput
+                      required
+                      value={form.referenceImportPrice}
+                      onChange={(v) => patchForm({ referenceImportPrice: v })}
+                    />
+                  </FormField>
+                  <FormField label="Retail price" required hint="Retail price — shown at POS.">
+                    <MoneyInput
+                      required
+                      value={form.defaultSalePrice}
+                      onChange={(v) => patchForm({ defaultSalePrice: v })}
+                    />
+                  </FormField>
+                </div>
+
+                {form.referenceImportPrice != null &&
+                  form.defaultSalePrice != null &&
+                  form.defaultSalePrice >= form.referenceImportPrice && (
+                    <p className="text-xs text-[var(--admin-muted)]">
+                      Margin:{' '}
+                      <strong className="text-[var(--admin-success)]">
+                        {formatVnd(form.defaultSalePrice - form.referenceImportPrice)}
+                      </strong>{' '}
+                      (
+                      {Math.round(
+                        ((form.defaultSalePrice - form.referenceImportPrice) /
+                          form.defaultSalePrice) *
+                          100,
+                      )}
+                      %)
+                    </p>
+                  )}
+              </section>
+
+              {editingId && (
+                <FormField label="Status">
+                  <select
+                    value={form.status}
+                    onChange={(e) => patchForm({ status: e.target.value })}
+                    className={selectClass}
+                  >
+                    <option value="active">Active — sell at POS</option>
+                    <option value="inactive">Inactive — hidden from POS</option>
+                  </select>
+                </FormField>
+              )}
+
+              {formError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button type="submit" loading={saving}>
+                  {editingId ? 'Save changes' : 'Create product'}
+                </Button>
+                {editingId && (
+                  <Button type="button" variant="secondary" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Card>
+        )}
+
+        <Card className={`${canManage ? 'xl:col-span-8' : ''} !p-0 overflow-hidden`}>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
             <p className="text-sm text-[var(--admin-muted)]">
               <strong>{filtered.length}</strong> / {items.length} products
@@ -386,7 +405,7 @@ export default function ProductsPage() {
             />
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <table className="w-full min-w-full text-left text-sm">
               <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                 <tr>
                   <th className="px-4 py-3">SKU</th>
@@ -396,14 +415,14 @@ export default function ProductsPage() {
                   <th className="px-4 py-3">Retail</th>
                   <th className="px-4 py-3">Unit</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  {canManage && <th className="px-4 py-3 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={8} className="px-4 py-4">
+                        <td colSpan={canManage ? 8 : 7} className="px-4 py-4">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
@@ -417,33 +436,39 @@ export default function ProductsPage() {
                           {p.code}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs text-[var(--admin-muted)]">
-                          {p.barcode || 'ΓÇö'}
+                          {p.barcode || '—'}
                         </td>
                         <td className="px-4 py-3 font-medium">{p.name}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {p.categoryName || 'ΓÇö'}
+                          {p.categoryName || '—'}
                         </td>
                         <td className="px-4 py-3 tabular-nums">{formatVnd(p.defaultSalePrice)}</td>
                         <td className="px-4 py-3">{unitLabel(p.unit)}</td>
                         <td className="px-4 py-3">
                           <Badge tone={p.status === 'active' ? 'success' : 'danger'}>
-                            {p.status || 'ΓÇö'}
+                            {p.status || '—'}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" className="!px-2 !py-1" onClick={() => startEdit(p)}>
-                              Edit
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              className="!px-2 !py-1 !text-red-600"
-                              onClick={() => handleDelete(p.id)}
-                            >
-                              Delete
-                            </Button>
-                          </div>
-                        </td>
+                        {canManage && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1"
+                                onClick={() => startEdit(p)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1 !text-red-600"
+                                onClick={() => handleDelete(p.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
               </tbody>

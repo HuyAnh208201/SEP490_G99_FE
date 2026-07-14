@@ -58,7 +58,8 @@ chainstore-admin/
 4. **Tailwind first.** Nếu cần style phức tạp (gradient mesh, animation key-frames), bỏ vào `tokens.css` hoặc inline `style={{}}` cho rõ ràng.
 5. **Form validation**: HTML5 + state cục bộ trước; chỉ kéo react-hook-form khi form thực sự phức tạp.
 6. **API call**: luôn qua `src/api/*`. Component không gọi axios trực tiếp.
-7. **Đa ngôn ngữ**: hiện tại hardcode tiếng Việt. Khi cần i18n, gom string vào `src/i18n/`.
+7. **UI language**: English only for all user-facing FE strings. Do not hardcode Vietnamese UI copy.
+8. **Layout density**: Prefer full-width list/table pages (`w-full`). Sacrifice side whitespace so tables are readable without horizontal scroll caused by empty gutters.
 
 ## Style direction (đừng đi chệch)
 

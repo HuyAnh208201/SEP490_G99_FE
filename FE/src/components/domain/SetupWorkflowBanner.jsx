@@ -20,7 +20,11 @@ const STEP_CHECKS = {
   6: (counts) => counts.campaigns > 0,
 };
 
-export default function SetupWorkflowBanner() {
+/**
+ * @param {{ counts?: Record<string, number|string> }} props
+ * Pass `counts` from Admin dashboard to avoid a second API wave.
+ */
+export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
   const { has } = usePermissions();
   const [counts, setCounts] = useState({
     categories: 0,
@@ -32,6 +36,18 @@ export default function SetupWorkflowBanner() {
   });
 
   useEffect(() => {
+    if (countsProp) {
+      setCounts({
+        categories: Number(countsProp.categories) || 0,
+        products: Number(countsProp.products) || 0,
+        suppliers: Number(countsProp.suppliers) || 0,
+        branches: Number(countsProp.branches) || 0,
+        users: Number(countsProp.users) || 0,
+        campaigns: Number(countsProp.campaigns) || 0,
+      });
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadProgress() {
@@ -65,7 +81,7 @@ export default function SetupWorkflowBanner() {
     return () => {
       cancelled = true;
     };
-  }, [has]);
+  }, [has, countsProp]);
 
   const completedSetupSteps = SETUP_WORKFLOW.filter((step) =>
     STEP_CHECKS[step.step]?.(counts),
@@ -83,9 +99,7 @@ export default function SetupWorkflowBanner() {
             {completedSetupSteps >= 6 ? (
               <Badge tone="success">Setup complete</Badge>
             ) : (
-              <Badge tone="soon">
-                {completedSetupSteps}/6 core steps
-              </Badge>
+              <Badge tone="soon">{completedSetupSteps}/6 core steps</Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-[var(--admin-muted)]">

@@ -78,7 +78,7 @@ export default function PurchaseOrdersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Purchase Orders"
         description="Order stock from suppliers to replenish the central warehouse and release requests waiting for stock."

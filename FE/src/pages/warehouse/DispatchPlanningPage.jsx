@@ -101,7 +101,7 @@ export default function DispatchPlanningPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Dispatch Planning"
         description="Select approved requests and group them into a dispatch order by delivery area and route."
