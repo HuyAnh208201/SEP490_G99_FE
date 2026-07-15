@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import { unitLabel } from '../../../constants/productUnits.js';
@@ -29,6 +30,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef(null);
+  const supplierSectionRef = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -154,10 +156,20 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
     });
   }
 
+  function focusSupplierField() {
+    supplierSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   async function handleSubmit() {
     setError('');
     if (!supplierId) {
-      setError('Please select a supplier.');
+      setError('Please select a supplier before creating the purchase order.');
+      focusSupplierField();
+      return;
+    }
+    if (suppliers.length === 0) {
+      setError('No active suppliers available. Add a supplier in Catalog first.');
+      focusSupplierField();
       return;
     }
     const items = lineList
@@ -188,6 +200,13 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
   }
 
   const availableRecommended = recommended.filter((r) => !lines.has(r.productId));
+  const needsSupplier = lineList.length > 0 && !supplierId;
+  const submitHint =
+    lineList.length === 0
+      ? 'Add at least one product to continue.'
+      : !supplierId
+        ? 'Select a supplier to create the purchase order.'
+        : '';
 
   return (
     <Modal
@@ -196,6 +215,23 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
       title="Create Purchase Order"
       description="Order stock from a supplier to replenish the central warehouse."
       size="xl"
+      footer={
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {submitHint && (
+            <p className="mr-auto text-sm text-amber-700">{submitHint}</p>
+          )}
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            loading={submitting}
+            disabled={lineList.length === 0 || submitting}
+            onClick={handleSubmit}
+          >
+            Create Purchase Order
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-6">
         {error && (
@@ -205,7 +241,14 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
         )}
 
         {/* Purchase order information */}
-        <section className="grid grid-cols-1 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-2">
+        <section
+          ref={supplierSectionRef}
+          className={`grid grid-cols-1 gap-4 rounded-xl border bg-[#f7f9fb]/60 p-4 sm:grid-cols-2 ${
+            needsSupplier
+              ? 'border-amber-300 ring-2 ring-amber-100'
+              : 'border-[var(--admin-border)]'
+          }`}
+        >
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               Supplier <span className="text-red-500">*</span>
@@ -213,7 +256,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} ${needsSupplier ? 'border-amber-400' : ''}`}
               disabled={loading}
             >
               <option value="">Select a supplier…</option>
@@ -223,6 +266,20 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
                 </option>
               ))}
             </select>
+            {!loading && suppliers.length === 0 && (
+              <p className="mt-1.5 text-xs text-red-600">
+                No active suppliers found.{' '}
+                <Link to="/catalog/suppliers" className="font-medium underline">
+                  Add a supplier
+                </Link>{' '}
+                in Catalog first.
+              </p>
+            )}
+            {needsSupplier && suppliers.length > 0 && (
+              <p className="mt-1.5 text-xs text-amber-700">
+                Required — choose which supplier will fulfill this order.
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
@@ -452,18 +509,6 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
           </div>
         </section>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            loading={submitting}
-            disabled={lineList.length === 0 || !supplierId}
-            onClick={handleSubmit}
-          >
-            Create Purchase Order
-          </Button>
-        </div>
       </div>
     </Modal>
   );

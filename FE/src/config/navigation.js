@@ -126,16 +126,34 @@ export const NAV_GROUPS = [
         icon: 'truck',
         permissions: ['CHOOSE_EXTERNAL_SUPPLIER'],
       },
+    ],
+  },
+  {
+    label: 'Inventory staff',
+    items: [
       {
-        path: '/purchase-requests',
-        label: 'Supply import',
-        icon: 'request',
-        anyPermission: true,
-        permissions: [
-          'CREATE_IMPORT_REQUEST',
-          'APPROVE_IMPORT_REQUEST',
-          'MANAGE_BRANCH_IMPORT_REQUESTS',
-        ],
+        path: '/inventory/count',
+        label: 'Inventory Count',
+        icon: 'boxes',
+        permissions: ['INVENTORY_COUNT'],
+      },
+      {
+        path: '/inventory/count-history',
+        label: 'Count History',
+        icon: 'report',
+        permissions: ['INVENTORY_COUNT'],
+      },
+      {
+        path: '/inventory/order-tracking',
+        label: 'Order Tracking',
+        icon: 'dispatch',
+        permissions: ['RECEIVE_SHIPMENT'],
+      },
+      {
+        path: '/inventory/receiving-history',
+        label: 'Receiving History',
+        icon: 'inbox',
+        permissions: ['RECEIVE_SHIPMENT'],
       },
     ],
   },
@@ -164,6 +182,12 @@ export const NAV_GROUPS = [
         label: 'Branch (BM)',
         icon: 'branch',
         permissions: ['BRANCH_DASHBOARD'],
+      },
+      {
+        path: '/purchase-requests',
+        label: 'Import requests',
+        icon: 'request',
+        permissions: ['CREATE_IMPORT_REQUEST'],
       },
       {
         path: '/branch-manager/shifts',

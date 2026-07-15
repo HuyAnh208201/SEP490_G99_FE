@@ -17,6 +17,11 @@ import IncomingRequestsPage from './pages/warehouse/IncomingRequestsPage.jsx';
 import DispatchPlanningPage from './pages/warehouse/DispatchPlanningPage.jsx';
 import DispatchOrdersPage from './pages/warehouse/DispatchOrdersPage.jsx';
 import PurchaseOrdersPage from './pages/warehouse/PurchaseOrdersPage.jsx';
+import OrderTrackingPage from './pages/inventory-staff/OrderTrackingPage.jsx';
+import ReceiveShipmentPage from './pages/inventory-staff/ReceiveShipmentPage.jsx';
+import ReceivingHistoryPage from './pages/inventory-staff/ReceivingHistoryPage.jsx';
+import InventoryCountPage from './pages/inventory-staff/InventoryCountPage.jsx';
+import CountHistoryPage from './pages/inventory-staff/CountHistoryPage.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
@@ -190,6 +195,47 @@ export default function App() {
           element={
             <PermissionRoute permission="CHOOSE_EXTERNAL_SUPPLIER">
               <PurchaseOrdersPage />
+            </PermissionRoute>
+          }
+        />
+
+        <Route
+          path="/inventory/order-tracking"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <OrderTrackingPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/receive/:dispatchOrderId/:requestId"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <ReceiveShipmentPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/receiving-history"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <ReceivingHistoryPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/count"
+          element={
+            <PermissionRoute permission="INVENTORY_COUNT">
+              <InventoryCountPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/count-history"
+          element={
+            <PermissionRoute permission="INVENTORY_COUNT">
+              <CountHistoryPage />
             </PermissionRoute>
           }
         />
