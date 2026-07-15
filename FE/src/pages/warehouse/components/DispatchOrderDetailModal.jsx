@@ -1,30 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import { formatDateTime } from '../../../lib/datetime.js';
 import { unitLabel } from '../../../constants/productUnits.js';
 import {
+  WAREHOUSE_DISPATCH_STATUS_OPTIONS,
   dispatchStatusMeta,
-  nextDispatchStatus,
-  DISPATCH_STATUS_META,
+  isWarehouseEditableStatus,
+  normalizeDispatchStatus,
 } from '../../../constants/dispatch.js';
 import { updateDispatchStatus } from '../../../api/dispatch.js';
 
 export default function DispatchOrderDetailModal({ open, onClose, order, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+
+  useEffect(() => {
+    if (order) {
+      setSelectedStatus(normalizeDispatchStatus(order.status) || 'preparing');
+    }
+  }, [order]);
 
   if (!order) return null;
   const meta = dispatchStatusMeta(order.status);
-  const next = nextDispatchStatus(order.status);
+  const editable = isWarehouseEditableStatus(order.status);
+  const dirty = normalizeDispatchStatus(order.status) !== selectedStatus;
 
-  async function advance() {
-    if (!next) return;
+  async function applyStatus() {
+    if (!editable || !dirty) return;
     setBusy(true);
     setError('');
     try {
-      await updateDispatchStatus(order.id, next);
+      await updateDispatchStatus(order.id, selectedStatus);
       onChanged?.();
       onClose();
     } catch (err) {
@@ -39,7 +48,7 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
       open={open}
       onClose={onClose}
       title={`Dispatch ${order.dispatchNumber || ''}`}
-      description="Delivery batch details and shipment progress."
+      description="Delivery batch details. Delivered status is set when branch inventory staff confirms receipt."
       size="xl"
     >
       <div className="space-y-5">
@@ -51,12 +60,29 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               Status
             </p>
-            <Badge tone={meta.tone} className="mt-1">
-              {meta.display}
-            </Badge>
+            {editable ? (
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-[var(--admin-border)] bg-white px-2 py-1.5 text-sm"
+              >
+                {WAREHOUSE_DISPATCH_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <Badge tone={meta.tone} className="mt-1">
+                {meta.label}
+              </Badge>
+            )}
           </div>
           <Info label="Created" value={formatDateTime(order.createdAt)} />
-          <Info label="Delivered" value={order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'} />
+          <Info
+            label="Delivered"
+            value={order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
+          />
         </div>
 
         {(order.requests || []).map((req) => (
@@ -105,9 +131,9 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          {next && (
-            <Button loading={busy} onClick={advance}>
-              Mark as {DISPATCH_STATUS_META[next].label}
+          {editable && (
+            <Button loading={busy} disabled={!dirty} onClick={applyStatus}>
+              Apply status
             </Button>
           )}
         </div>
