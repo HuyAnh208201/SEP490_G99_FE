@@ -9,6 +9,7 @@ import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
 import CreateUserModal from '../../components/domain/CreateUserModal.jsx';
+import CriticalUserActionModal from '../../components/domain/CriticalUserActionModal.jsx';
 import UserDetailDrawer from '../../components/domain/UserDetailDrawer.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
 
@@ -40,6 +41,7 @@ export default function UsersPage() {
   const [branchFilter, setBranchFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const [criticalAction, setCriticalAction] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,7 +98,15 @@ export default function UsersPage() {
     );
   }, [users, query, roleFilter, branchFilter]);
 
+  function isCriticalUser(user) {
+    return ['ADMIN', 'DIRECTOR', 'OWNER', 'PROMOTION_DIRECTOR'].includes(user.role);
+  }
+
   async function handleDeactivate(targetUser) {
+    if (isCriticalUser(targetUser)) {
+      setCriticalAction({ user: targetUser, type: 'DEACTIVATE', label: 'Deactivate' });
+      return;
+    }
     if (!window.confirm(`Deactivate account for ${targetUser.name}?`)) return;
     setActionLoading(`deactivate-${targetUser.id}`);
     setError('');
@@ -111,6 +121,10 @@ export default function UsersPage() {
   }
 
   async function handleDelete(targetUser) {
+    if (isCriticalUser(targetUser)) {
+      setCriticalAction({ user: targetUser, type: 'DELETE', label: 'Delete' });
+      return;
+    }
     if (!window.confirm(`Delete account for ${targetUser.name}? This cannot be undone.`)) return;
     setActionLoading(`delete-${targetUser.id}`);
     setError('');
@@ -289,6 +303,22 @@ export default function UsersPage() {
         currentUserId={currentUserId}
         onClose={() => setSelectedUserId(null)}
         onChanged={load}
+      />
+
+      <CriticalUserActionModal
+        open={Boolean(criticalAction)}
+        user={criticalAction?.user}
+        actionType={criticalAction?.type}
+        actionLabel={criticalAction?.label || 'Confirm'}
+        onClose={() => setCriticalAction(null)}
+        onConfirm={async (verification) => {
+          if (criticalAction?.type === 'DELETE') {
+            await deleteUser(criticalAction.user.id, verification);
+          } else {
+            await updateUserStatus(criticalAction.user.id, false, verification);
+          }
+          await load();
+        }}
       />
     </div>
   );

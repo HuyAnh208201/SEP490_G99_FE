@@ -11,7 +11,7 @@ import {
   saveDraft,
   submitRequest,
 } from '../../../api/purchaseRequests.js';
-import { unitLabel } from '../../../constants/productUnits.js';
+import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
 import ProductCatalogPicker from './ProductCatalogPicker.jsx';
 
 const inputClass =
@@ -151,7 +151,9 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
             productId: id,
             productName: p.name ?? p.productName,
             productCode: p.code ?? p.productCode,
-            unit: p.unit,
+            unit: p.importUnit || p.unit,
+            retailUnit: p.unit,
+            unitsPerImportUnit: p.unitsPerImportUnit,
             requestedQuantity: qtyResolver ? qtyResolver(p) : 1,
           };
         });
@@ -292,7 +294,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                   <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                     <tr>
                       <th className="px-3 py-2.5">Product</th>
-                      <th className="px-3 py-2.5">Unit</th>
+                      <th className="px-3 py-2.5">Import unit</th>
                       <th className="px-3 py-2.5 text-right">Qty</th>
                       <th className="px-3 py-2.5" />
                     </tr>
@@ -306,7 +308,15 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                             {l.productCode}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-[var(--admin-muted)]">{unitLabel(l.unit)}</td>
+                        <td className="px-3 py-2 text-[var(--admin-muted)]">
+                          {purchaseUnitLabel(l.unit)}
+                          {l.unitsPerImportUnit ? (
+                            <span className="block text-[10px] text-[var(--admin-subtle)]">
+                              {l.unitsPerImportUnit} {unitLabel(l.retailUnit || l.unit)} /{' '}
+                              {purchaseUnitLabel(l.unit)}
+                            </span>
+                          ) : null}
+                        </td>
                         <td className="px-3 py-2 text-right">
                           <input
                             type="number"

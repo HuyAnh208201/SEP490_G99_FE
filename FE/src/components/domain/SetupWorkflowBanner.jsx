@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchBranches } from '../../api/branches.js';
 import { fetchCampaigns } from '../../api/campaigns.js';
-import { fetchCategories } from '../../api/categories.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchSuppliers } from '../../api/suppliers.js';
 import { fetchUsers } from '../../api/users.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import Card from '../ui/Card.jsx';
 import Badge from '../ui/Badge.jsx';
 import { SETUP_WORKFLOW } from '../../config/navigation.js';
@@ -26,6 +26,7 @@ const STEP_CHECKS = {
  */
 export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
   const { has } = usePermissions();
+  const { getCategories, getProducts, getSuppliers } = useReferenceData();
   const [counts, setCounts] = useState({
     categories: 0,
     products: 0,
@@ -52,9 +53,9 @@ export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
 
     async function loadProgress() {
       const tasks = [
-        ['categories', fetchCategories()],
-        ['products', fetchProducts()],
-        ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['categories', getCategories()],
+        ['products', getProducts()],
+        ['suppliers', has('SUPPLIER_MANAGEMENT') ? getSuppliers() : Promise.resolve([])],
         ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
         ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
         ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
@@ -81,7 +82,7 @@ export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [has, countsProp]);
+  }, [has, countsProp, getCategories, getProducts, getSuppliers]);
 
   const completedSetupSteps = SETUP_WORKFLOW.filter((step) =>
     STEP_CHECKS[step.step]?.(counts),
