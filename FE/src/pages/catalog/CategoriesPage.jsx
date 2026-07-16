@@ -95,7 +95,7 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Product categories"
         description="Step 1 of admin setup — create product groups before adding SKUs."

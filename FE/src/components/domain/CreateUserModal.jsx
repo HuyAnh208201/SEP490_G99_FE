@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createUser, fetchMe } from '../../api/users.js';
+import { createUser, fetchCriticalRoleSlots, fetchMe } from '../../api/users.js';
 import { fetchBranches, fetchBranchById } from '../../api/branches.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
@@ -37,21 +37,31 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
   const { user } = useAuth();
   const { role: actorRole } = usePermissions();
   const webRole = normalizeWebRole(actorRole);
-  const roles = useMemo(() => {
-    const list = getAssignableRoles(actorRole);
-    if (webRole === 'BRANCH_MANAGER') {
-      return list.filter((r) => r === 'CASHIER' || r === 'INVENTORY_STAFF');
-    }
-    return list;
-  }, [actorRole, webRole]);
   const actorBranchId = user?.branchId ?? user?.branch_id ?? null;
 
   const [step, setStep] = useState('details');
   const [form, setForm] = useState(EMPTY);
   const [branches, setBranches] = useState([]);
+  const [roleSlots, setRoleSlots] = useState(null);
   const [lockedBranchName, setLockedBranchName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const roles = useMemo(() => {
+    let list = getAssignableRoles(actorRole);
+    if (webRole === 'BRANCH_MANAGER') {
+      list = list.filter((r) => r === 'CASHIER' || r === 'INVENTORY_STAFF');
+    }
+    if (roleSlots) {
+      list = list.filter((r) => {
+        if (r === 'ADMIN') return roleSlots.adminAvailable;
+        if (r === 'DIRECTOR' || r === 'PROMOTION_DIRECTOR') return roleSlots.directorAvailable;
+        if (r === 'WAREHOUSE_MANAGER') return roleSlots.warehouseManagerAvailable;
+        return true;
+      });
+    }
+    return list;
+  }, [actorRole, webRole, roleSlots]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +91,9 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
     fetchBranches()
       .then((data) => setBranches(Array.isArray(data) ? data : []))
       .catch(() => setBranches([]));
+    fetchCriticalRoleSlots()
+      .then((slots) => setRoleSlots(slots))
+      .catch(() => setRoleSlots(null));
   }, [open, roles, webRole, actorBranchId]);
 
   function patch(updates) {

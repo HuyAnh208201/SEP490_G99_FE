@@ -1,6 +1,8 @@
 /**
  * Sidebar menu — each item maps to a BE permission code (WebPermission).
  * `anyPermission: true` → visible if user has at least one listed permission.
+ *
+ * Role abbreviations: BM = Branch Manager, IS = Inventory Staff, WM = Warehouse Manager.
  */
 import { ROLE_LABELS } from '../constants/userRoles.js';
 
@@ -73,7 +75,9 @@ export const NAV_GROUPS = [
         path: '/catalog/products',
         label: 'Products',
         icon: 'package',
-        permissions: ['PRODUCT_MANAGEMENT'],
+        anyPermission: true,
+        permissions: ['PRODUCT_MANAGEMENT', 'PRODUCT_VIEW'],
+        alsoRoles: ['INVENTORY_STAFF'],
       },
       {
         path: '/catalog/suppliers',
@@ -92,12 +96,6 @@ export const NAV_GROUPS = [
         label: 'Central warehouse',
         icon: 'warehouse',
         permissions: ['WAREHOUSE_DASHBOARD'],
-      },
-      {
-        path: '/warehouse/inventory',
-        label: 'Inventory',
-        icon: 'boxes',
-        permissions: ['VIEW_CENTRAL_INVENTORY'],
       },
       {
         path: '/warehouse/incoming-requests',
@@ -124,16 +122,28 @@ export const NAV_GROUPS = [
         icon: 'truck',
         permissions: ['CHOOSE_EXTERNAL_SUPPLIER'],
       },
+    ],
+  },
+  {
+    label: 'Inventory staff',
+    items: [
       {
-        path: '/purchase-requests',
-        label: 'Supply import',
-        icon: 'request',
-        anyPermission: true,
-        permissions: [
-          'CREATE_IMPORT_REQUEST',
-          'APPROVE_IMPORT_REQUEST',
-          'MANAGE_BRANCH_IMPORT_REQUESTS',
-        ],
+        path: '/inventory/count-history',
+        label: 'Count History',
+        icon: 'report',
+        permissions: ['INVENTORY_COUNT'],
+      },
+      {
+        path: '/inventory/order-tracking',
+        label: 'Order Tracking',
+        icon: 'dispatch',
+        permissions: ['RECEIVE_SHIPMENT'],
+      },
+      {
+        path: '/inventory/receiving-history',
+        label: 'Receiving History',
+        icon: 'inbox',
+        permissions: ['RECEIVE_SHIPMENT'],
       },
     ],
   },
@@ -141,10 +151,16 @@ export const NAV_GROUPS = [
     label: 'Branch staff',
     items: [
       {
-        path: '/purchase-requests',
+        path: '/branch-manager/receive',
         label: 'Receive goods',
-        icon: 'request',
+        icon: 'boxes',
         permissions: ['SUPPLY_IMPORT_RECEIPT_APPROVE'],
+      },
+      {
+        path: '/my-shifts',
+        label: 'My shifts',
+        icon: 'clock',
+        permissions: ['MY_SHIFTS'],
       },
     ],
   },
@@ -156,6 +172,12 @@ export const NAV_GROUPS = [
         label: 'Branch (BM)',
         icon: 'branch',
         permissions: ['BRANCH_DASHBOARD'],
+      },
+      {
+        path: '/purchase-requests',
+        label: 'Import requests',
+        icon: 'request',
+        permissions: ['CREATE_IMPORT_REQUEST'],
       },
       {
         path: '/branch-manager/shifts',
@@ -215,7 +237,7 @@ export const SETUP_WORKFLOW = [
   { step: 5, label: 'Team', path: '/users' },
   { step: 6, label: 'Promotions', path: '/promotions' },
   { step: 7, label: 'Import requests', path: '/purchase-requests' },
-  { step: 8, label: 'Inventory', path: '/warehouse/inventory' },
+  { step: 8, label: 'Products', path: '/catalog/products' },
   { step: 9, label: 'Shifts', path: '/branch-manager/shifts' },
   { step: 10, label: 'Reports', path: '/director/reports' },
 ];

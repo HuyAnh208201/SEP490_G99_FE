@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import {
   adminApi,
   branchManagerApi,
@@ -8,9 +9,6 @@ import {
   warehouseApi,
 } from '../../api/modules.js';
 import { fetchBranches } from '../../api/branches.js';
-import { fetchCategories } from '../../api/categories.js';
-import { fetchProducts } from '../../api/products.js';
-import { fetchSuppliers } from '../../api/suppliers.js';
 import { fetchUsers } from '../../api/users.js';
 import { fetchCampaigns } from '../../api/campaigns.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -86,12 +84,12 @@ const QUICK_LINKS = {
   BRANCH_MANAGER: [
     { to: '/branch-manager/shifts', label: 'Shifts' },
     { to: '/users', label: 'Team & accounts' },
-    { to: '/purchase-requests', label: 'Supply import' },
+    { to: '/purchase-requests', label: 'Import requests' },
     { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
   ],
   WAREHOUSE_MANAGER: [
     { to: '/warehouse/inventory', label: 'Inventory' },
-    { to: '/purchase-requests', label: 'Supply import' },
+    { to: '/warehouse/incoming-requests', label: 'Incoming requests' },
     { to: '/warehouse/dispatch', label: 'Dispatch orders' },
     { to: '/catalog/suppliers', label: 'Suppliers' },
   ],
@@ -99,6 +97,7 @@ const QUICK_LINKS = {
 
 export default function DashboardPage() {
   const { role, has } = usePermissions();
+  const { getCategories, getProducts, getSuppliers } = useReferenceData();
   const webRole = normalizeWebRole(role);
 
   const config = ROLE_DASHBOARD[webRole];
@@ -141,9 +140,9 @@ export default function DashboardPage() {
       const tasks = [
         ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
         ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
-        ['products', fetchProducts()],
-        ['categories', fetchCategories()],
-        ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['products', getProducts()],
+        ['categories', getCategories()],
+        ['suppliers', has('SUPPLIER_MANAGEMENT') ? getSuppliers() : Promise.resolve([])],
         ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
       ];
 
@@ -163,12 +162,12 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [webRole, has]);
+  }, [webRole, has, getCategories, getProducts, getSuppliers]);
 
   const quickLinks = QUICK_LINKS[webRole] || [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <PageHeader
         title={config?.title || 'Overview'}
         description={`Role: ${ROLE_LABELS[webRole] || webRole || '—'}. ChainStore convenience chain management system.`}
@@ -179,7 +178,9 @@ export default function DashboardPage() {
         }
       />
 
-      {(webRole === 'ADMIN' || webRole === 'DIRECTOR') && <SetupWorkflowBanner />}
+      {(webRole === 'ADMIN' || webRole === 'DIRECTOR') && (
+        <SetupWorkflowBanner counts={webRole === 'ADMIN' ? counts : undefined} />
+      )}
 
       {config ? (
         <>

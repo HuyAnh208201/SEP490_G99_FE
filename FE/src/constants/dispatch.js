@@ -1,19 +1,47 @@
 /**
- * Dispatch (lô vận chuyển) constants — status machine, badges, vehicle options, permissions.
- * BE trả status uppercase (PREPARING/DELIVERING/RECEIVED).
+ * Dispatch (shipment batch) constants — status machine, badges, vehicle options, permissions.
+ * The backend returns statuses in uppercase (PREPARING/DELIVERING/REDELIVERY/RECEIVED).
  */
 
 export const DISPATCH_STATUS = {
   PREPARING: 'preparing',
   DELIVERING: 'delivering',
+  REDELIVERY: 'redelivery',
   RECEIVED: 'received',
 };
 
 export const DISPATCH_STATUS_META = {
-  [DISPATCH_STATUS.PREPARING]: { label: 'Preparing', display: 'PREPARING', tone: 'warning' },
-  [DISPATCH_STATUS.DELIVERING]: { label: 'Delivering', display: 'DELIVERING', tone: 'brand' },
-  [DISPATCH_STATUS.RECEIVED]: { label: 'Received', display: 'RECEIVED', tone: 'success' },
+  [DISPATCH_STATUS.PREPARING]: {
+    label: 'Preparing',
+    display: 'PREPARING',
+    tone: 'warning',
+  },
+  [DISPATCH_STATUS.DELIVERING]: {
+    label: 'Delivering',
+    display: 'DELIVERING',
+    tone: 'brand',
+  },
+  [DISPATCH_STATUS.REDELIVERY]: {
+    label: 'Redelivery',
+    display: 'REDELIVERY',
+    tone: 'danger',
+  },
+  [DISPATCH_STATUS.RECEIVED]: {
+    label: 'Delivered',
+    display: 'RECEIVED',
+    tone: 'success',
+  },
 };
+
+/** Warehouse statuses selectable in the dropdown (excludes RECEIVED). */
+export const WAREHOUSE_DISPATCH_STATUS_OPTIONS = [
+  DISPATCH_STATUS.PREPARING,
+  DISPATCH_STATUS.DELIVERING,
+  DISPATCH_STATUS.REDELIVERY,
+].map((value) => ({
+  value,
+  label: DISPATCH_STATUS_META[value].label,
+}));
 
 export const DISPATCH_STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -47,15 +75,16 @@ export function dispatchStatusMeta(status) {
   );
 }
 
-/** Next status in the delivery lifecycle, or null if terminal. */
-export function nextDispatchStatus(status) {
-  const key = normalizeDispatchStatus(status);
-  if (key === DISPATCH_STATUS.PREPARING) return DISPATCH_STATUS.DELIVERING;
-  if (key === DISPATCH_STATUS.DELIVERING) return DISPATCH_STATUS.RECEIVED;
-  return null;
-}
-
 /** Warehouse manager manages dispatch orders. */
 export function canManageDispatch(has) {
   return typeof has === 'function' && has('MANAGE_DISPATCH_ORDERS');
+}
+
+export function isWarehouseEditableStatus(status) {
+  const key = normalizeDispatchStatus(status);
+  return (
+    key === DISPATCH_STATUS.PREPARING ||
+    key === DISPATCH_STATUS.DELIVERING ||
+    key === DISPATCH_STATUS.REDELIVERY
+  );
 }

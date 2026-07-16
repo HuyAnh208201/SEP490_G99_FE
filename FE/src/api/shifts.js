@@ -60,3 +60,20 @@ export async function fetchAvailableEmployees({ branchId, date, startTime, endTi
   });
   return unwrap(data);
 }
+
+export async function fetchWeeklySchedule(branchId, weekStart) {
+  const { data } = await http.get('/shifts/weekly', {
+    params: { branchId, weekStart },
+  });
+  return unwrap(data);
+}
+
+export async function fetchMyShifts() {
+  const { data } = await http.get('/shifts/my');
+  return unwrap(data);
+}
+
+export async function checkInShift(shiftId) {
+  const { data } = await http.patch(`/shifts/${shiftId}/check-in`);
+  return unwrap(data);
+}

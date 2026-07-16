@@ -9,7 +9,19 @@ const inputClass =
  * - autofocus for USB/Bluetooth scanners (rapid digits + Enter)
  */
 const BarcodeInput = forwardRef(function BarcodeInput(
-  { value, onChange, onScan, label = 'Barcode', hint, required, autoFocus, id, name },
+  {
+    value,
+    onChange,
+    onScan,
+    onGenerate,
+    generating,
+    label = 'Barcode',
+    hint,
+    required,
+    autoFocus,
+    id,
+    name,
+  },
   ref,
 ) {
   const innerRef = useRef(null);
@@ -44,6 +56,16 @@ const BarcodeInput = forwardRef(function BarcodeInput(
         <span className="rounded-full bg-[#0058be]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0058be]">
           Scan ready
         </span>
+        {onGenerate && (
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={generating}
+            className="rounded-lg border border-[#0058be]/30 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0058be] hover:bg-[#f0f6ff] disabled:opacity-60"
+          >
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        )}
       </div>
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--admin-subtle)]">
