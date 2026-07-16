@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchBranches } from '../../api/branches.js';
 import { fetchCampaigns } from '../../api/campaigns.js';
-import { fetchCategories } from '../../api/categories.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchSuppliers } from '../../api/suppliers.js';
 import { fetchUsers } from '../../api/users.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
+import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import Card from '../ui/Card.jsx';
 import Badge from '../ui/Badge.jsx';
 import { SETUP_WORKFLOW } from '../../config/navigation.js';
@@ -20,8 +20,13 @@ const STEP_CHECKS = {
   6: (counts) => counts.campaigns > 0,
 };
 
-export default function SetupWorkflowBanner() {
+/**
+ * @param {{ counts?: Record<string, number|string> }} props
+ * Pass `counts` from Admin dashboard to avoid a second API wave.
+ */
+export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
   const { has } = usePermissions();
+  const { getCategories, getProducts, getSuppliers } = useReferenceData();
   const [counts, setCounts] = useState({
     categories: 0,
     products: 0,
@@ -32,13 +37,25 @@ export default function SetupWorkflowBanner() {
   });
 
   useEffect(() => {
+    if (countsProp) {
+      setCounts({
+        categories: Number(countsProp.categories) || 0,
+        products: Number(countsProp.products) || 0,
+        suppliers: Number(countsProp.suppliers) || 0,
+        branches: Number(countsProp.branches) || 0,
+        users: Number(countsProp.users) || 0,
+        campaigns: Number(countsProp.campaigns) || 0,
+      });
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadProgress() {
       const tasks = [
-        ['categories', fetchCategories()],
-        ['products', fetchProducts()],
-        ['suppliers', has('SUPPLIER_MANAGEMENT') ? fetchSuppliers() : Promise.resolve([])],
+        ['categories', getCategories()],
+        ['products', getProducts()],
+        ['suppliers', has('SUPPLIER_MANAGEMENT') ? getSuppliers() : Promise.resolve([])],
         ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
         ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
         ['campaigns', has('PROMOTION_LIST') ? fetchCampaigns() : Promise.resolve([])],
@@ -65,7 +82,7 @@ export default function SetupWorkflowBanner() {
     return () => {
       cancelled = true;
     };
-  }, [has]);
+  }, [has, countsProp, getCategories, getProducts, getSuppliers]);
 
   const completedSetupSteps = SETUP_WORKFLOW.filter((step) =>
     STEP_CHECKS[step.step]?.(counts),
@@ -83,9 +100,7 @@ export default function SetupWorkflowBanner() {
             {completedSetupSteps >= 6 ? (
               <Badge tone="success">Setup complete</Badge>
             ) : (
-              <Badge tone="soon">
-                {completedSetupSteps}/6 core steps
-              </Badge>
+              <Badge tone="soon">{completedSetupSteps}/6 core steps</Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-[var(--admin-muted)]">

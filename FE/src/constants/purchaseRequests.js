@@ -19,15 +19,15 @@ export const PR_STATUS = {
 
 /** Display labels + badge tone for each status. */
 export const PR_STATUS_META = {
-  [PR_STATUS.DRAFT]: { label: 'Draft', display: 'DRAFT', tone: 'default' },
-  [PR_STATUS.PENDING]: { label: 'Pending', display: 'PENDING', tone: 'warning' },
-  [PR_STATUS.APPROVED]: { label: 'Approved', display: 'APPROVED', tone: 'brand' },
-  [PR_STATUS.AWAITING_STOCK]: { label: 'Awaiting stock', display: 'AWAITING STOCK', tone: 'soon' },
-  [PR_STATUS.DISPATCHING]: { label: 'Dispatching', display: 'DISPATCHING', tone: 'brand' },
-  [PR_STATUS.IN_TRANSIT]: { label: 'In transit', display: 'IN TRANSIT', tone: 'warning' },
-  [PR_STATUS.RECEIVED]: { label: 'Received', display: 'RECEIVED', tone: 'success' },
-  [PR_STATUS.REJECTED]: { label: 'Rejected', display: 'REJECTED', tone: 'danger' },
-  [PR_STATUS.CANCELLED]: { label: 'Cancelled', display: 'CANCELLED', tone: 'default' },
+  [PR_STATUS.DRAFT]: { label: 'Draft', display: 'DRAFT', tone: 'default', step: 1 },
+  [PR_STATUS.PENDING]: { label: 'Pending approval', display: 'PENDING', tone: 'warning', step: 2 },
+  [PR_STATUS.APPROVED]: { label: 'Approved', display: 'APPROVED', tone: 'brand', step: 3 },
+  [PR_STATUS.AWAITING_STOCK]: { label: 'Awaiting stock', display: 'AWAITING STOCK', tone: 'soon', step: 3 },
+  [PR_STATUS.DISPATCHING]: { label: 'Pending transport', display: 'PENDING TRANSPORT', tone: 'brand', step: 4 },
+  [PR_STATUS.IN_TRANSIT]: { label: 'In transit', display: 'IN TRANSIT', tone: 'warning', step: 5 },
+  [PR_STATUS.RECEIVED]: { label: 'Received', display: 'RECEIVED', tone: 'success', step: 6 },
+  [PR_STATUS.REJECTED]: { label: 'Rejected', display: 'REJECTED', tone: 'danger', step: 0 },
+  [PR_STATUS.CANCELLED]: { label: 'Cancelled', display: 'CANCELLED', tone: 'default', step: 0 },
 };
 
 export const PR_STATUS_OPTIONS = [

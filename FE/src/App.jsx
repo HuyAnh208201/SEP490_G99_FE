@@ -11,19 +11,25 @@ import SystemSettingsPage from './pages/system/SystemSettingsPage.jsx';
 import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
 import ProductsPage from './pages/catalog/ProductsPage.jsx';
 import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
-import WarehouseDashboardPage, {
-  WarehouseInventoryPage,
-} from './pages/warehouse/WarehousePages.jsx';
+import WarehouseDashboardPage from './pages/warehouse/WarehousePages.jsx';
+import WarehouseInventoryPage from './pages/warehouse/WarehouseInventoryPage.jsx';
 import IncomingRequestsPage from './pages/warehouse/IncomingRequestsPage.jsx';
 import DispatchPlanningPage from './pages/warehouse/DispatchPlanningPage.jsx';
 import DispatchOrdersPage from './pages/warehouse/DispatchOrdersPage.jsx';
 import PurchaseOrdersPage from './pages/warehouse/PurchaseOrdersPage.jsx';
+import OrderTrackingPage from './pages/inventory-staff/OrderTrackingPage.jsx';
+import ReceiveShipmentPage from './pages/inventory-staff/ReceiveShipmentPage.jsx';
+import ReceivingHistoryPage from './pages/inventory-staff/ReceivingHistoryPage.jsx';
+import InventoryCountPage from './pages/inventory-staff/InventoryCountPage.jsx';
+import CountHistoryPage from './pages/inventory-staff/CountHistoryPage.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
 import BranchManagerDashboardPage, {
   CashDiscrepancyPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
+import BranchReceivePage from './pages/branch-manager/BranchReceivePage.jsx';
+import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
 import DirectorDashboardPage, {
   DirectorPlanningPage,
@@ -126,7 +132,10 @@ export default function App() {
         <Route
           path="/catalog/products"
           element={
-            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']}>
+            <PermissionRoute
+              anyOf={['PRODUCT_MANAGEMENT', 'PRODUCT_VIEW']}
+              roles={['INVENTORY_STAFF']}
+            >
               <ProductsPage />
             </PermissionRoute>
           }
@@ -150,11 +159,7 @@ export default function App() {
         />
         <Route
           path="/warehouse/inventory"
-          element={
-            <PermissionRoute permission="VIEW_CENTRAL_INVENTORY">
-              <WarehouseInventoryPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/catalog/products" replace />}
         />
         <Route
           path="/warehouse/incoming-requests"
@@ -194,6 +199,43 @@ export default function App() {
         />
 
         <Route
+          path="/inventory/order-tracking"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <OrderTrackingPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/receive/:dispatchOrderId/:requestId"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <ReceiveShipmentPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/receiving-history"
+          element={
+            <PermissionRoute permission="RECEIVE_SHIPMENT">
+              <ReceivingHistoryPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/inventory/count"
+          element={<Navigate to="/catalog/products?count=1" replace />}
+        />
+        <Route
+          path="/inventory/count-history"
+          element={
+            <PermissionRoute permission="INVENTORY_COUNT">
+              <CountHistoryPage />
+            </PermissionRoute>
+          }
+        />
+
+        <Route
           path="/branch-manager"
           element={
             <PermissionRoute permission="BRANCH_DASHBOARD">
@@ -213,6 +255,22 @@ export default function App() {
         <Route
           path="/branch-manager/import-requests"
           element={<Navigate to="/purchase-requests" replace />}
+        />
+        <Route
+          path="/branch-manager/receive"
+          element={
+            <PermissionRoute permission="SUPPLY_IMPORT_RECEIPT_APPROVE">
+              <BranchReceivePage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/my-shifts"
+          element={
+            <PermissionRoute permission="MY_SHIFTS">
+              <MyShiftsPage />
+            </PermissionRoute>
+          }
         />
         <Route
           path="/branch-manager/cash-discrepancy"

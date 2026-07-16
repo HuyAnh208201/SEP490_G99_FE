@@ -113,7 +113,7 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Suppliers"
         description="Step 3 — centralized supplier list for purchasing and warehouse operations."

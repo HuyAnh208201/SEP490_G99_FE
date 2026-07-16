@@ -428,21 +428,21 @@ INSERT INTO categories (id, name, parent_id, description) VALUES
 INSERT INTO products
 (id, code, barcode, name, image_url, description, category_id, unit, reference_import_price, default_sale_price, status)
 VALUES
-(1, 'DRINK001', '893000000001', 'Nước suối Lavie 500ml', NULL, 'Nước suối đóng chai', 1, 'chai', 4000, 7000, 'active'),
-(2, 'DRINK002', '893000000002', 'Coca-Cola lon 320ml', NULL, 'Nước ngọt có gas', 1, 'lon', 7000, 12000, 'active'),
-(3, 'FOOD001', '893000000003', 'Mì Hảo Hảo tôm chua cay', NULL, 'Mì ăn liền', 2, 'gói', 3500, 6000, 'active'),
-(4, 'MILK001', '893000000004', 'Sữa tươi Vinamilk 180ml', NULL, 'Sữa tươi tiệt trùng', 3, 'hộp', 5500, 9000, 'active'),
-(5, 'HOUSE001', '893000000005', 'Khăn giấy bỏ túi', NULL, 'Khăn giấy tiện lợi', 4, 'gói', 3000, 6000, 'active'),
-(6, 'DRINK003', '893000000006', 'Trà xanh không độ 500ml', NULL, 'Trà xanh đóng chai', 1, 'chai', 5000, 9000, 'active'),
-(7, 'DRINK004', '893000000007', 'Cà phê lon Highlands 235ml', NULL, 'Cà phê pha sẵn', 1, 'lon', 8000, 15000, 'active'),
-(8, 'FOOD002', '893000000008', 'Bánh mì tươi ruốc', NULL, 'Bánh mì đóng gói', 2, 'cái', 6000, 12000, 'active'),
-(9, 'FOOD003', '893000000009', 'Xúc xích Đức Việt 200g', NULL, 'Xúc xích tiệt trùng', 2, 'gói', 18000, 28000, 'active'),
-(10, 'MILK002', '893000000010', 'Sữa chua Vinamilk có đường', NULL, 'Sữa chua ăn', 3, 'hộp', 4500, 8000, 'active'),
-(11, 'MILK003', '893000000011', 'Sữa đặc Ông Thọ 380g', NULL, 'Sữa đặc có đường', 3, 'lon', 15000, 24000, 'active'),
-(12, 'HOUSE002', '893000000012', 'Pin Con Ó AA (vỉ 4)', NULL, 'Pin tiểu AA', 4, 'vỉ', 20000, 35000, 'active'),
-(13, 'HOUSE003', '893000000013', 'Nước rửa tay Lifebuoy 250ml', NULL, 'Nước rửa tay diệt khuẩn', 4, 'chai', 22000, 39000, 'active'),
-(14, 'FOOD004', '893000000014', 'Snack khoai tây Lays 52g', NULL, 'Snack khoai tây', 2, 'gói', 7000, 12000, 'active'),
-(15, 'DRINK005', '893000000015', 'Bia Tiger lon 330ml', NULL, 'Bia lon', 1, 'lon', 12000, 18000, 'active');
+(1, 'DRINK001', '893000000001', 'Lavie Natural Mineral Water 500ml', NULL, 'Bottled mineral water', 1, 'bottle', 4000, 7000, 'active'),
+(2, 'DRINK002', '893000000002', 'Coca-Cola Can 320ml', NULL, 'Carbonated soft drink', 1, 'can', 7000, 12000, 'active'),
+(3, 'FOOD001', '893000000003', 'Hao Hao Spicy Shrimp Instant Noodles', NULL, 'Instant noodles', 2, 'pack', 3500, 6000, 'active'),
+(4, 'MILK001', '893000000004', 'Vinamilk Fresh Milk 180ml', NULL, 'UHT fresh milk', 3, 'box', 5500, 9000, 'active'),
+(5, 'HOUSE001', '893000000005', 'Pocket Tissue Pack', NULL, 'Convenience tissue pack', 4, 'pack', 3000, 6000, 'active'),
+(6, 'DRINK003', '893000000006', 'Green Tea Unsweetened 500ml', NULL, 'Ready-to-drink green tea', 1, 'bottle', 5000, 9000, 'active'),
+(7, 'DRINK004', '893000000007', 'Highlands Coffee Can 235ml', NULL, 'Ready-to-drink coffee', 1, 'can', 8000, 15000, 'active'),
+(8, 'FOOD002', '893000000008', 'Pork Floss Bread', NULL, 'Packaged sandwich', 2, 'piece', 6000, 12000, 'active'),
+(9, 'FOOD003', '893000000009', 'Duc Viet Sausage 200g', NULL, 'Vacuum-packed sausage', 2, 'pack', 18000, 28000, 'active'),
+(10, 'MILK002', '893000000010', 'Vinamilk Sweet Yogurt', NULL, 'Yogurt cup', 3, 'box', 4500, 8000, 'active'),
+(11, 'MILK003', '893000000011', 'Longevity Condensed Milk 380g', NULL, 'Sweetened condensed milk', 3, 'can', 15000, 24000, 'active'),
+(12, 'HOUSE002', '893000000012', 'Con Coc AA Batteries (blister 4)', NULL, 'AA alkaline batteries', 4, 'blister', 20000, 35000, 'active'),
+(13, 'HOUSE003', '893000000013', 'Lifebuoy Hand Wash 250ml', NULL, 'Antibacterial hand wash', 4, 'bottle', 22000, 39000, 'active'),
+(14, 'FOOD004', '893000000014', 'Lays Potato Chips 52g', NULL, 'Potato chips snack', 2, 'pack', 7000, 12000, 'active'),
+(15, 'DRINK005', '893000000015', 'Tiger Beer Can 330ml', NULL, 'Beer can', 1, 'can', 12000, 18000, 'active');
 
 INSERT INTO product_packagings (product_id, name, conversion_qty, barcode, is_base) VALUES
 (1, 'Chai', 1, '893000000001', true),

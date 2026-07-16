@@ -20,6 +20,11 @@ export async function fetchProductById(id) {
   return unwrap(data);
 }
 
+export async function generateBarcode() {
+  const { data } = await http.post('/products/generate-barcode');
+  return unwrap(data);
+}
+
 export async function createProduct(payload) {
   const { data } = await http.post('/products', payload);
   return unwrap(data);

@@ -15,7 +15,7 @@ export default function SupplyImportLayout() {
   const showConsolidated = canViewConsolidatedImports(has);
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">

@@ -14,7 +14,7 @@ export default function ModulePageShell({
   actions,
 }) {
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title={title}
         description={description}

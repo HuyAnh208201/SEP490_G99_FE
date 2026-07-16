@@ -5,9 +5,9 @@ import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import {
   DISPATCH_STATUS_OPTIONS,
-  DISPATCH_STATUS_META,
+  WAREHOUSE_DISPATCH_STATUS_OPTIONS,
   dispatchStatusMeta,
-  nextDispatchStatus,
+  isWarehouseEditableStatus,
   normalizeDispatchStatus,
 } from '../../constants/dispatch.js';
 import { listDispatchOrders, updateDispatchStatus } from '../../api/dispatch.js';
@@ -23,13 +23,20 @@ export default function DispatchOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [detail, setDetail] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [draftStatus, setDraftStatus] = useState({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await listDispatchOrders();
-      setRows(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setRows(list);
+      const drafts = {};
+      list.forEach((r) => {
+        drafts[r.id] = normalizeDispatchStatus(r.status) || 'preparing';
+      });
+      setDraftStatus(drafts);
     } catch (err) {
       setError(err?.message || 'Failed to load dispatch orders');
       setRows([]);
@@ -49,9 +56,9 @@ export default function DispatchOrdersPage() {
     });
   }, [rows, statusFilter]);
 
-  async function advance(order) {
-    const next = nextDispatchStatus(order.status);
-    if (!next) return;
+  async function applyStatus(order) {
+    const next = draftStatus[order.id];
+    if (!next || normalizeDispatchStatus(order.status) === next) return;
     setUpdatingId(order.id);
     setError('');
     try {
@@ -69,10 +76,10 @@ export default function DispatchOrdersPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Dispatch Orders"
-        description="Monitor outbound dispatch orders, update shipment status, and view delivery progress."
+        description="Monitor outbound dispatch orders. Select status from the list — delivered is set only when branch staff confirms receipt."
       />
 
       {error && (
@@ -122,7 +129,9 @@ export default function DispatchOrdersPage() {
                   ))
                 : filteredRows.map((r) => {
                     const meta = dispatchStatusMeta(r.status);
-                    const next = nextDispatchStatus(r.status);
+                    const editable = isWarehouseEditableStatus(r.status);
+                    const currentDraft = draftStatus[r.id] || normalizeDispatchStatus(r.status);
+                    const dirty = normalizeDispatchStatus(r.status) !== currentDraft;
                     return (
                       <tr
                         key={r.id}
@@ -143,14 +152,23 @@ export default function DispatchOrdersPage() {
                         <td className="px-4 py-3">{storesOf(r).join(', ') || '—'}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">{r.vehicle || '—'}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <Badge tone={meta.tone}>{meta.display}</Badge>
-                            {next && (
-                              <span className="text-xs text-[var(--admin-subtle)]">
-                                → {DISPATCH_STATUS_META[next].label}
-                              </span>
-                            )}
-                          </div>
+                          {editable ? (
+                            <select
+                              value={currentDraft}
+                              onChange={(e) =>
+                                setDraftStatus((prev) => ({ ...prev, [r.id]: e.target.value }))
+                              }
+                              className={`${selectClass} min-w-[10rem]`}
+                            >
+                              {WAREHOUSE_DISPATCH_STATUS_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>
+                                  {o.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <Badge tone={meta.tone}>{meta.label}</Badge>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex justify-end gap-2">
@@ -161,13 +179,14 @@ export default function DispatchOrdersPage() {
                             >
                               View Details
                             </Button>
-                            {next && (
+                            {editable && (
                               <Button
                                 className="!px-3 !py-1 !text-xs"
                                 loading={updatingId === r.id}
-                                onClick={() => advance(r)}
+                                disabled={!dirty}
+                                onClick={() => applyStatus(r)}
                               >
-                                Update Status
+                                Apply
                               </Button>
                             )}
                           </div>

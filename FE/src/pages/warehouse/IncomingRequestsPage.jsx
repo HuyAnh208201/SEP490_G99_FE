@@ -100,7 +100,7 @@ export default function IncomingRequestsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl">
+    <div className="w-full">
       <PageHeader
         title="Incoming Requests"
         description="Review branch import requests and approve when warehouse inventory is sufficient."
