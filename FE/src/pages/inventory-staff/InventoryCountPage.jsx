@@ -256,14 +256,26 @@ export default function InventoryCountPage() {
                         <td className="px-4 py-3 text-[var(--admin-muted)]">{unitLabel(p.unit)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{p.systemQty ?? 0}</td>
                         <td className="px-4 py-3 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            value={form[p.productId]?.counted ?? ''}
-                            onChange={(e) => setField(p.productId, 'counted', e.target.value)}
-                            placeholder="—"
-                            className={inputClass}
-                          />
+                          <div className="inline-flex items-center justify-end gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={form[p.productId]?.counted ?? ''}
+                              onChange={(e) => setField(p.productId, 'counted', e.target.value)}
+                              placeholder="—"
+                              className={inputClass}
+                            />
+                            <button
+                              type="button"
+                              title="Fill from system qty"
+                              onClick={() =>
+                                setField(p.productId, 'counted', String(p.systemQty ?? 0))
+                              }
+                              className="rounded border border-[var(--admin-border)] bg-white px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#0058be] hover:bg-[#f0f6ff]"
+                            >
+                              Fill
+                            </button>
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">
                           {v == null ? (

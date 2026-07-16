@@ -132,7 +132,10 @@ export default function App() {
         <Route
           path="/catalog/products"
           element={
-            <PermissionRoute anyOf={['PRODUCT_MANAGEMENT']} roles={['INVENTORY_STAFF']}>
+            <PermissionRoute
+              anyOf={['PRODUCT_MANAGEMENT', 'PRODUCT_VIEW']}
+              roles={['INVENTORY_STAFF']}
+            >
               <ProductsPage />
             </PermissionRoute>
           }
@@ -156,11 +159,7 @@ export default function App() {
         />
         <Route
           path="/warehouse/inventory"
-          element={
-            <PermissionRoute permission="VIEW_CENTRAL_INVENTORY">
-              <WarehouseInventoryPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/catalog/products" replace />}
         />
         <Route
           path="/warehouse/incoming-requests"
@@ -225,11 +224,7 @@ export default function App() {
         />
         <Route
           path="/inventory/count"
-          element={
-            <PermissionRoute permission="INVENTORY_COUNT">
-              <InventoryCountPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/catalog/products?count=1" replace />}
         />
         <Route
           path="/inventory/count-history"

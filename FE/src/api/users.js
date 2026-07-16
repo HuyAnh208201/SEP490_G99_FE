@@ -46,13 +46,34 @@ export async function updateProfile(payload) {
   return normalizeUser(unwrap(data));
 }
 
-export async function updateUserStatus(id, active) {
-  const { data } = await http.patch(`/auth/admin/users/${id}/status`, { active });
+export async function updateUserStatus(id, active, verification) {
+  const { data } = await http.patch(`/auth/admin/users/${id}/status`, {
+    active,
+    email: verification?.email,
+    verificationCode: verification?.verificationCode,
+  });
   return normalizeUser(unwrap(data));
 }
 
-export async function deleteUser(id) {
-  await http.delete(`/auth/admin/users/${id}`);
+export async function deleteUser(id, verification) {
+  if (verification?.email && verification?.verificationCode) {
+    await http.delete(`/auth/admin/users/${id}`, { data: verification });
+  } else {
+    await http.delete(`/auth/admin/users/${id}`);
+  }
+}
+
+export async function sendCriticalUserActionCode(userId, email, actionType) {
+  const { data } = await http.post(`/auth/admin/users/${userId}/critical-action/send-code`, {
+    email,
+    actionType,
+  });
+  return unwrap(data);
+}
+
+export async function fetchCriticalRoleSlots() {
+  const { data } = await http.get('/auth/admin/role-slots');
+  return unwrap(data);
 }
 
 export async function fetchMe() {
