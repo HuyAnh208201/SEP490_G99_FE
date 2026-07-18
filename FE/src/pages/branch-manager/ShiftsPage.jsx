@@ -1,437 +1,655 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchMe } from '../../api/users.js';
+import { fetchBranchById } from '../../api/branches.js';
 import {
-  assignEmployees,
-  createShift,
-  deleteShift,
+  assignToSlot,
+  copyPreviousWeek,
   fetchAvailableEmployees,
-  fetchShifts,
+  fetchWeekSetup,
   fetchWeeklySchedule,
-  publishShift,
+  publishWeek,
+  setupAndPublishWeek,
 } from '../../api/shifts.js';
-import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
-import Badge from '../../components/ui/Badge.jsx';
-import Modal from '../../components/ui/Modal.jsx';
-import MoneyInput from '../../components/ui/MoneyInput.jsx';
-import { formatDateTime } from '../../lib/datetime.js';
+import { deriveShiftSlots, MAX_SHIFT_HOURS, parseOperatingHours } from '../../lib/operatingHours.js';
+import AssignModal from './shifts/AssignModal.jsx';
+import ScheduleGrid from './shifts/ScheduleGrid.jsx';
+import WeekSetupModal from './shifts/WeekSetupModal.jsx';
+import {
+  MAX_EMPLOYEES_PER_SHIFT,
+  addDays,
+  buildWeekDays,
+  cellState,
+  dateOf,
+  fromDdMmYyyy,
+  localIso,
+  mondayOf,
+  timeOf,
+  toDdMmYyyy,
+} from './shifts/shiftGrid.js';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
-const STATUS_META = {
-  DRAFT: { label: 'Draft', tone: 'default' },
-  PUBLISHED: { label: 'Published', tone: 'success' },
-  CANCELLED: { label: 'Cancelled', tone: 'danger' },
-};
-
-function toIso(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function toDateParam(iso) {
-  if (!iso) return '';
-  return iso.slice(0, 10);
-}
-
-function toTimeParam(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-}
-
-const emptyForm = () => ({
-  startTime: '',
-  endTime: '',
-  openingCash: 0,
-  expectedCash: 0,
-});
-
 export default function ShiftsPage() {
   const [branchId, setBranchId] = useState(null);
-  const [view, setView] = useState('list');
+  const [operatingHours, setOperatingHours] = useState('08:00 - 22:00');
+  const [weekStart, setWeekStart] = useState(() => mondayOf());
+  const [weekStartInput, setWeekStartInput] = useState(() => toDdMmYyyy(mondayOf()));
   const [rows, setRows] = useState([]);
-  const [weekly, setWeekly] = useState(null);
-  const [weekStart, setWeekStart] = useState(() => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(d.setDate(diff));
-    return monday.toISOString().slice(0, 10);
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState('');
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [assignCtx, setAssignCtx] = useState(null);
+  const [cashierIds, setCashierIds] = useState([]);
+  const [inventoryIds, setInventoryIds] = useState([]);
+  const [availableCashiers, setAvailableCashiers] = useState([]);
+  const [availableIs, setAvailableIs] = useState([]);
+  const [availableLoaded, setAvailableLoaded] = useState(false);
+  const [availableLoading, setAvailableLoading] = useState(false);
+  const [assignError, setAssignError] = useState('');
 
-  const [assignShift, setAssignShift] = useState(null);
-  const [assignRole, setAssignRole] = useState('CASHIER');
-  const [available, setAvailable] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState('');
+  const [setupCashiers, setSetupCashiers] = useState([]);
+  const [setupInventory, setSetupInventory] = useState([]);
+  const [setupWeekStart, setSetupWeekStart] = useState('');
+  /** @type {[Record<string, object>, Function]} */
+  const [setupSlots, setSetupSlots] = useState({});
+  const [activeSetupKey, setActiveSetupKey] = useState(null);
+
+  const slots = useMemo(() => deriveShiftSlots(operatingHours), [operatingHours]);
+  const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
+
+  const applyWeekStart = useCallback((next) => {
+    const normalized = mondayOf(next);
+    setWeekStart(normalized);
+    setWeekStartInput(toDdMmYyyy(normalized));
+  }, []);
+
+  const applySchedule = useCallback((data) => {
+    const normalized = data?.weekStart ? String(data.weekStart).slice(0, 10) : '';
+    if (normalized) {
+      setWeekStart((current) => (current === normalized ? current : normalized));
+      setWeekStartInput(toDdMmYyyy(normalized));
+    }
+    setRows((data?.days || []).flatMap((day) => day.shifts || []));
+  }, []);
 
   const load = useCallback(async () => {
     if (!branchId) return;
     setLoading(true);
     setError('');
     try {
-      const data = await fetchShifts(branchId);
-      setRows(Array.isArray(data) ? data : []);
+      const data = await fetchWeeklySchedule(branchId, weekStart);
+      applySchedule(data);
     } catch (err) {
       setError(err?.message || 'Failed to load shifts');
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [branchId]);
+  }, [applySchedule, branchId, weekStart]);
 
   useEffect(() => {
-    fetchMe()
-      .then((me) => {
-        if (me?.branchId) setBranchId(me.branchId);
-      })
-      .catch(() => setError('Could not load branch context'));
+    (async () => {
+      try {
+        const me = await fetchMe();
+        if (!me?.branchId) {
+          setError('Could not load branch context');
+          return;
+        }
+        setBranchId(me.branchId);
+        const branch = await fetchBranchById(me.branchId);
+        if (branch?.operatingHours) setOperatingHours(branch.operatingHours);
+      } catch {
+        setError('Could not load branch context');
+      }
+    })();
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  const grid = useMemo(() => {
+    const map = {};
+    for (const day of weekDays) {
+      for (const slot of slots) {
+        map[`${day.date}|${slot.key}`] = null;
+      }
+    }
+    for (const shift of rows) {
+      const d = dateOf(shift.startTime);
+      if (d < weekStart || d > addDays(weekStart, 6)) continue;
+      const start = timeOf(shift.startTime);
+      const end = timeOf(shift.endTime);
+      const slot =
+        slots.find((s) => start >= s.start && start < s.end) ||
+        slots.find((s) => s.start === start && s.end === end) ||
+        null;
+      if (!slot) continue;
+      const key = `${d}|${slot.key}`;
+      if (!map[key] || new Date(shift.startTime) < new Date(map[key].startTime)) {
+        map[key] = shift;
+      }
+    }
+    return map;
+  }, [rows, slots, weekDays, weekStart]);
+
+  const weekStats = useMemo(() => {
+    let empty = 0;
+    let incomplete = 0;
+    let ready = 0;
+    let published = 0;
+    for (const day of weekDays) {
+      for (const slot of slots) {
+        const shift = grid[`${day.date}|${slot.key}`];
+        const state = cellState(shift, slot);
+        if (state === 'empty') empty += 1;
+        else if (state === 'incomplete') incomplete += 1;
+        else if (state === 'ready') ready += 1;
+        else if (state === 'published') published += 1;
+      }
+    }
+    return { empty, incomplete, ready, published, total: slots.length * weekDays.length };
+  }, [grid, slots, weekDays]);
+
+  const openAssign = useCallback(
+    (dayDate, slot) => {
+      const shift = grid[`${dayDate}|${slot.key}`];
+      if (shift?.status === 'PUBLISHED') return;
+
+      const cashiers = (shift?.assignedEmployees || [])
+        .filter((e) => e.role === 'CASHIER')
+        .map((e) => e.employeeId);
+      const inventory = (shift?.assignedEmployees || [])
+        .filter((e) => e.role === 'INVENTORY_STAFF')
+        .map((e) => e.employeeId);
+
+      setAssignError('');
+      setCashierIds(cashiers);
+      setInventoryIds(inventory);
+      setAssignCtx({ date: dayDate, slot, shift: shift || null });
+    },
+    [grid],
+  );
+
   useEffect(() => {
-    if (!branchId || view !== 'weekly') return;
+    if (!assignCtx || !branchId) return;
+    if (availableLoaded) {
+      setAvailableLoading(false);
+      return;
+    }
     let cancelled = false;
+    setAvailableLoading(true);
+    setAssignError('');
+
+    const startTime = `${assignCtx.slot.start}:00`;
+    const endTime = `${assignCtx.slot.end}:00`;
+
     (async () => {
       try {
-        const data = await fetchWeeklySchedule(branchId, weekStart);
-        if (!cancelled) setWeekly(data);
+        const [cashiers, inventory] = await Promise.all([
+          fetchAvailableEmployees({
+            branchId,
+            date: assignCtx.date,
+            startTime,
+            endTime,
+            requiredRole: 'CASHIER',
+          }),
+          fetchAvailableEmployees({
+            branchId,
+            date: assignCtx.date,
+            startTime,
+            endTime,
+            requiredRole: 'INVENTORY_STAFF',
+          }),
+        ]);
+        if (cancelled) return;
+
+        const assignedCashiers = (assignCtx.shift?.assignedEmployees || []).filter(
+          (e) => e.role === 'CASHIER',
+        );
+        const assignedIs = (assignCtx.shift?.assignedEmployees || []).filter(
+          (e) => e.role === 'INVENTORY_STAFF',
+        );
+
+        const merge = (available, assigned) => {
+          const map = new Map();
+          for (const e of available || []) map.set(e.employeeId, e);
+          for (const e of assigned) {
+            if (!map.has(e.employeeId)) {
+              map.set(e.employeeId, {
+                employeeId: e.employeeId,
+                fullName: e.fullName,
+                email: e.email,
+                role: e.role,
+              });
+            }
+          }
+          return [...map.values()];
+        };
+
+        setAvailableCashiers(merge(cashiers, assignedCashiers));
+        setAvailableIs(merge(inventory, assignedIs));
+        setAvailableLoaded(true);
       } catch (err) {
-        if (!cancelled) setError(err?.message || 'Failed to load weekly schedule');
+        if (!cancelled) {
+          setAvailableCashiers([]);
+          setAvailableIs([]);
+          setAssignError(err?.message || 'Failed to load available staff');
+        }
+      } finally {
+        if (!cancelled) setAvailableLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [branchId, view, weekStart]);
+  }, [assignCtx, availableLoaded, branchId]);
 
-  const sortedRows = useMemo(
-    () => [...rows].sort((a, b) => new Date(b.startTime) - new Date(a.startTime)),
-    [rows],
-  );
+  function toggleRoleSelection(role, employeeId, checked) {
+    const total = cashierIds.length + inventoryIds.length;
+    if (checked && total >= MAX_EMPLOYEES_PER_SHIFT) {
+      setAssignError(`Each shift can have at most ${MAX_EMPLOYEES_PER_SHIFT} employees.`);
+      return;
+    }
+    setAssignError('');
+    if (role === 'CASHIER') {
+      setCashierIds((ids) =>
+        checked ? (ids.includes(employeeId) ? ids : [...ids, employeeId]) : ids.filter((id) => id !== employeeId),
+      );
+      if (checked) setInventoryIds((ids) => ids.filter((id) => id !== employeeId));
+    } else {
+      setInventoryIds((ids) =>
+        checked ? (ids.includes(employeeId) ? ids : [...ids, employeeId]) : ids.filter((id) => id !== employeeId),
+      );
+      if (checked) setCashierIds((ids) => ids.filter((id) => id !== employeeId));
+    }
+  }
 
-  async function runAction(label, fn) {
-    setBusy(label);
-    setError('');
+  async function handleSaveAssign() {
+    if (!assignCtx || !branchId || availableLoading) return;
+    const total = cashierIds.length + inventoryIds.length;
+    if (total > MAX_EMPLOYEES_PER_SHIFT) {
+      setAssignError(`Each shift can have at most ${MAX_EMPLOYEES_PER_SHIFT} employees.`);
+      return;
+    }
+    setAssignError('');
+    setBusy('assign');
     try {
-      await fn();
-      await load();
+      const savedShift = await assignToSlot({
+        branchId,
+        startTime: localIso(assignCtx.date, assignCtx.slot.start),
+        endTime: localIso(assignCtx.date, assignCtx.slot.end),
+        cashiers: cashierIds,
+        inventoryStaff: inventoryIds,
+      });
+      setAssignCtx(null);
+      setInfo(total === 0 ? 'Slot cleared.' : 'Assignments saved as draft.');
+      setRows((current) => {
+        if (!savedShift) {
+          return assignCtx.shift?.id
+            ? current.filter((shift) => shift.id !== assignCtx.shift.id)
+            : current;
+        }
+        const existingIndex = current.findIndex((shift) => shift.id === savedShift.id);
+        if (existingIndex < 0) return [...current, savedShift];
+        return current.map((shift, index) => (index === existingIndex ? savedShift : shift));
+      });
     } catch (err) {
-      setError(err?.message || 'Action failed');
+      setAssignError(err?.message || 'Failed to save');
     } finally {
       setBusy('');
     }
   }
 
-  async function handleCreate(e) {
-    e.preventDefault();
+  async function handleCopyWeek() {
     if (!branchId) return;
-    await runAction('create', () =>
-      createShift({
-        branchId,
-        startTime: toIso(form.startTime),
-        endTime: toIso(form.endTime),
-        openingCash: form.openingCash ?? 0,
-        expectedCash: form.expectedCash ?? 0,
-      }),
+    const ok = window.confirm(
+      'Copy Mon–Sun assignments from last week into empty slots? Existing assignments are kept.',
     );
-    setFormOpen(false);
-    setForm(emptyForm());
-  }
-
-  async function openAssign(shift) {
-    setAssignShift(shift);
-    setSelectedIds([]);
-    setAssignRole('CASHIER');
-    setAvailable([]);
+    if (!ok) return;
+    setBusy('copy');
     setError('');
+    setInfo('');
+    try {
+      const result = await copyPreviousWeek({ branchId, weekStart });
+      const conflictHint =
+        result?.conflicts?.length > 0
+          ? ` Conflicts: ${result.conflicts.slice(0, 3).join(' · ')}${result.conflicts.length > 3 ? '…' : ''}`
+          : '';
+      setInfo(
+        `Copied ${result?.copied ?? 0} slot(s), skipped ${result?.skipped ?? 0}.${conflictHint}`,
+      );
+      if (result?.schedule) applySchedule(result.schedule);
+      else await load();
+    } catch (err) {
+      setError(err?.message || 'Failed to copy previous week');
+    } finally {
+      setBusy('');
+    }
   }
 
-  useEffect(() => {
-    if (!assignShift || !branchId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await fetchAvailableEmployees({
-          branchId,
-          date: toDateParam(assignShift.startTime),
-          startTime: toTimeParam(assignShift.startTime),
-          endTime: toTimeParam(assignShift.endTime),
-          requiredRole: assignRole,
-        });
-        if (!cancelled) setAvailable(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (!cancelled) setError(err?.message || 'Failed to load available staff');
+  async function handlePublishWeek() {
+    if (!branchId || weekStats.ready < 1) return;
+    const ok = window.confirm(
+      `Publish ${weekStats.ready} ready draft slot(s)? ${weekStats.incomplete} incomplete and ${weekStats.empty} empty will be skipped.`,
+    );
+    if (!ok) return;
+    setBusy('publish-week');
+    setError('');
+    setInfo('');
+    try {
+      const result = await publishWeek({ branchId, weekStart });
+      const skipped = result?.skipped || [];
+      const skipHint =
+        skipped.length > 0
+          ? ` Skipped ${skipped.length}: ${skipped
+              .slice(0, 2)
+              .map((s) => s.reason)
+              .join(' · ')}${skipped.length > 2 ? '…' : ''}`
+          : '';
+      setInfo(`Published ${result?.published ?? 0} shift(s).${skipHint}`);
+      if (result?.schedule) applySchedule(result.schedule);
+      else await load();
+    } catch (err) {
+      setError(err?.message || 'Failed to publish week');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function openWeekSetup() {
+    if (!branchId) return;
+    setSetupOpen(true);
+    setSetupLoading(true);
+    setSetupError('');
+    setActiveSetupKey(null);
+    try {
+      const data = await fetchWeekSetup(branchId, weekStart);
+      const responseWeekStart = data?.weekStart
+        ? String(data.weekStart).slice(0, 10)
+        : weekStart;
+      setSetupWeekStart(responseWeekStart);
+      if (responseWeekStart !== weekStart) {
+        applyWeekStart(responseWeekStart);
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [assignShift, assignRole, branchId]);
-
-  async function handleAssign() {
-    if (!assignShift || selectedIds.length === 0) return;
-    await runAction('assign', () => assignEmployees(assignShift.id, selectedIds, assignRole));
-    setAssignShift(null);
+      setSetupCashiers(data?.cashiers || []);
+      setSetupInventory(data?.inventoryStaff || []);
+      setAvailableCashiers(data?.cashiers || []);
+      setAvailableIs(data?.inventoryStaff || []);
+      setAvailableLoaded(true);
+      const map = {};
+      let firstEditableKey = null;
+      for (const slot of data?.slots || []) {
+        const key = `${slot.startTime}|${slot.endTime}`;
+        const entry = {
+          key,
+          date: slot.date ? String(slot.date).slice(0, 10) : dateOf(slot.startTime),
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          slotIndex: slot.slotIndex,
+          first: Boolean(slot.first),
+          last: Boolean(slot.last),
+          readOnly: Boolean(slot.readOnly || slot.published),
+          published: Boolean(slot.published),
+          cashiers: [...(slot.cashiers || [])],
+          inventoryStaff: [...(slot.inventoryStaff || [])],
+          assignedEmployees: slot.assignedEmployees || [],
+        };
+        map[key] = entry;
+        if (!firstEditableKey && !entry.readOnly) firstEditableKey = key;
+      }
+      setSetupSlots(map);
+      setActiveSetupKey(firstEditableKey || Object.keys(map)[0] || null);
+      if (data?.operatingHours) setOperatingHours(data.operatingHours);
+    } catch (err) {
+      setSetupError(err?.message || 'Failed to load week setup');
+      setSetupSlots({});
+      setSetupWeekStart('');
+    } finally {
+      setSetupLoading(false);
+    }
   }
+
+  const toggleSetupSelection = useCallback((slotKey, role, employeeId, checked) => {
+    setSetupSlots((prev) => {
+      const slot = prev[slotKey];
+      if (!slot || slot.readOnly) return prev;
+      const cashiers = [...slot.cashiers];
+      const inventoryStaff = [...slot.inventoryStaff];
+      const total = cashiers.length + inventoryStaff.length;
+      if (checked && total >= MAX_EMPLOYEES_PER_SHIFT) {
+        setSetupError(`Each shift can have at most ${MAX_EMPLOYEES_PER_SHIFT} employees.`);
+        return prev;
+      }
+      setSetupError('');
+      if (role === 'CASHIER') {
+        if (checked) {
+          if (!cashiers.includes(employeeId)) cashiers.push(employeeId);
+          const isIdx = inventoryStaff.indexOf(employeeId);
+          if (isIdx >= 0) inventoryStaff.splice(isIdx, 1);
+        } else {
+          const idx = cashiers.indexOf(employeeId);
+          if (idx >= 0) cashiers.splice(idx, 1);
+        }
+      } else if (checked) {
+        if (!inventoryStaff.includes(employeeId)) inventoryStaff.push(employeeId);
+        const cIdx = cashiers.indexOf(employeeId);
+        if (cIdx >= 0) cashiers.splice(cIdx, 1);
+      } else {
+        const idx = inventoryStaff.indexOf(employeeId);
+        if (idx >= 0) inventoryStaff.splice(idx, 1);
+      }
+      return { ...prev, [slotKey]: { ...slot, cashiers, inventoryStaff } };
+    });
+  }, []);
+
+  async function handleSetupPublish() {
+    if (!branchId || !setupWeekStart) return;
+    const editable = Object.values(setupSlots).filter((s) => !s.readOnly);
+    const ready = editable.filter(
+      (s) =>
+        s.cashiers.length >= 1 &&
+        s.cashiers.length + s.inventoryStaff.length <= MAX_EMPLOYEES_PER_SHIFT &&
+        (!(s.first || s.last) || s.inventoryStaff.length >= 1),
+    );
+    if (ready.length < editable.length || editable.length < 1) return;
+
+    const ok = window.confirm(
+      `Assign and publish ${editable.length} slot(s) for this week? This cannot partially succeed.`,
+    );
+    if (!ok) return;
+    setBusy('setup-publish');
+    setSetupError('');
+    try {
+      const slotsPayload = editable.map((s) => ({
+        startTime: s.startTime.length === 16 ? `${s.startTime}:00` : s.startTime,
+        endTime: s.endTime.length === 16 ? `${s.endTime}:00` : s.endTime,
+        cashiers: s.cashiers,
+        inventoryStaff: s.inventoryStaff,
+      }));
+      const result = await setupAndPublishWeek({
+        branchId,
+        weekStart: setupWeekStart,
+        slots: slotsPayload,
+      });
+      setSetupOpen(false);
+      setInfo(`Published ${result?.published ?? 0} shift(s) for the week.`);
+      if (result?.schedule) applySchedule(result.schedule);
+      else await load();
+    } catch (err) {
+      setSetupError(err?.message || 'Failed to set up and publish week');
+    } finally {
+      setBusy('');
+    }
+  }
+
+  const hours = parseOperatingHours(operatingHours);
+  const needsIs = assignCtx ? assignCtx.slot.isFirst || assignCtx.slot.isLast : false;
+  const assignTotal = cashierIds.length + inventoryIds.length;
+  const canSave =
+    !availableLoading && (assignTotal > 0 || Boolean(assignCtx?.shift)) && assignTotal <= MAX_EMPLOYEES_PER_SHIFT;
 
   return (
-    <div className="w-full space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="w-full space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">
             Branch operations
           </p>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--admin-text)]">Shifts</h1>
           <p className="mt-1 text-sm text-[var(--admin-muted)]">
-            Create shifts, assign staff, and set opening cash for your branch.
+            Fixed slots from branch hours ({hours.open} – {hours.close}), max {MAX_SHIFT_HOURS}h each.
+            Up to {MAX_EMPLOYEES_PER_SHIFT} staff per slot. Every slot needs a Cashier; first and last need
+            Inventory Staff.
           </p>
         </div>
-        <Button onClick={() => setFormOpen(true)} disabled={!branchId}>
-          + Create shift
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => applyWeekStart(addDays(weekStart, -7))}
+            disabled={!!busy}
+          >
+            ← Prev
+          </Button>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="DD/MM/YYYY"
+            value={weekStartInput}
+            onChange={(e) => setWeekStartInput(e.target.value)}
+            onBlur={() => {
+              const parsed = fromDdMmYyyy(weekStartInput);
+              if (parsed) applyWeekStart(parsed);
+              else setWeekStartInput(toDdMmYyyy(weekStart));
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.currentTarget.blur();
+            }}
+            className={inputClass + ' !w-[7.5rem]'}
+            title="Week start (DD/MM/YYYY)"
+            disabled={!!busy}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => applyWeekStart(addDays(weekStart, 7))}
+            disabled={!!busy}
+          >
+            Next →
+          </Button>
+          <Button
+            variant="secondary"
+            loading={busy === 'copy'}
+            onClick={handleCopyWeek}
+            disabled={!branchId || !!busy}
+          >
+            Copy previous week
+          </Button>
+          <Button
+            variant="secondary"
+            loading={busy === 'publish-week'}
+            onClick={handlePublishWeek}
+            disabled={!branchId || !!busy || weekStats.ready < 1}
+          >
+            Publish week
+          </Button>
+          <Button onClick={openWeekSetup} disabled={!branchId || !!busy || setupLoading}>
+            Set up week & publish
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant={view === 'list' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('list')}>
-          List view
-        </Button>
-        <Button variant={view === 'weekly' ? 'primary' : 'secondary'} size="sm" onClick={() => setView('weekly')}>
-          Weekly view
-        </Button>
-        {view === 'weekly' && (
-          <input
-            type="date"
-            value={weekStart}
-            onChange={(e) => setWeekStart(e.target.value)}
-            className={inputClass + ' !w-auto'}
-          />
-        )}
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--admin-muted)]">
+        <span className="rounded-md border border-[var(--admin-border)] bg-[#f7f9fb] px-2.5 py-1 font-medium text-[var(--admin-text)]">
+          {weekStats.ready}/{weekStats.total} ready to publish
+          {weekStats.published > 0 ? ` · ${weekStats.published} published` : ''}
+          {weekStats.incomplete > 0 ? ` · ${weekStats.incomplete} incomplete` : ''}
+          {weekStats.empty > 0 ? ` · ${weekStats.empty} empty` : ''}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--admin-border)] bg-white" />
+          Empty
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm border border-amber-300 bg-amber-50" />
+          Incomplete
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm border border-[#0058be]/35 bg-[#eef4fc]" />
+          Ready draft
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-50" />
+          Published
+        </span>
       </div>
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       )}
-
-      <Card className="!p-0 overflow-hidden">
-        {view === 'weekly' ? (
-          <div className="grid gap-0 md:grid-cols-7">
-            {(weekly?.days || []).map((day) => (
-              <div key={day.date} className="border-b border-r border-[var(--admin-border)] p-3 md:border-b-0">
-                <p className="text-xs font-semibold uppercase text-[var(--admin-subtle)]">{day.date}</p>
-                <ul className="mt-2 space-y-2">
-                  {(day.shifts || []).length === 0 ? (
-                    <li className="text-xs text-[var(--admin-muted)]">—</li>
-                  ) : (
-                    day.shifts.map((shift) => (
-                      <li key={shift.id} className="rounded-lg bg-[#f7f9fb] p-2 text-xs">
-                        <p className="font-medium">{formatDateTime(shift.startTime).slice(11)}</p>
-                        <p className="text-[var(--admin-muted)]">
-                          {shift.assignedEmployees?.map((e) => e.fullName).join(', ') || 'Unassigned'}
-                        </p>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </div>
-            ))}
-            {!weekly && <p className="p-6 text-sm text-[var(--admin-muted)]">Loading weekly schedule…</p>}
-          </div>
-        ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-              <tr>
-                <th className="px-4 py-3">Start</th>
-                <th className="px-4 py-3">End</th>
-                <th className="px-4 py-3 text-right">Opening cash</th>
-                <th className="px-4 py-3">Staff</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading
-                ? Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={6} className="px-4 py-4">
-                        <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
-                      </td>
-                    </tr>
-                  ))
-                : sortedRows.map((shift) => {
-                    const meta = STATUS_META[shift.status] || { label: shift.status, tone: 'default' };
-                    return (
-                      <tr key={shift.id} className="border-t border-[var(--admin-border)]">
-                        <td className="px-4 py-3">{formatDateTime(shift.startTime)}</td>
-                        <td className="px-4 py-3">{formatDateTime(shift.endTime)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {Number(shift.openingCash || 0).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {shift.assignedEmployees?.length
-                            ? shift.assignedEmployees.map((e) => e.fullName).join(', ')
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge tone={meta.tone}>{meta.label}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {shift.status === 'DRAFT' && (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  className="!px-3 !py-1 !text-xs"
-                                  onClick={() => openAssign(shift)}
-                                >
-                                  Assign
-                                </Button>
-                                <Button
-                                  className="!px-3 !py-1 !text-xs"
-                                  loading={busy === `publish-${shift.id}`}
-                                  onClick={() =>
-                                    runAction(`publish-${shift.id}`, () => publishShift(shift.id))
-                                  }
-                                >
-                                  Publish
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  className="!px-3 !py-1 !text-xs !text-red-600"
-                                  loading={busy === `delete-${shift.id}`}
-                                  onClick={() => {
-                                    if (!window.confirm('Delete this draft shift?')) return;
-                                    runAction(`delete-${shift.id}`, () => deleteShift(shift.id));
-                                  }}
-                                >
-                                  Delete
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-            </tbody>
-          </table>
-          {!loading && sortedRows.length === 0 && (
-            <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">No shifts yet.</p>
-          )}
+      {info && !error && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {info}
         </div>
-        )}
-      </Card>
+      )}
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Create shift" size="md">
-        <form onSubmit={handleCreate} className="space-y-4">
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-[var(--admin-text)]">Start time</span>
-            <input
-              type="datetime-local"
-              required
-              value={form.startTime}
-              onChange={(e) => setForm((s) => ({ ...s, startTime: e.target.value }))}
-              className={inputClass}
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-[var(--admin-text)]">End time</span>
-            <input
-              type="datetime-local"
-              required
-              value={form.endTime}
-              onChange={(e) => setForm((s) => ({ ...s, endTime: e.target.value }))}
-              className={inputClass}
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium text-[var(--admin-text)]">Opening cash (VND)</span>
-            <MoneyInput
-              value={form.openingCash}
-              onChange={(v) => setForm((s) => ({ ...s, openingCash: v ?? 0 }))}
-            />
-          </label>
-          <div className="flex justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
-            <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={busy === 'create'}>
-              Save draft
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      <ScheduleGrid
+        loading={loading}
+        slots={slots}
+        weekDays={weekDays}
+        grid={grid}
+        busy={busy}
+        branchId={branchId}
+        onAssign={openAssign}
+      />
 
-      <Modal
-        open={Boolean(assignShift)}
-        onClose={() => setAssignShift(null)}
-        title="Assign staff"
-        size="md"
-      >
-        {assignShift && (
-          <div className="space-y-4">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">Role</span>
-              <select
-                value={assignRole}
-                onChange={(e) => {
-                  setAssignRole(e.target.value);
-                  setSelectedIds([]);
-                }}
-                className={inputClass}
-              >
-                <option value="CASHIER">Cashier</option>
-                <option value="INVENTORY_STAFF">Inventory staff</option>
-              </select>
-            </label>
-            <div className="max-h-56 space-y-2 overflow-y-auto rounded-lg border border-[var(--admin-border)] p-3">
-              {available.length === 0 ? (
-                <p className="text-sm text-[var(--admin-muted)]">No available staff for this slot.</p>
-              ) : (
-                available.map((emp) => (
-                  <label key={emp.employeeId} className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(emp.employeeId)}
-                      onChange={(e) => {
-                        setSelectedIds((ids) =>
-                          e.target.checked
-                            ? [...ids, emp.employeeId]
-                            : ids.filter((id) => id !== emp.employeeId),
-                        );
-                      }}
-                    />
-                    <span className="font-medium">{emp.fullName}</span>
-                    <span className="text-[var(--admin-subtle)]">{emp.email}</span>
-                  </label>
-                ))
-              )}
-            </div>
-            <div className="flex justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
-              <Button variant="secondary" onClick={() => setAssignShift(null)}>
-                Cancel
-              </Button>
-              <Button loading={busy === 'assign'} disabled={selectedIds.length === 0} onClick={handleAssign}>
-                Assign selected
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <AssignModal
+        assignCtx={assignCtx}
+        needsIs={needsIs}
+        assignTotal={assignTotal}
+        canSave={canSave}
+        assignError={assignError}
+        availableLoading={availableLoading}
+        availableCashiers={availableCashiers}
+        availableIs={availableIs}
+        cashierIds={cashierIds}
+        inventoryIds={inventoryIds}
+        busy={busy}
+        onClose={() => setAssignCtx(null)}
+        onClear={() => {
+          setCashierIds([]);
+          setInventoryIds([]);
+          setAssignError('');
+        }}
+        onSave={handleSaveAssign}
+        onToggle={toggleRoleSelection}
+      />
+
+      <WeekSetupModal
+        open={setupOpen}
+        weekStart={setupWeekStart}
+        setupLoading={setupLoading}
+        setupError={setupError}
+        setupSlots={setupSlots}
+        setupCashiers={setupCashiers}
+        setupInventory={setupInventory}
+        activeSetupKey={activeSetupKey}
+        busy={busy}
+        onClose={() => setSetupOpen(false)}
+        onPublish={handleSetupPublish}
+        onSelectSlot={setActiveSetupKey}
+        onToggleSelection={toggleSetupSelection}
+      />
     </div>
   );
 }

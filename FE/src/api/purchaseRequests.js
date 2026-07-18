@@ -54,6 +54,8 @@ export async function getRecommendedProducts(branchId) {
     currentStock: r.currentStock ?? r.stock,
     reorderPoint: r.reorderPoint ?? r.reorder,
     suggestedQty: r.suggestedQty ?? r.suggestedQuantity,
+    topPackagingLabel: r.topPackagingLabel,
+    topPackagingConversionQty: r.topPackagingConversionQty,
   }));
 }
 
@@ -69,6 +71,8 @@ export async function searchRequestProducts(keyword, params = {}) {
     unit: p.unit,
     categoryId: p.categoryId,
     categoryName: p.categoryName,
+    topPackagingLabel: p.topPackagingLabel,
+    unitsPerImportUnit: p.topPackagingConversionQty,
   }));
 }
 
@@ -143,5 +147,7 @@ export async function fetchRequestProducts() {
     categoryName: p.categoryName,
     currentStock: p.currentStock ?? null,
     supplierId: p.supplierId ?? null,
+    topPackagingLabel: p.topPackagingLabel,
+    unitsPerImportUnit: p.topPackagingConversionQty ?? p.unitsPerImportUnit,
   }));
 }

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Button from '../../../components/ui/Button.jsx';
 import { unitLabel } from '../../../constants/productUnits.js';
+import AddQtyModal from './AddQtyModal.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -17,6 +18,7 @@ export default function ProductCatalogPicker({
 }) {
   const [filter, setFilter] = useState('');
   const [selected, setSelected] = useState(() => new Set());
+  const [pendingProduct, setPendingProduct] = useState(null);
 
   const excluded = useMemo(
     () => (excludedIds instanceof Set ? excludedIds : new Set(excludedIds || [])),
@@ -71,12 +73,18 @@ export default function ProductCatalogPicker({
   }
 
   function addOne(product) {
-    onAddMany?.([product]);
+    setPendingProduct(product);
+  }
+
+  function confirmAddOne(qty) {
+    if (!pendingProduct) return;
+    onAddMany?.([{ ...pendingProduct, requestedQty: qty }]);
     setSelected((prev) => {
       const next = new Set(prev);
-      next.delete(product.id);
+      next.delete(pendingProduct.id);
       return next;
     });
+    setPendingProduct(null);
   }
 
   const selectedCount = [...selected].filter((id) => !excluded.has(id)).length;
@@ -204,6 +212,14 @@ export default function ProductCatalogPicker({
           Showing {filtered.length} of {available.length} available products
         </div>
       </div>
+
+      <AddQtyModal
+        open={Boolean(pendingProduct)}
+        product={pendingProduct}
+        defaultQty={1}
+        onConfirm={confirmAddOne}
+        onCancel={() => setPendingProduct(null)}
+      />
     </div>
   );
 }

@@ -54,6 +54,44 @@ export async function removeEmployee(shiftId, employeeId) {
   return unwrap(data);
 }
 
+/** Upsert DRAFT for a slot window and sync cashiers + inventory staff. Empty lists clears the slot. */
+export async function assignToSlot({ branchId, startTime, endTime, cashiers, inventoryStaff }) {
+  const { data } = await http.post('/shifts/slot/assign', {
+    branchId,
+    startTime,
+    endTime,
+    cashiers: cashiers || [],
+    inventoryStaff: inventoryStaff || [],
+  });
+  return unwrap(data);
+}
+
+export async function publishWeek({ branchId, weekStart }) {
+  const { data } = await http.put('/shifts/week/publish', { branchId, weekStart });
+  return unwrap(data);
+}
+
+export async function copyPreviousWeek({ branchId, weekStart }) {
+  const { data } = await http.post('/shifts/week/copy', { branchId, weekStart });
+  return unwrap(data);
+}
+
+export async function fetchWeekSetup(branchId, weekStart) {
+  const { data } = await http.get('/shifts/week/setup', {
+    params: { branchId, weekStart },
+  });
+  return unwrap(data);
+}
+
+export async function setupAndPublishWeek({ branchId, weekStart, slots }) {
+  const { data } = await http.post('/shifts/week/setup-and-publish', {
+    branchId,
+    weekStart,
+    slots,
+  });
+  return unwrap(data);
+}
+
 export async function fetchAvailableEmployees({ branchId, date, startTime, endTime, requiredRole }) {
   const { data } = await http.get('/employees/available', {
     params: { branchId, date, startTime, endTime, requiredRole },

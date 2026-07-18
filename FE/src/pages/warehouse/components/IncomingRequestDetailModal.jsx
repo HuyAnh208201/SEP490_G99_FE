@@ -32,13 +32,18 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
 
   const isPending = request && normalizeStatus(request.status) === PR_STATUS.PENDING;
 
-  /** Danh sách sản phẩm thiếu tồn kho tổng theo SL duyệt hiện tại. */
+  /**
+   * Danh sách sản phẩm thiếu tồn kho tổng theo SL duyệt hiện tại. Approved qty is
+   * entered in TOP packaging units (e.g. cases); warehouse stock is tracked in BASE
+   * units, so it must be converted via topPackagingConversionQty before comparing.
+   */
   const shortages = useMemo(() => {
     if (!request?.items) return [];
     return request.items.filter((it) => {
       if (it.warehouseStock == null) return false;
-      const approved = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
-      return approved > it.warehouseStock;
+      const approvedTopUnits = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
+      const approvedBaseUnits = approvedTopUnits * (it.topPackagingConversionQty || 1);
+      return approvedBaseUnits > it.warehouseStock;
     });
   }, [request, approvedQty]);
 
@@ -129,7 +134,7 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                 <tr>
                   <th className="px-4 py-2.5">Product</th>
                   <th className="px-4 py-2.5">Category</th>
-                  <th className="px-4 py-2.5">Unit</th>
+                  <th className="px-4 py-2.5">Purchase unit</th>
                   <th className="px-4 py-2.5 text-right">Requested</th>
                   <th className="px-4 py-2.5 text-right">Warehouse stock</th>
                   <th className="px-4 py-2.5 text-right">Approved</th>
@@ -138,7 +143,8 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
               <tbody>
                 {request.items?.map((it) => {
                   const approved = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
-                  const isShort = it.warehouseStock != null && approved > it.warehouseStock;
+                  const approvedBaseUnits = approved * (it.topPackagingConversionQty || 1);
+                  const isShort = it.warehouseStock != null && approvedBaseUnits > it.warehouseStock;
                   return (
                     <tr key={it.id} className="border-t border-[var(--admin-border)]">
                       <td className="px-4 py-2.5">
@@ -148,7 +154,9 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-[var(--admin-muted)]">{it.categoryName}</td>
-                      <td className="px-4 py-2.5 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
+                      <td className="px-4 py-2.5 text-[var(--admin-muted)]">
+                        {it.topPackagingLabel || unitLabel(it.unit)}
+                      </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{it.requestedQuantity}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
                         {it.warehouseStock == null ? (

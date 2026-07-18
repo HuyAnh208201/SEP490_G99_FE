@@ -34,8 +34,11 @@ export async function deleteCampaign(id) {
   await http.delete(`/campaigns/${id}`);
 }
 
-export async function activateCampaign(id) {
-  const { data } = await http.patch(`/campaigns/${id}/activate`);
+export async function activateCampaign(id, dates = null) {
+  const { data } = await http.patch(
+    `/campaigns/${id}/activate`,
+    dates ? { startAt: dates.startAt, endAt: dates.endAt } : undefined,
+  );
   return unwrap(data);
 }
 

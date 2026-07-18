@@ -19,6 +19,8 @@ export function normalizeRequestDetail(row) {
     id: it.id,
     requestedQuantity: it.requestedQuantity ?? it.requestedQty ?? 0,
     approvedQuantity: it.approvedQuantity ?? null,
+    topPackagingLabel: it.topPackagingLabel,
+    topPackagingConversionQty: it.topPackagingConversionQty ?? 1,
   }));
   return {
     ...normalizeRequestSummary(row),

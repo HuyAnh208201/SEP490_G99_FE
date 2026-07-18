@@ -574,7 +574,7 @@ INSERT INTO stock_count_items (stock_count_id, product_id, system_quantity, actu
 INSERT INTO shifts
 (id, branch_id, created_by, start_time, end_time, opening_cash, expected_cash, actual_cash, difference, status, approved_by)
 VALUES
-(1, 1, 3, NOW(), DATE_ADD(NOW(), INTERVAL 8 HOUR), 1000000, 0, NULL, NULL, 'open', NULL);
+(1, 1, 3, NOW(), DATE_ADD(NOW(), INTERVAL 8 HOUR), 1000000, 0, NULL, NULL, 'PUBLISHED', NULL);
 
 INSERT INTO shift_assignments (shift_id, staff_id, check_in_at, check_out_at) VALUES
 (1, 8, NOW(), NULL);
