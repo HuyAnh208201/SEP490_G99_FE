@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { postLoginPath } from '../../lib/postLoginPath.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,9 +23,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
-      await signIn({ username: form.username, password: form.password });
-      const from = location.state?.from?.pathname || '/dashboard';
-      navigate(from, { replace: true });
+      const user = await signIn({ username: form.username, password: form.password });
+      const from = location.state?.from?.pathname;
+      const target =
+        from && from !== '/login' ? from : postLoginPath(user);
+      navigate(target, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
     }

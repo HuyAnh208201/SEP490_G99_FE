@@ -16,12 +16,14 @@ export function PermissionsProvider({ children }) {
   const { isAuthenticated, token } = useAuth();
   const [role, setRole] = useState(null);
   const [permissions, setPermissions] = useState([]);
-  const [loading, setLoading] = useState(false);
+  // Avoid a flash where authenticated + role=null + loading=false redirects cashiers away from /pos.
+  const [loading, setLoading] = useState(() => Boolean(token));
 
   const load = useCallback(async () => {
     if (!token) {
       setRole(null);
       setPermissions([]);
+      setLoading(false);
       return;
     }
     setLoading(true);
@@ -42,6 +44,7 @@ export function PermissionsProvider({ children }) {
     else {
       setRole(null);
       setPermissions([]);
+      setLoading(false);
     }
   }, [isAuthenticated, load]);
 
