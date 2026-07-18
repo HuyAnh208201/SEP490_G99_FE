@@ -13,6 +13,7 @@ import {
 } from '../../../api/purchaseRequests.js';
 import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
 import ProductCatalogPicker from './ProductCatalogPicker.jsx';
+import AddQtyModal from './AddQtyModal.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -31,6 +32,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [pendingRecommended, setPendingRecommended] = useState(null);
 
   useEffect(() => {
     if (!open || !lockedBranchId) return undefined;
@@ -57,6 +59,8 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
               categoryName: row.categoryName,
               currentStock: Number(row.quantity ?? 0),
               reorderPoint: row.reorderPoint != null ? Number(row.reorderPoint) : null,
+              topPackagingLabel: row.topPackagingLabel,
+              unitsPerImportUnit: row.topPackagingConversionQty,
             })),
           );
           return;
@@ -154,18 +158,25 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
             unit: p.importUnit || p.unit,
             retailUnit: p.unit,
             unitsPerImportUnit: p.unitsPerImportUnit,
-            requestedQuantity: qtyResolver ? qtyResolver(p) : 1,
+            topPackagingLabel: p.topPackagingLabel,
+            requestedQuantity: p.requestedQty ?? (qtyResolver ? qtyResolver(p) : 1),
           };
         });
       return [...prev, ...additions];
     });
   }
 
-  function addRecommended(r) {
+  function openAddRecommended(r) {
+    setPendingRecommended(r);
+  }
+
+  function confirmAddRecommended(qty) {
+    if (!pendingRecommended) return;
+    const r = pendingRecommended;
     addProducts(
-      [{ id: r.productId, name: r.name, code: r.code, unit: r.unit }],
-      () => r.suggestedQty || 1,
+      [{ id: r.productId, name: r.name, code: r.code, unit: r.unit, topPackagingLabel: r.topPackagingLabel, requestedQty: qty }],
     );
+    setPendingRecommended(null);
   }
 
   function addAllRecommended() {
@@ -309,11 +320,10 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                           </div>
                         </td>
                         <td className="px-3 py-2 text-[var(--admin-muted)]">
-                          {purchaseUnitLabel(l.unit)}
+                          {l.topPackagingLabel || purchaseUnitLabel(l.unit)}
                           {l.unitsPerImportUnit ? (
                             <span className="block text-[10px] text-[var(--admin-subtle)]">
-                              {l.unitsPerImportUnit} {unitLabel(l.retailUnit || l.unit)} /{' '}
-                              {purchaseUnitLabel(l.unit)}
+                              = {l.unitsPerImportUnit} {unitLabel(l.retailUnit || l.unit)}
                             </span>
                           ) : null}
                         </td>
@@ -398,7 +408,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                       variant="secondary"
                       className="!px-2 !py-1 !text-xs"
                       disabled={addedIds.has(r.productId)}
-                      onClick={() => addRecommended(r)}
+                      onClick={() => openAddRecommended(r)}
                     >
                       {addedIds.has(r.productId) ? 'Added' : '+ Add'}
                     </Button>
@@ -435,6 +445,21 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
           </div>
         </div>
       </div>
+
+      <AddQtyModal
+        open={Boolean(pendingRecommended)}
+        product={
+          pendingRecommended && {
+            name: pendingRecommended.name,
+            code: pendingRecommended.code,
+            unit: pendingRecommended.unit,
+            topPackagingLabel: pendingRecommended.topPackagingLabel,
+          }
+        }
+        defaultQty={pendingRecommended?.suggestedQty || 1}
+        onConfirm={confirmAddRecommended}
+        onCancel={() => setPendingRecommended(null)}
+      />
     </Modal>
   );
 }

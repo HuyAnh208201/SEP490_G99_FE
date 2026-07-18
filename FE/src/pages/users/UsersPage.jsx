@@ -28,6 +28,7 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { has, role } = usePermissions();
   const canCreate = has('USER_DETAILS_EDIT') || has('MANAGE_BRANCH_STAFF_INFO');
+  const isBranchManager = role === 'BRANCH_MANAGER';
   const actorBranchId = currentUser?.branchId ?? currentUser?.branch_id ?? null;
   const currentUserId = currentUser?.id ?? null;
   const [actionLoading, setActionLoading] = useState(null);
@@ -42,6 +43,26 @@ export default function UsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [criticalAction, setCriticalAction] = useState(null);
+
+  const roleFilters = useMemo(() => {
+    if (!isBranchManager) return ROLE_FILTERS;
+    return ROLE_FILTERS.filter((f) =>
+      ['all', 'ADMIN', 'DIRECTOR', 'PROMOTION_DIRECTOR', 'BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'].includes(
+        f.id,
+      ),
+    );
+  }, [isBranchManager]);
+
+  const visibleBranches = useMemo(() => {
+    if (!isBranchManager) return branches || [];
+    return (branches || []).filter((b) => String(b.id) === String(actorBranchId));
+  }, [branches, isBranchManager, actorBranchId]);
+
+  useEffect(() => {
+    if (isBranchManager) {
+      setBranchFilter('all');
+    }
+  }, [isBranchManager]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -166,7 +187,7 @@ export default function UsersPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {ROLE_FILTERS.map((f) => (
+            {roleFilters.map((f) => (
               <button
                 key={f.id}
                 type="button"
@@ -182,19 +203,24 @@ export default function UsersPage() {
             ))}
           </div>
 
-          {(branches || []).length > 0 && (
+          {visibleBranches.length > 0 && !isBranchManager && (
             <select
               value={branchFilter}
               onChange={(e) => setBranchFilter(e.target.value)}
               className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
             >
               <option value="all">All branches</option>
-              {branches.map((b) => (
+              {visibleBranches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>
               ))}
             </select>
+          )}
+          {isBranchManager && actorBranchId && (
+            <span className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm text-[var(--admin-muted)]">
+              {branchMap[actorBranchId] || 'Your branch'} · HQ roles visible
+            </span>
           )}
         </div>
 

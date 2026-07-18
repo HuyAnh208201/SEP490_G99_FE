@@ -47,3 +47,58 @@ export function validateOperatingHours(open, close) {
   }
   return '';
 }
+
+/** Max shift length for part-time-friendly scheduling (hours). */
+export const MAX_SHIFT_HOURS = 6;
+
+function timeToMinutes(hhmm) {
+  const [h, m] = (hhmm || '00:00').split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(total) {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.round(total)));
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Split branch open→close into equal same-day slots, each ≤ MAX_SHIFT_HOURS.
+ * @returns {{ key: string, label: string, start: string, end: string, index: number, isFirst: boolean, isLast: boolean }[]}
+ */
+export function deriveShiftSlots(open, close, maxHours = MAX_SHIFT_HOURS) {
+  const parsed = typeof open === 'string' && close == null ? parseOperatingHours(open) : { open, close };
+  const openStr = parsed.open || '08:00';
+  const closeStr = parsed.close || '22:00';
+  const openMins = timeToMinutes(openStr);
+  let closeMins = timeToMinutes(closeStr);
+  if (closeMins <= openMins) {
+    // No overnight: treat invalid/overnight as a single short window ending next minute past open, or 24/7 day.
+    if (openStr === '00:00' && closeStr === '23:59') {
+      closeMins = 23 * 60 + 59;
+    } else {
+      closeMins = openMins + Math.min(maxHours * 60, 60);
+    }
+  }
+  const durationMins = Math.max(1, closeMins - openMins);
+  const slotCount = Math.max(1, Math.ceil(durationMins / (maxHours * 60)));
+  const slotLength = durationMins / slotCount;
+  const slots = [];
+  for (let i = 0; i < slotCount; i += 1) {
+    const startMins = openMins + Math.round(slotLength * i);
+    const endMins = i === slotCount - 1 ? closeMins : openMins + Math.round(slotLength * (i + 1));
+    const start = minutesToTime(startMins);
+    const end = minutesToTime(endMins);
+    slots.push({
+      key: `slot-${i}-${start}-${end}`,
+      label: `${start} – ${end}`,
+      start,
+      end,
+      index: i,
+      isFirst: i === 0,
+      isLast: i === slotCount - 1,
+    });
+  }
+  return slots;
+}

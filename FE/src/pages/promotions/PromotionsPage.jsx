@@ -53,6 +53,7 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 
 import CampaignFormModal from '../../components/domain/CampaignFormModal.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 
 
 
@@ -219,6 +220,10 @@ export default function PromotionsPage() {
   const [creatorFilter, setCreatorFilter] = useState('all');
 
   const [query, setQuery] = useState('');
+
+  const [reactivateTarget, setReactivateTarget] = useState(null);
+  const [reactivateDates, setReactivateDates] = useState({ startAt: '', endAt: '' });
+  const [reactivateError, setReactivateError] = useState('');
 
 
 
@@ -388,7 +393,27 @@ export default function PromotionsPage() {
 
     try {
 
-      if (action === 'activate') await activateCampaign(id);
+      if (action === 'activate') {
+        try {
+          await activateCampaign(id);
+        } catch (err) {
+          const msg = err.message || '';
+          if (/past|new startAt|dates are in the past/i.test(msg)) {
+            const campaign = items.find((c) => String(c.id) === String(id));
+            const today = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const localDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+            setReactivateTarget({ id, name: campaign?.name });
+            setReactivateDates({
+              startAt: `${localDate}T00:00`,
+              endAt: `${localDate}T23:59`,
+            });
+            setReactivateError(msg);
+            return;
+          }
+          throw err;
+        }
+      }
 
       else if (action === 'suspend') await suspendCampaign(id);
 
@@ -416,6 +441,27 @@ export default function PromotionsPage() {
 
     }
 
+  }
+
+  async function confirmReactivate() {
+    if (!reactivateTarget) return;
+    setReactivateError('');
+    setActionLoading(reactivateTarget.id);
+    try {
+      const startAt = reactivateDates.startAt ? new Date(reactivateDates.startAt).toISOString() : null;
+      const endAt = reactivateDates.endAt ? new Date(reactivateDates.endAt).toISOString() : null;
+      if (!startAt || !endAt) {
+        setReactivateError('Start and end dates are required.');
+        return;
+      }
+      await activateCampaign(reactivateTarget.id, { startAt, endAt });
+      setReactivateTarget(null);
+      await load();
+    } catch (err) {
+      setReactivateError(err.message || 'Failed to activate with new dates');
+    } finally {
+      setActionLoading(null);
+    }
   }
 
 
@@ -969,6 +1015,55 @@ export default function PromotionsPage() {
         onSaved={load}
 
       />
+
+      <Modal
+        open={Boolean(reactivateTarget)}
+        onClose={() => setReactivateTarget(null)}
+        title="Set new promotion dates"
+        description={
+          reactivateTarget?.name
+            ? `“${reactivateTarget.name}” needs a new schedule before it can be activated.`
+            : 'This promotion needs a new schedule before it can be activated.'
+        }
+        size="sm"
+      >
+        <div className="space-y-4">
+          {reactivateError && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {reactivateError}
+            </p>
+          )}
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">New start</span>
+            <input
+              type="datetime-local"
+              value={reactivateDates.startAt}
+              onChange={(e) => setReactivateDates((s) => ({ ...s, startAt: e.target.value }))}
+              className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">New end</span>
+            <input
+              type="datetime-local"
+              value={reactivateDates.endAt}
+              onChange={(e) => setReactivateDates((s) => ({ ...s, endAt: e.target.value }))}
+              className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+            />
+          </label>
+          <div className="flex justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
+            <Button variant="secondary" onClick={() => setReactivateTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              loading={actionLoading === reactivateTarget?.id}
+              onClick={confirmReactivate}
+            >
+              Activate
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
     </div>
 

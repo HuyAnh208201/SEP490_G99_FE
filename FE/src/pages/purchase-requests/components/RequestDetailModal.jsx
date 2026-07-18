@@ -113,7 +113,7 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
                 <tr>
                   <th className="px-4 py-2.5">Product</th>
                   <th className="px-4 py-2.5">Category</th>
-                  <th className="px-4 py-2.5">Unit</th>
+                  <th className="px-4 py-2.5">Purchase unit</th>
                   <th className="px-4 py-2.5 text-right">Requested</th>
                   <th className="px-4 py-2.5 text-right">Approved</th>
                 </tr>
@@ -126,7 +126,9 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
                       <div className="font-mono text-xs text-[var(--admin-subtle)]">{it.productCode}</div>
                     </td>
                     <td className="px-4 py-2.5 text-[var(--admin-muted)]">{it.categoryName}</td>
-                    <td className="px-4 py-2.5 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
+                    <td className="px-4 py-2.5 text-[var(--admin-muted)]">
+                      {it.topPackagingLabel || unitLabel(it.unit)}
+                    </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{it.requestedQuantity}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {mode === 'approve' ? (
