@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import {
@@ -99,6 +99,10 @@ export default function DashboardPage() {
   const { role, has } = usePermissions();
   const { getCategories, getProducts, getSuppliers } = useReferenceData();
   const webRole = normalizeWebRole(role);
+
+  if (webRole === 'CASHIER') {
+    return <Navigate to="/pos" replace />;
+  }
 
   const config = ROLE_DASHBOARD[webRole];
   const [moduleData, setModuleData] = useState(null);
