@@ -1,0 +1,86 @@
+import { useEffect, useState } from 'react';
+import Modal from '../../../components/ui/Modal.jsx';
+import { formatVnd } from '../../../lib/money.js';
+import { unitPrice } from '../data/mockData.js';
+
+export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
+  const [qty, setQty] = useState(1);
+
+  useEffect(() => {
+    if (open) setQty(1);
+  }, [open, product?.id]);
+
+  if (!product) return null;
+
+  const price = unitPrice(product);
+  const subtotal = price * qty;
+  const maxStock = product.stock ?? 9999;
+
+  return (
+    <Modal open={open} onClose={onClose} title={product.name} size="sm">
+      <p className="text-sm text-[var(--admin-muted)]">
+        {product.code} · {product.category}
+      </p>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] p-3 text-sm">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+            Unit price
+          </p>
+          {product.promoPrice != null && (
+            <p className="text-xs text-[var(--admin-subtle)] line-through">
+              {formatVnd(product.price)}
+            </p>
+          )}
+          <p className="font-semibold text-[var(--admin-brand)]">{formatVnd(price)}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+            In stock
+          </p>
+          <p className="font-semibold">{product.stock}</p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+          Quantity
+        </p>
+        <div className="inline-flex items-center overflow-hidden rounded-lg border border-[var(--admin-border)]">
+          <button
+            type="button"
+            onClick={() => setQty((value) => Math.max(1, value - 1))}
+            className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
+            aria-label="Decrease quantity"
+          >
+            −
+          </button>
+          <span className="flex h-11 min-w-14 items-center justify-center border-x border-[var(--admin-border)] bg-white text-lg font-bold">
+            {qty}
+          </span>
+          <button
+            type="button"
+            onClick={() => setQty((value) => Math.min(maxStock, value + 1))}
+            className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
+            aria-label="Increase quantity"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <span className="text-[var(--admin-muted)]">Subtotal</span>
+        <span className="text-base font-bold text-[var(--admin-text)]">{formatVnd(subtotal)}</span>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => onConfirm?.(product, qty)}
+        className="mt-5 w-full rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
+      >
+        Confirm
+      </button>
+    </Modal>
+  );
+}

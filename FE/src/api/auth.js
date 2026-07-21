@@ -1,16 +1,17 @@
 import { http } from './http.js';
 
 function resolveAuthError(err, fallback) {
-  const status = err?.response?.status;
-  const serverMessage = err?.response?.data?.message;
+  // http.js may wrap API errors as Error(message) with .status (no Axios response).
+  const status = err?.response?.status ?? err?.status ?? err?.code;
+  const serverMessage = err?.response?.data?.message || err?.message;
 
-  if (!err?.response) {
+  if (!err?.response && status == null) {
     return 'Cannot reach the backend. Start BE first on port 4313 (cd BE && mvnw.cmd spring-boot:run).';
   }
   if ((status === 500 || status === 502 || status === 503 || status === 504) && !serverMessage) {
     return 'Backend is not running or returned an error. Check http://localhost:4313 is up.';
   }
-  return serverMessage || err?.message || fallback;
+  return serverMessage || fallback;
 }
 
 /**
