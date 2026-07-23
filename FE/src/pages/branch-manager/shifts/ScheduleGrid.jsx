@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import Badge from '../../../components/ui/Badge.jsx';
 import Card from '../../../components/ui/Card.jsx';
+import { formatVnd } from '../../../lib/money.js';
 import {
   CELL_STYLES,
   MAX_EMPLOYEES_PER_SHIFT,
@@ -87,6 +88,11 @@ function ScheduleGrid({ loading, slots, weekDays, grid, busy, branchId, onAssign
                                   {staff.length}/{MAX_EMPLOYEES_PER_SHIFT}
                                 </span>
                               </div>
+                              {slot.isFirst && (
+                                <p className="text-[10px] tabular-nums text-[var(--admin-subtle)]">
+                                  Float {formatVnd(shift.openingCash)}
+                                </p>
+                              )}
                               <ul className="space-y-0.5 text-xs text-[var(--admin-text)]">
                                 {staff.map((e) => (
                                   <li key={e.employeeId || e.assignmentId}>
