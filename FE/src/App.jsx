@@ -35,13 +35,31 @@ import DirectorDashboardPage, {
   DirectorPlanningPage,
   DirectorReportsPage,
 } from './pages/director/DirectorPages.jsx';
+import PosLayout from './pages/pos/PosLayout.jsx';
+import PosNewOrderPage from './pages/pos/PosNewOrderPage.jsx';
+import OrderHistoryPage from './pages/pos/OrderHistoryPage.jsx';
+import InventoryPage from './pages/pos/InventoryPage.jsx';
+import SettingsPage from './pages/pos/SettingsPage.jsx';
+import CashPaymentPage from './pages/pos/CashPaymentPage.jsx';
+import PayOSPaymentPage from './pages/pos/PayOSPaymentPage.jsx';
 import AppLayout from './components/layout/AppLayout.jsx';
 import ProtectedRoute, { PermissionRoute } from './routes/ProtectedRoute.jsx';
+import PosRoute from './routes/PosRoute.jsx';
 
 function AppShell() {
   return (
     <ProtectedRoute>
       <AppLayout />
+    </ProtectedRoute>
+  );
+}
+
+function PosShell() {
+  return (
+    <ProtectedRoute>
+      <PosRoute>
+        <PosLayout />
+      </PosRoute>
     </ProtectedRoute>
   );
 }
@@ -53,6 +71,15 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      <Route element={<PosShell />}>
+        <Route path="/pos" element={<PosNewOrderPage />} />
+        <Route path="/pos/history" element={<OrderHistoryPage />} />
+        <Route path="/pos/inventory" element={<InventoryPage />} />
+        <Route path="/pos/settings" element={<SettingsPage />} />
+        <Route path="/pos/payment/cash" element={<CashPaymentPage />} />
+        <Route path="/pos/payment/payos" element={<PayOSPaymentPage />} />
+      </Route>
 
       <Route element={<AppShell />}>
         <Route path="/dashboard" element={<DashboardPage />} />
