@@ -68,7 +68,77 @@ export default function PosOrderTable({
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {/* Mobile: mỗi dòng thành một thẻ — bảng 9 cột không đọc được trên màn nhỏ */}
+      <ul className="divide-y divide-[var(--admin-border)] lg:hidden">
+        {lines.map((line, index) => (
+          <li key={line.key} className="px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--admin-text)]">
+                  <span className="text-[var(--admin-subtle)]">{index + 1}. </span>
+                  {line.name}
+                  {line.hasPromo && (
+                    <span className="ml-2 rounded border border-[var(--admin-brand)]/30 bg-[#0058be]/5 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[var(--admin-brand)]">
+                      Promo
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 font-mono text-[11px] text-[var(--admin-subtle)]">
+                  {line.barcode}
+                </p>
+                <p className="mt-1 text-xs text-[var(--admin-muted)]">
+                  {formatVnd(line.unitPrice)} / {unitLabels[line.unit] ?? line.unit}
+                </p>
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold text-[var(--admin-text)]">
+                  {formatVnd(line.unitPrice * line.qty)}
+                </p>
+                {editable && (
+                  <button
+                    type="button"
+                    onClick={() => requestRemove(line)}
+                    className="mt-1 inline-flex h-8 w-8 items-center justify-center rounded-lg text-[var(--admin-subtle)] transition hover:bg-[var(--admin-danger-bg)] hover:text-[var(--admin-danger)]"
+                    aria-label={`Remove ${line.name}`}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
+                      <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {editable ? (
+              <div className="mt-2 inline-flex items-center overflow-hidden rounded-lg border border-[var(--admin-border)]">
+                <button
+                  type="button"
+                  onClick={() => requestQtyChange(line, line.qty - 1)}
+                  className="h-10 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
+                  aria-label={`Decrease ${line.name}`}
+                >
+                  −
+                </button>
+                <span className="flex h-10 min-w-12 items-center justify-center border-x border-[var(--admin-border)] bg-white font-semibold">
+                  {line.qty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => requestQtyChange(line, line.qty + 1)}
+                  className="h-10 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
+                  aria-label={`Increase ${line.name}`}
+                >
+                  +
+                </button>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-[var(--admin-muted)]">Số lượng: {line.qty}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-x-auto lg:block">
         <table className="min-w-full text-left text-sm">
           <thead className="border-y border-[var(--admin-border)] bg-[#f7f9fb] text-[11px] font-bold uppercase tracking-wide text-[var(--admin-muted)]">
             <tr>
@@ -181,16 +251,18 @@ export default function PosOrderTable({
             })}
           </tbody>
         </table>
-        {!lines.length && (
-          <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center text-[var(--admin-subtle)]">
-            <svg viewBox="0 0 24 24" className="mb-3 h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 9.5 5 4h14l2 5.5M4 9.5h16V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5ZM9 14h6" />
-            </svg>
-            <p className="font-medium">No products in cart</p>
-            <p className="mt-1 text-xs">Scan a barcode or search to add products.</p>
-          </div>
-        )}
       </div>
+
+      {/* Ngoài khối bảng để mobile (bảng bị ẩn) vẫn thấy trạng thái giỏ rỗng */}
+      {!lines.length && (
+        <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center text-[var(--admin-subtle)]">
+          <svg viewBox="0 0 24 24" className="mb-3 h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M3 9.5 5 4h14l2 5.5M4 9.5h16V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5ZM9 14h6" />
+          </svg>
+          <p className="font-medium">No products in cart</p>
+          <p className="mt-1 text-xs">Scan a barcode or search to add products.</p>
+        </div>
+      )}
 
       <ConfirmDialog
         open={Boolean(confirm)}

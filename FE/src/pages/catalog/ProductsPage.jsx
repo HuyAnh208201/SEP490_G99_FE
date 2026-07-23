@@ -34,6 +34,7 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import FormField from '../../components/ui/FormField.jsx';
 import BarcodeInput from '../../components/ui/BarcodeInput.jsx';
+import PrintableBarcode from '../../components/ui/PrintableBarcode.jsx';
 import MoneyInput from '../../components/ui/MoneyInput.jsx';
 import InventoryCountPanel from '../../components/domain/InventoryCountPanel.jsx';
 
@@ -367,6 +368,8 @@ export default function ProductsPage() {
                     />
                   </FormField>
                 )}
+
+                <PrintableBarcode value={form.barcode} productName={form.name} />
 
                 {!editingId && showScan && (
                   <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
