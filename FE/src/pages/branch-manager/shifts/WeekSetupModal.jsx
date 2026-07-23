@@ -1,6 +1,9 @@
 import { useMemo } from 'react';
 import Button from '../../../components/ui/Button.jsx';
+import FormField from '../../../components/ui/FormField.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
+import MoneyInput from '../../../components/ui/MoneyInput.jsx';
+import { formatVnd } from '../../../lib/money.js';
 import StaffPicker from './StaffPicker.jsx';
 import {
   CELL_STYLES,
@@ -25,6 +28,7 @@ export default function WeekSetupModal({
   onPublish,
   onSelectSlot,
   onToggleSelection,
+  onOpeningCashChange,
 }) {
   const setupDays = useMemo(() => (weekStart ? buildWeekDays(weekStart) : []), [weekStart]);
 
@@ -219,6 +223,11 @@ export default function WeekSetupModal({
                                   <li className="text-[var(--admin-muted)]">Add staff</li>
                                 )}
                               </ul>
+                              {slot.first && (
+                                <p className="text-[10px] tabular-nums text-[var(--admin-subtle)]">
+                                  Float {formatVnd(slot.openingCash)}
+                                </p>
+                              )}
                               {issues.length > 0 && !slot.published && (
                                 <p className="text-[10px] font-medium text-amber-800">
                                   Needs {issues.filter((i) => i !== 'staff').join(' + ') || 'staff'}
@@ -253,6 +262,31 @@ export default function WeekSetupModal({
                     </p>
                   </div>
                 </div>
+                {activeSetupSlot.first && (
+                  <div className="mb-3 rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] p-3">
+                    {activeSetupSlot.readOnly ? (
+                      <>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+                          Opening cash
+                        </p>
+                        <p className="mt-1 text-sm font-medium tabular-nums text-[var(--admin-text)]">
+                          {formatVnd(activeSetupSlot.openingCash)}
+                        </p>
+                      </>
+                    ) : (
+                      <FormField
+                        label="Opening cash"
+                        hint="Cash float placed in the drawer to start the day. Leave blank to use the branch default. Later slots of the day inherit the previous shift's counted cash."
+                      >
+                        <MoneyInput
+                          value={activeSetupSlot.openingCash}
+                          onChange={(value) => onOpeningCashChange(activeSetupSlot.key, value)}
+                          placeholder="0"
+                        />
+                      </FormField>
+                    )}
+                  </div>
+                )}
                 {activeSetupSlot.readOnly ? (
                   <div className="grid gap-3 sm:grid-cols-2">
                     <ReadOnlyStaffList
