@@ -12,3 +12,12 @@ export function toPosProduct(product) {
     category: product.categoryName ?? 'Uncategorized',
   };
 }
+
+/** Giá bán thực tế của một dòng: ưu tiên giá khuyến mãi nếu có. */
+export function unitPrice(product) {
+  return product.promoPrice ?? product.price;
+}
+
+export function hasPromo(product) {
+  return product.promoPrice != null && product.promoPrice < product.price;
+}

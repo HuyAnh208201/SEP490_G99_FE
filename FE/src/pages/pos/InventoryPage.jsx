@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatVnd } from '../../lib/money.js';
 import { fetchProducts } from '../../api/products.js';
-import { hasPromo, unitPrice } from './data/mockData.js';
+import { hasPromo, unitPrice } from './posProduct.js';
 import { toPosProduct } from './posProduct.js';
 import PosPageTitle from './components/PosPageTitle.jsx';
 
