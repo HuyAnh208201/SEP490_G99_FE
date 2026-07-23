@@ -1,24 +1,57 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatVnd } from '../../lib/money.js';
-import { MOCK_PRODUCTS, hasPromo, unitPrice } from './data/mockData.js';
+import { fetchProducts } from '../../api/products.js';
+import { hasPromo, unitPrice } from './data/mockData.js';
+import { toPosProduct } from './posProduct.js';
 import PosPageTitle from './components/PosPageTitle.jsx';
 
 export default function InventoryPage() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('ALL');
+  const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  const categories = [...new Set(MOCK_PRODUCTS.map((product) => product.category))];
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    fetchProducts()
+      .then((rows) => {
+        if (!active) return;
+        setAllProducts(rows.map(toPosProduct));
+        setLoadError('');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setAllProducts([]);
+        setLoadError(
+          `Không tải được sản phẩm từ server: ${error.message || 'lỗi kết nối'}. Kiểm tra backend (cổng 4313) rồi tải lại trang.`,
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const categories = useMemo(
+    () => [...new Set(allProducts.map((product) => product.category))],
+    [allProducts],
+  );
+
   const products = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return MOCK_PRODUCTS.filter((product) => {
+    return allProducts.filter((product) => {
       const matchesQuery =
         !term ||
         product.name.toLowerCase().includes(term) ||
         product.code.toLowerCase().includes(term) ||
-        product.barcode.includes(term);
+        (product.barcode ?? '').includes(term);
       return matchesQuery && (category === 'ALL' || product.category === category);
     });
-  }, [query, category]);
+  }, [query, category, allProducts]);
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
@@ -52,6 +85,12 @@ export default function InventoryPage() {
             {products.length} products
           </span>
         </div>
+
+        {loadError && (
+          <p className="border-b border-[var(--admin-border)] bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            {loadError}
+          </p>
+        )}
 
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -99,7 +138,11 @@ export default function InventoryPage() {
               {!products.length && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-[var(--admin-subtle)]">
-                    No matching products.
+                    {loading
+                      ? 'Đang tải sản phẩm từ server...'
+                      : loadError
+                        ? 'Không có dữ liệu để hiển thị.'
+                        : 'No matching products.'}
                   </td>
                 </tr>
               )}
@@ -108,7 +151,7 @@ export default function InventoryPage() {
         </div>
 
         <div className="flex items-center justify-between border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-subtle)]">
-          <span>1–{products.length} of {MOCK_PRODUCTS.length}</span>
+          <span>1–{products.length} of {allProducts.length}</span>
           <div className="flex gap-1">
             <button type="button" disabled className="h-8 w-8 rounded-lg border border-[var(--admin-border)] disabled:opacity-40">‹</button>
             <button type="button" className="h-8 w-8 rounded-lg bg-[var(--admin-brand)] font-semibold text-white">1</button>

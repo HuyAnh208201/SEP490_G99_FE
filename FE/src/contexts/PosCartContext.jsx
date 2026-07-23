@@ -10,11 +10,11 @@ import {
   MOCK_DISCOUNT_CODES,
   MOCK_ORDER_HISTORY,
   POINT_VALUE_VND,
-  findCustomerByPhone,
   findProductByBarcode,
   hasPromo,
   unitPrice,
 } from '../pages/pos/data/mockData.js';
+import { lookupCustomer as apiLookupCustomer } from '../api/cashier.js';
 
 const PosCartContext = createContext(null);
 
@@ -157,7 +157,7 @@ export function PosCartProvider({ children }) {
     setPointsToRedeem(0);
   }, []);
 
-  const lookupCustomer = useCallback((phone) => {
+  const lookupCustomer = useCallback(async (phone) => {
     const value = String(phone ?? '').trim();
     setCustomerPhone(value);
     if (!value) {
@@ -166,16 +166,24 @@ export function PosCartProvider({ children }) {
       setPointsToRedeem(0);
       return { ok: true, retail: true };
     }
-    const found = findCustomerByPhone(value);
-    if (!found) {
+    try {
+      const data = await apiLookupCustomer(value);
+      const found = {
+        id: data.customerId,
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        points: data.totalPoints ?? 0,
+      };
+      setCustomer(found);
+      setCustomerLookupError('');
+      return { ok: true, customer: found };
+    } catch (error) {
       setCustomer(null);
-      setCustomerLookupError('Phone not found in membership system');
       setPointsToRedeem(0);
+      setCustomerLookupError(error.message || 'Customer not found');
       return { ok: false };
     }
-    setCustomer(found);
-    setCustomerLookupError('');
-    return { ok: true, customer: found };
   }, []);
 
   const applyDiscountCode = useCallback(() => {
