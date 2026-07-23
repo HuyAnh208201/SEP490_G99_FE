@@ -223,6 +223,17 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Reports',
+    items: [
+      {
+        path: '/reports',
+        label: 'Reports',
+        icon: 'report',
+        permissions: ['REPORTS_VIEW'],
+      },
+    ],
+  },
+  {
     label: 'Account',
     items: [
       {
