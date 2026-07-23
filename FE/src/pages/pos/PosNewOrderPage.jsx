@@ -22,6 +22,10 @@ export default function PosNewOrderPage() {
     lines,
     customer,
     customerLookupError,
+    customerResults,
+    customerNotFound,
+    customerBusy,
+    pointsAwarded,
     discountCodeInput,
     setDiscountCodeInput,
     appliedCode,
@@ -34,6 +38,9 @@ export default function PosNewOrderPage() {
     removeLine,
     clearCart,
     lookupCustomer,
+    selectCustomer,
+    createCustomer,
+    awardPoints,
     applyDiscountCode,
     clearDiscountCode,
     paymentOpen,
@@ -42,6 +49,9 @@ export default function PosNewOrderPage() {
 
   const [query, setQuery] = useState('');
   const [phone, setPhone] = useState('');
+  const [newCustomerName, setNewCustomerName] = useState('');
+  // Bỏ trống thì lấy luôn chuỗi vừa tra — nhưng cashier tra bằng tên thì phải sửa lại được.
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
   const [showResults, setShowResults] = useState(false);
   const [popupProduct, setPopupProduct] = useState(null);
   const [pendingProduct, setPendingProduct] = useState(null);
@@ -368,9 +378,9 @@ export default function PosNewOrderPage() {
                     className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-brand)]"
                   />
                   <span className="text-xs leading-relaxed text-[var(--admin-muted)]">
-                    <strong className="block text-sm text-[var(--admin-text)]">Chế độ máy quét</strong>
-                    Bật trên <strong>điện thoại</strong>: quét xong gửi mã sang máy bán hàng thay vì
-                    thêm vào giỏ của máy này. Máy bán hàng để <strong>tắt</strong>.
+                    <strong className="block text-sm text-[var(--admin-text)]">Scanner mode</strong>
+                    Enable on your <strong>phone</strong>: After scanning, send the code to the vending machine instead of
+                    adding it to the cart on this machine. The vending machine is turned <strong>off</strong>.
                   </span>
                 </label>
 
@@ -469,15 +479,19 @@ export default function PosNewOrderPage() {
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
-                  placeholder="Enter phone number"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') lookupCustomer(phone);
+                  }}
+                  placeholder="Phone, name or email"
                   className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
                 />
                 <button
                   type="button"
+                  disabled={customerBusy}
                   onClick={() => lookupCustomer(phone)}
-                  className="rounded-lg border border-[var(--admin-brand)] px-3 py-2.5 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
+                  className="rounded-lg border border-[var(--admin-brand)] px-3 py-2.5 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5 disabled:opacity-45"
                 >
-                  Look Up
+                  {customerBusy ? 'Searching…' : 'Look Up'}
                 </button>
                 <button
                   type="button"
@@ -492,6 +506,84 @@ export default function PosNewOrderPage() {
               {customerLookupError && (
                 <p className="mt-2 text-xs text-[var(--admin-danger)]">{customerLookupError}</p>
               )}
+
+              {customerResults.length > 0 && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-[var(--admin-border)]">
+                  <p className="border-b border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
+                    {customerResults.length} matches · pick one
+                  </p>
+                  <ul className="max-h-52 overflow-y-auto">
+                    {customerResults.map((match) => (
+                      <li key={match.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectCustomer(match);
+                            setPhone(match.phone || '');
+                          }}
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition hover:bg-[#0058be]/5"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium">
+                              {match.fullName}
+                            </span>
+                            <span className="block truncate text-xs text-[var(--admin-muted)]">
+                              {match.phone}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs font-bold text-[var(--admin-brand)]">
+                            {match.points} pts
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {customerNotFound && !customer && (
+                <div className="mt-3 rounded-lg border border-dashed border-[var(--admin-border)] bg-[#f7f9fb] p-3">
+                  <p className="text-xs font-semibold text-[var(--admin-text)]">
+                    No customer matches &ldquo;{phone}&rdquo;
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--admin-muted)]">
+                    Add them now so this sale can earn points.
+                  </p>
+                  <input
+                    value={newCustomerName}
+                    onChange={(event) => setNewCustomerName(event.target.value)}
+                    placeholder="Customer name"
+                    className="mt-2 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                  />
+                  <input
+                    value={newCustomerPhone || phone}
+                    onChange={(event) => setNewCustomerPhone(event.target.value)}
+                    placeholder="Phone number"
+                    inputMode="tel"
+                    className="mt-2 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                  />
+                  <button
+                    type="button"
+                    disabled={
+                      customerBusy || !newCustomerName.trim() || !(newCustomerPhone || phone).trim()
+                    }
+                    onClick={async () => {
+                      const result = await createCustomer({
+                        fullName: newCustomerName,
+                        phone: newCustomerPhone || phone,
+                      });
+                      if (result.ok) {
+                        setNewCustomerName('');
+                        setNewCustomerPhone('');
+                      }
+                    }}
+                    className="mt-2 w-full rounded-lg bg-[var(--admin-brand)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {customerBusy ? 'Creating…' : 'Create customer'}
+                  </button>
+                </div>
+              )}
+
               {customer ? (
                 <div className="mt-3 rounded-lg border border-[#0058be]/15 bg-[#0058be]/5 p-3">
                   <div className="flex items-start justify-between">
@@ -524,6 +616,24 @@ export default function PosNewOrderPage() {
                   {totals.pointsEarned > 0 && (
                     <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
                       Customer will earn +{totals.pointsEarned} points.
+                    </p>
+                  )}
+                  {/* Khoá sau khi cộng để tránh bấm hai lần cộng điểm trùng cho cùng một đơn. */}
+                  <button
+                    type="button"
+                    disabled={customerBusy || totals.total <= 0 || pointsAwarded !== null}
+                    onClick={awardPoints}
+                    className="mt-2 w-full rounded-lg border border-[var(--admin-brand)] px-3 py-2 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {customerBusy
+                      ? 'Adding…'
+                      : pointsAwarded !== null
+                        ? 'Points already added'
+                        : `Add points for ${formatVnd(totals.total)}`}
+                  </button>
+                  {pointsAwarded !== null && (
+                    <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
+                      Added +{pointsAwarded} points · new balance {customer.points} pts.
                     </p>
                   )}
                 </div>

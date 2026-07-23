@@ -14,9 +14,24 @@ import {
   hasPromo,
   unitPrice,
 } from '../pages/pos/data/mockData.js';
-import { lookupCustomer as apiLookupCustomer } from '../api/cashier.js';
+import {
+  addPoints as apiAddPoints,
+  createCustomer as apiCreateCustomer,
+  searchCustomers as apiSearchCustomers,
+} from '../api/cashier.js';
 
 const PosCartContext = createContext(null);
+
+/** CustomerLookupResponse (BE) → shape dùng trong giỏ hàng. */
+function toCustomer(data) {
+  return {
+    id: data.customerId,
+    fullName: data.fullName,
+    email: data.email,
+    phone: data.phone,
+    points: data.totalPoints ?? 0,
+  };
+}
 
 function lineKey(productId) {
   return String(productId);
@@ -76,6 +91,13 @@ export function PosCartProvider({ children }) {
   const [customer, setCustomer] = useState(null);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerLookupError, setCustomerLookupError] = useState('');
+  /** Nhiều khách cùng khớp một phần SĐT → cashier chọn tay. */
+  const [customerResults, setCustomerResults] = useState([]);
+  /** Tra không ra ai → mở form tạo nhanh. */
+  const [customerNotFound, setCustomerNotFound] = useState(false);
+  const [customerBusy, setCustomerBusy] = useState(false);
+  /** Số điểm vừa cộng, để hiện xác nhận sau khi bấm Add points. */
+  const [pointsAwarded, setPointsAwarded] = useState(null);
   const [discountCodeInput, setDiscountCodeInput] = useState('');
   const [appliedCode, setAppliedCode] = useState(null);
   const [discountCodeError, setDiscountCodeError] = useState('');
@@ -151,40 +173,119 @@ export function PosCartProvider({ children }) {
     setCustomer(null);
     setCustomerPhone('');
     setCustomerLookupError('');
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    setPointsAwarded(null);
     setDiscountCodeInput('');
     setAppliedCode(null);
     setDiscountCodeError('');
     setPointsToRedeem(0);
   }, []);
 
-  const lookupCustomer = useCallback(async (phone) => {
-    const value = String(phone ?? '').trim();
+  /** Tra theo một phần SĐT / email / tên. Khớp đúng 1 người thì chọn luôn. */
+  const lookupCustomer = useCallback(async (keyword) => {
+    const value = String(keyword ?? '').trim();
     setCustomerPhone(value);
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    setPointsAwarded(null);
     if (!value) {
       setCustomer(null);
       setCustomerLookupError('');
       setPointsToRedeem(0);
       return { ok: true, retail: true };
     }
+    setCustomerBusy(true);
     try {
-      const data = await apiLookupCustomer(value);
-      const found = {
-        id: data.customerId,
-        fullName: data.fullName,
-        email: data.email,
-        phone: data.phone,
-        points: data.totalPoints ?? 0,
-      };
-      setCustomer(found);
+      const matches = await apiSearchCustomers(value);
+      if (matches.length === 1) {
+        const found = toCustomer(matches[0]);
+        setCustomer(found);
+        setCustomerLookupError('');
+        return { ok: true, customer: found };
+      }
+      setCustomer(null);
+      setPointsToRedeem(0);
+      if (matches.length > 1) {
+        setCustomerResults(matches.map(toCustomer));
+        setCustomerLookupError('');
+        return { ok: true, multiple: true };
+      }
+      setCustomerNotFound(true);
       setCustomerLookupError('');
-      return { ok: true, customer: found };
+      return { ok: false, notFound: true };
     } catch (error) {
       setCustomer(null);
       setPointsToRedeem(0);
-      setCustomerLookupError(error.message || 'Customer not found');
+      setCustomerLookupError(error.message || 'Customer lookup failed');
       return { ok: false };
+    } finally {
+      setCustomerBusy(false);
     }
   }, []);
+
+  const selectCustomer = useCallback((found) => {
+    setCustomer(found);
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    setCustomerLookupError('');
+    setPointsAwarded(null);
+    setPointsToRedeem(0);
+  }, []);
+
+  /** Tạo nhanh khách mới tại quầy rồi gắn luôn vào đơn. */
+  const createCustomer = useCallback(async ({ fullName, phone }) => {
+    const name = String(fullName ?? '').trim();
+    const number = String(phone ?? '').trim();
+    if (!name || !number) {
+      setCustomerLookupError('Enter both a name and a phone number.');
+      return { ok: false };
+    }
+    setCustomerBusy(true);
+    try {
+      const created = toCustomer(await apiCreateCustomer({ fullName: name, phone: number }));
+      setCustomer(created);
+      setCustomerPhone(created.phone ?? number);
+      setCustomerResults([]);
+      setCustomerNotFound(false);
+      setCustomerLookupError('');
+      setPointsAwarded(null);
+      setPointsToRedeem(0);
+      return { ok: true, customer: created };
+    } catch (error) {
+      setCustomerLookupError(error.message || 'Could not create customer');
+      return { ok: false };
+    } finally {
+      setCustomerBusy(false);
+    }
+  }, []);
+
+  /** Cộng điểm cho khách theo tổng tiền đang có trên giỏ (10.000đ = 1 điểm). */
+  const awardPoints = useCallback(async () => {
+    if (!customer) return { ok: false };
+    if (totals.total <= 0) {
+      setCustomerLookupError('Add products to the cart before earning points.');
+      return { ok: false };
+    }
+    setCustomerBusy(true);
+    try {
+      const data = await apiAddPoints({
+        phoneOrEmail: customer.phone || customer.email,
+        invoiceAmount: totals.total,
+      });
+      setCustomer((current) =>
+        current ? { ...current, points: data.totalPoints ?? current.points } : current,
+      );
+      setPointsAwarded(data.pointsEarned ?? 0);
+      setCustomerLookupError('');
+      return { ok: true, data };
+    } catch (error) {
+      setCustomerLookupError(error.message || 'Could not add points');
+      return { ok: false };
+    } finally {
+      setCustomerBusy(false);
+    }
+  }, [customer, totals.total]);
 
   const applyDiscountCode = useCallback(() => {
     const code = discountCodeInput.trim().toUpperCase();
@@ -250,6 +351,10 @@ export function PosCartProvider({ children }) {
       customer,
       customerPhone,
       customerLookupError,
+      customerResults,
+      customerNotFound,
+      customerBusy,
+      pointsAwarded,
       discountCodeInput,
       setDiscountCodeInput,
       appliedCode,
@@ -266,6 +371,9 @@ export function PosCartProvider({ children }) {
       removeLine,
       clearCart,
       lookupCustomer,
+      selectCustomer,
+      createCustomer,
+      awardPoints,
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,
@@ -275,6 +383,10 @@ export function PosCartProvider({ children }) {
       customer,
       customerPhone,
       customerLookupError,
+      customerResults,
+      customerNotFound,
+      customerBusy,
+      pointsAwarded,
       discountCodeInput,
       appliedCode,
       discountCodeError,
@@ -288,6 +400,9 @@ export function PosCartProvider({ children }) {
       removeLine,
       clearCart,
       lookupCustomer,
+      selectCustomer,
+      createCustomer,
+      awardPoints,
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,
