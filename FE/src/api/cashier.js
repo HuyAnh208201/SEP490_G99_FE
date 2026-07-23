@@ -9,6 +9,12 @@ function unwrap(body) {
   return body.data;
 }
 
+/** Tỉ lệ tích/đổi điểm do server quyết định → { vndPerPoint, pointValueVnd }. */
+export async function fetchLoyaltyConfig() {
+  const { data } = await http.get('/cashier/loyalty-config');
+  return unwrap(data);
+}
+
 /** Tra cứu khách hàng khớp chính xác SĐT hoặc email → { customerId, fullName, email, phone, totalPoints }. */
 export async function lookupCustomer(phoneOrEmail) {
   const { data } = await http.get('/cashier/customer', {

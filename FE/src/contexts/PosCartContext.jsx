@@ -2,24 +2,25 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { hasPromo, toPosProduct, unitPrice } from '../pages/pos/posProduct.js';
 import {
-  EARN_VND_PER_POINT,
-  MOCK_DISCOUNT_CODES,
-  MOCK_ORDER_HISTORY,
-  POINT_VALUE_VND,
-  findProductByBarcode,
-  hasPromo,
-  unitPrice,
-} from '../pages/pos/data/mockData.js';
-import {
-  addPoints as apiAddPoints,
-  createCustomer as apiCreateCustomer,
+  fetchLoyaltyConfig as apiFetchLoyaltyConfig,
   searchCustomers as apiSearchCustomers,
 } from '../api/cashier.js';
+import {
+  checkout as apiCheckout,
+  fetchOrders as apiFetchOrders,
+  lookupVoucher as apiLookupVoucher,
+} from '../api/posOrders.js';
+import { scanBarcode as apiScanBarcode } from '../api/barcode.js';
+
+/** Fallback khi chưa tải được cấu hình từ server; server vẫn là nguồn sự thật khi chốt đơn. */
+const DEFAULT_LOYALTY = { vndPerPoint: 10000, pointValueVnd: 1000 };
 
 const PosCartContext = createContext(null);
 
@@ -51,35 +52,34 @@ function calcTotals(state) {
   const promoSavings = subtotalOriginal - subtotalAfterPromo;
   let afterPromo = subtotalAfterPromo;
 
+  // Voucher lấy từ BE (GET /pos/orders/vouchers/{code}); đây chỉ là bản xem trước,
+  // server tính lại con số cuối cùng lúc chốt đơn.
   let codeDiscount = 0;
-  if (state.appliedCode) {
-    const rule = MOCK_DISCOUNT_CODES[state.appliedCode];
-    if (rule?.type === 'percent') {
-      codeDiscount = Math.round((afterPromo * rule.value) / 100);
-    } else if (rule?.type === 'fixed') {
-      codeDiscount = rule.value;
-    }
+  const voucher = state.appliedVoucher;
+  if (voucher) {
+    codeDiscount = voucher.discountType === 'PERCENT'
+      ? Math.round((afterPromo * Number(voucher.discountValue)) / 100)
+      : Number(voucher.discountValue);
     codeDiscount = Math.min(codeDiscount, afterPromo);
     afterPromo -= codeDiscount;
   }
 
+  const { vndPerPoint, pointValueVnd } = state.loyalty ?? DEFAULT_LOYALTY;
   const maxPoints = state.customer?.points ?? 0;
   const pointsUsed = Math.min(state.pointsToRedeem, maxPoints);
-  const pointsDiscount = pointsUsed * POINT_VALUE_VND;
+  const pointsDiscount = pointsUsed * pointValueVnd;
   const cappedPointsDiscount = Math.min(pointsDiscount, afterPromo);
 
   const total = Math.max(0, afterPromo - cappedPointsDiscount);
   const pointsEarned =
-    state.customer && total > 0
-      ? Math.floor(total / EARN_VND_PER_POINT)
-      : 0;
+    state.customer && total > 0 ? Math.floor(total / vndPerPoint) : 0;
 
   return {
     subtotalOriginal,
     subtotalAfterPromo,
     promoSavings,
     codeDiscount,
-    pointsUsed: Math.floor(cappedPointsDiscount / POINT_VALUE_VND),
+    pointsUsed: Math.floor(cappedPointsDiscount / pointValueVnd),
     pointsDiscount: cappedPointsDiscount,
     total,
     pointsEarned,
@@ -101,21 +101,41 @@ export function PosCartProvider({ children }) {
   /** Chốt đơn là thao tác ghi DB — ref chặn double-click chắc hơn state. */
   const checkoutInFlight = useRef(false);
   const [discountCodeInput, setDiscountCodeInput] = useState('');
-  const [appliedCode, setAppliedCode] = useState(null);
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [discountCodeError, setDiscountCodeError] = useState('');
+  const [discountCodeBusy, setDiscountCodeBusy] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  const [orderHistory, setOrderHistory] = useState(MOCK_ORDER_HISTORY);
+  const [orderHistory, setOrderHistory] = useState([]);
+  const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [loyalty, setLoyalty] = useState(DEFAULT_LOYALTY);
+
+  // Tỉ lệ điểm do server quyết định — tải một lần khi mở POS.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await apiFetchLoyaltyConfig();
+        if (!cancelled && config) setLoyalty(config);
+      } catch {
+        // Giữ mặc định; chốt đơn vẫn dùng số của server nên không sai tiền.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const totals = useMemo(
     () =>
       calcTotals({
         lines,
-        appliedCode,
+        appliedVoucher,
         customer,
         pointsToRedeem,
+        loyalty,
       }),
-    [lines, appliedCode, customer, pointsToRedeem],
+    [lines, appliedVoucher, customer, pointsToRedeem, loyalty],
   );
 
   const addProduct = useCallback((product, qty = 1) => {
@@ -150,11 +170,16 @@ export function PosCartProvider({ children }) {
   }, []);
 
   const addByBarcode = useCallback(
-    (barcode) => {
-      const product = findProductByBarcode(barcode);
-      if (!product) return { ok: false, message: 'Product not found' };
-      addProduct(product, 1);
-      return { ok: true, product };
+    async (barcode) => {
+      const code = String(barcode ?? '').trim();
+      if (!code) return { ok: false, message: 'Empty barcode' };
+      try {
+        const product = toPosProduct(await apiScanBarcode(code));
+        addProduct(product, 1);
+        return { ok: true, product };
+      } catch (error) {
+        return { ok: false, message: error.message || 'Product not found' };
+      }
     },
     [addProduct],
   );
@@ -178,7 +203,7 @@ export function PosCartProvider({ children }) {
     setCustomerResults([]);
     setCustomerNotFound(false);
     setDiscountCodeInput('');
-    setAppliedCode(null);
+    setAppliedVoucher(null);
     setDiscountCodeError('');
     setPointsToRedeem(0);
   }, []);
@@ -259,26 +284,45 @@ export function PosCartProvider({ children }) {
     return { ok: true };
   }, []);
 
-  const applyDiscountCode = useCallback(() => {
-    const code = discountCodeInput.trim().toUpperCase();
+  const applyDiscountCode = useCallback(async () => {
+    const code = discountCodeInput.trim();
     if (!code) {
-      setAppliedCode(null);
+      setAppliedVoucher(null);
       setDiscountCodeError('');
       return { ok: true };
     }
-    if (!MOCK_DISCOUNT_CODES[code]) {
-      setDiscountCodeError('Invalid or expired discount code');
+    setDiscountCodeBusy(true);
+    try {
+      const voucher = await apiLookupVoucher(code);
+      setAppliedVoucher(voucher);
+      setDiscountCodeError('');
+      return { ok: true, voucher };
+    } catch (error) {
+      setAppliedVoucher(null);
+      setDiscountCodeError(error.message || 'Invalid or expired discount code');
       return { ok: false };
+    } finally {
+      setDiscountCodeBusy(false);
     }
-    setAppliedCode(code);
-    setDiscountCodeError('');
-    return { ok: true };
   }, [discountCodeInput]);
 
   const clearDiscountCode = useCallback(() => {
     setDiscountCodeInput('');
-    setAppliedCode(null);
+    setAppliedVoucher(null);
     setDiscountCodeError('');
+  }, []);
+
+  const loadOrderHistory = useCallback(async (range) => {
+    setOrderHistoryLoading(true);
+    try {
+      setOrderHistory(await apiFetchOrders(range));
+      return { ok: true };
+    } catch (error) {
+      setOrderHistory([]);
+      return { ok: false, message: error.message || 'Could not load order history' };
+    } finally {
+      setOrderHistoryLoading(false);
+    }
   }, []);
 
   const completeCashPayment = useCallback(
@@ -296,51 +340,19 @@ export function PosCartProvider({ children }) {
       setCheckoutBusy(true);
 
       try {
-        // Ghi khách + điểm TRƯỚC khi chốt đơn. Chốt xong mới ghi mà hỏng thì giỏ đã
-        // bị xoá, tên khách mất luôn và cashier không còn gì để thử lại.
-        let saved = customer;
-        if (customer?.pending) {
-          try {
-            saved = toCustomer(
-              await apiCreateCustomer({ fullName: customer.fullName, phone: customer.phone }),
-            );
-          } catch (error) {
-            return { ok: false, message: error.message || 'Could not save the new customer' };
-          }
-        }
-
-        // totals.pointsUsed là số điểm ĐÃ bị chặn trên theo tổng đơn, không phải số thô
-        // cashier gõ vào — gửi số thô sẽ trừ nhiều hơn phần giảm giá thực tế.
-        let pointsEarned = 0;
-        let pointsRedeemed = 0;
-        if (saved && (totals.pointsEarned > 0 || totals.pointsUsed > 0)) {
-          try {
-            const data = await apiAddPoints({
-              phoneOrEmail: saved.phone || saved.email,
-              invoiceAmount: totals.total,
-              pointsToRedeem: totals.pointsUsed,
-            });
-            pointsEarned = data.pointsEarned ?? 0;
-            pointsRedeemed = data.pointsRedeemed ?? 0;
-          } catch (error) {
-            return { ok: false, message: error.message || 'Could not settle loyalty points' };
-          }
-        }
-
-        const nextId = (orderHistory[0]?.id ?? 50) + 1;
-        const order = {
-          id: nextId,
-          invoiceCode: `INV-2026-${String(nextId).padStart(3, '0')}`,
-          createdAt: new Date().toISOString(),
-          customerName: saved?.fullName ?? 'Retail',
-          itemCount: totals.itemCount,
-          total: totals.total,
+        // Một request duy nhất: server ghi đơn, trừ kho, chốt điểm và khoá voucher
+        // trong cùng transaction. Hỏng bất kỳ đâu thì không có gì được ghi và giỏ
+        // vẫn nguyên để cashier thử lại.
+        const order = await apiCheckout({
+          lines: lines.map((line) => ({ productId: line.productId, quantity: line.qty })),
           paymentMethod,
-          status: 'COMPLETED',
-          lines: [...lines],
-          pointsEarned,
-          pointsUsed: pointsRedeemed,
-        };
+          cashReceived: paymentMethod === 'CASH' ? receivedAmount : null,
+          customerPhone: customer?.phone ?? null,
+          customerName: customer?.pending ? customer.fullName : null,
+          voucherCode: appliedVoucher?.code ?? null,
+          // pointsUsed đã bị chặn trên theo tổng đơn, không phải số thô cashier gõ.
+          pointsToRedeem: totals.pointsUsed,
+        });
 
         setOrderHistory((prev) => [order, ...prev]);
         clearCart();
@@ -348,14 +360,16 @@ export function PosCartProvider({ children }) {
         return {
           ok: true,
           order,
-          change: receivedAmount - totals.total,
+          change: Number(order.changeAmount ?? 0),
         };
+      } catch (error) {
+        return { ok: false, message: error.message || 'Could not complete the order' };
       } finally {
         checkoutInFlight.current = false;
         setCheckoutBusy(false);
       }
     },
-    [lines, totals, customer, orderHistory, clearCart],
+    [lines, totals, customer, appliedVoucher, clearCart],
   );
 
   const value = useMemo(
@@ -370,12 +384,16 @@ export function PosCartProvider({ children }) {
       checkoutBusy,
       discountCodeInput,
       setDiscountCodeInput,
-      appliedCode,
+      appliedVoucher,
       discountCodeError,
+      discountCodeBusy,
       pointsToRedeem,
       setPointsToRedeem,
       totals,
       orderHistory,
+      orderHistoryLoading,
+      loadOrderHistory,
+      loyalty,
       paymentOpen,
       setPaymentOpen,
       addProduct,
@@ -400,11 +418,15 @@ export function PosCartProvider({ children }) {
       customerBusy,
       checkoutBusy,
       discountCodeInput,
-      appliedCode,
+      appliedVoucher,
       discountCodeError,
+      discountCodeBusy,
       pointsToRedeem,
       totals,
       orderHistory,
+      orderHistoryLoading,
+      loadOrderHistory,
+      loyalty,
       paymentOpen,
       addProduct,
       addByBarcode,
