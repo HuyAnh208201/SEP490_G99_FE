@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -20,7 +19,6 @@ function formatMoney(value) {
 }
 
 export default function ShiftClosingPage() {
-  const navigate = useNavigate();
   const { refresh } = useShiftSession();
 
   const [data, setData] = useState(null);
@@ -117,9 +115,12 @@ export default function ShiftClosingPage() {
     setBusy('close');
     setError('');
     try {
-      await closeCashierShift();
+      const updated = await closeCashierShift();
+      // The shift is not finished on close anymore: it now awaits manager
+      // approval. Keep the cashier on this page and surface the pending state
+      // instead of navigating away as if the shift were fully closed.
+      setData((prev) => updated ?? (prev ? { ...prev, status: 'PENDING_APPROVAL' } : prev));
       await refresh();
-      navigate('/pos/shift/opening', { replace: true });
     } catch (err) {
       setError(err?.message || 'Could not close shift');
     } finally {
@@ -127,8 +128,14 @@ export default function ShiftClosingPage() {
     }
   }
 
+  const isPendingApproval = data?.status === 'PENDING_APPROVAL';
+  const wasRejected = data?.status === 'PENDING_HANDOVER' && Boolean(data?.reviewNote);
+
   const canCloseCashier =
-    data?.verificationConfirmed && data?.handoverConfirmed && data?.status !== 'CLOSED';
+    data?.verificationConfirmed &&
+    data?.handoverConfirmed &&
+    data?.status !== 'CLOSED' &&
+    !isPendingApproval;
 
   const shift = data?.shift;
 
@@ -145,6 +152,25 @@ export default function ShiftClosingPage() {
         <p className="text-sm text-[var(--admin-muted)]">Loading…</p>
       ) : (
         <>
+          {isPendingApproval && (
+            <Card className="border-amber-200 bg-amber-50">
+              <p className="font-semibold text-amber-800">Pending manager approval</p>
+              <p className="mt-1 text-sm text-amber-700">
+                Your shift has been submitted and is waiting for the branch manager to
+                review the cash difference. You can start a new shift once it is approved.
+              </p>
+            </Card>
+          )}
+
+          {wasRejected && (
+            <Card className="border-red-200 bg-red-50">
+              <p className="font-semibold text-red-800">Manager rejected this shift</p>
+              <p className="mt-1 text-sm text-red-700">
+                Manager rejected: {data.reviewNote} — please recount the cash and resubmit.
+              </p>
+            </Card>
+          )}
+
           {shift && (
             <Card className="bg-[#f7f9fb]">
               <p className="font-semibold">
