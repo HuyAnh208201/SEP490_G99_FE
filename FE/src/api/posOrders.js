@@ -49,3 +49,30 @@ export async function lookupVoucher(code) {
   const { data } = await http.get(`/pos/orders/vouchers/${encodeURIComponent(code)}`);
   return unwrap(data);
 }
+
+/**
+ * Cashier xin hoàn/huỷ một đơn (chỉ hợp lệ trong 5 phút sau khi tạo — server
+ * kiểm lại). Trả RefundResponse ở trạng thái PENDING chờ BM duyệt.
+ */
+export async function requestRefund(orderId, reason) {
+  const { data } = await http.post(`/pos/orders/${orderId}/refund-request`, { reason });
+  return unwrap(data);
+}
+
+/** Các yêu cầu hoàn đơn đang chờ duyệt của chi nhánh BM. */
+export async function fetchPendingRefunds() {
+  const { data } = await http.get('/pos/refunds/pending');
+  return unwrap(data) ?? [];
+}
+
+/** BM duyệt yêu cầu hoàn đơn → server hoàn kho, thu hồi điểm, đơn thành REFUNDED. */
+export async function approveRefund(refundId, note) {
+  const { data } = await http.post(`/pos/refunds/${refundId}/approve`, { note });
+  return unwrap(data);
+}
+
+/** BM từ chối yêu cầu hoàn đơn → đơn giữ nguyên. */
+export async function rejectRefund(refundId, note) {
+  const { data } = await http.post(`/pos/refunds/${refundId}/reject`, { note });
+  return unwrap(data);
+}

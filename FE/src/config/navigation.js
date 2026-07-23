@@ -191,6 +191,12 @@ export const NAV_GROUPS = [
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },
+      {
+        path: '/branch-manager/refunds',
+        label: 'Refund approvals',
+        icon: 'report',
+        permissions: ['REFUND_APPROVAL'],
+      },
     ],
   },
   {
