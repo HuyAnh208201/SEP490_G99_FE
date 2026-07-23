@@ -1,5 +1,7 @@
 import Button from '../../../components/ui/Button.jsx';
+import FormField from '../../../components/ui/FormField.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
+import MoneyInput from '../../../components/ui/MoneyInput.jsx';
 import StaffPicker from './StaffPicker.jsx';
 import { MAX_EMPLOYEES_PER_SHIFT } from './shiftGrid.js';
 
@@ -14,11 +16,13 @@ export default function AssignModal({
   availableIs,
   cashierIds,
   inventoryIds,
+  openingCash,
   busy,
   onClose,
   onClear,
   onSave,
   onToggle,
+  onOpeningCashChange,
 }) {
   return (
     <Modal
@@ -62,6 +66,16 @@ export default function AssignModal({
           {assignError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {assignError}
+            </div>
+          )}
+          {assignCtx.slot.isFirst && (
+            <div className="rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] p-3">
+              <FormField
+                label="Opening cash"
+                hint="Cash float placed in the drawer to start the day. Leave blank to use the branch default. Later slots of the day inherit the previous shift's counted cash."
+              >
+                <MoneyInput value={openingCash} onChange={onOpeningCashChange} placeholder="0" />
+              </FormField>
             </div>
           )}
           {availableLoading ? (
