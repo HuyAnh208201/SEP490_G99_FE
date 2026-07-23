@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
@@ -55,17 +56,23 @@ export default function PayOSPaymentPage() {
     lines,
     totals,
     appliedCode,
+    checkoutBusy,
     completeCashPayment,
   } = usePosCart();
+  const [error, setError] = useState('');
 
   if (!lines.length) return <Navigate to="/pos" replace />;
 
-  function confirmReceived() {
-    const result = completeCashPayment({
+  async function confirmReceived() {
+    setError('');
+    const result = await completeCashPayment({
       receivedAmount: totals.total,
       paymentMethod: 'PAYOS',
     });
-    if (!result.ok) return;
+    if (!result.ok) {
+      setError(result.message || 'Could not complete the payment');
+      return;
+    }
     navigate('/pos/history', {
       replace: true,
       state: { completedInvoice: result.order.invoiceCode },
@@ -131,8 +138,9 @@ export default function PayOSPaymentPage() {
           </button>
           <button
             type="button"
+            disabled={checkoutBusy}
             onClick={confirmReceived}
-            className="inline-flex items-center gap-2 rounded-lg bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
+            className="inline-flex items-center gap-2 rounded-lg bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
               <path d="M6 9V3h12v6M6 17H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M6 14h12v7H6z" strokeLinejoin="round" />
@@ -140,6 +148,9 @@ export default function PayOSPaymentPage() {
             Payment Received — Print Receipt
           </button>
         </div>
+        {error && (
+          <p className="mt-3 text-right text-sm text-[var(--admin-danger)]">{error}</p>
+        )}
       </div>
     </main>
   );

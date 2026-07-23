@@ -25,7 +25,6 @@ export default function PosNewOrderPage() {
     customerResults,
     customerNotFound,
     customerBusy,
-    pointsAwarded,
     discountCodeInput,
     setDiscountCodeInput,
     appliedCode,
@@ -39,8 +38,7 @@ export default function PosNewOrderPage() {
     clearCart,
     lookupCustomer,
     selectCustomer,
-    createCustomer,
-    awardPoints,
+    stageNewCustomer,
     applyDiscountCode,
     clearDiscountCode,
     paymentOpen,
@@ -547,7 +545,8 @@ export default function PosNewOrderPage() {
                     No customer matches &ldquo;{phone}&rdquo;
                   </p>
                   <p className="mt-0.5 text-xs text-[var(--admin-muted)]">
-                    Add them now so this sale can earn points.
+                    Add their name to this order. They are saved to the system once payment
+                    completes.
                   </p>
                   <input
                     value={newCustomerName}
@@ -564,11 +563,9 @@ export default function PosNewOrderPage() {
                   />
                   <button
                     type="button"
-                    disabled={
-                      customerBusy || !newCustomerName.trim() || !(newCustomerPhone || phone).trim()
-                    }
-                    onClick={async () => {
-                      const result = await createCustomer({
+                    disabled={!newCustomerName.trim() || !(newCustomerPhone || phone).trim()}
+                    onClick={() => {
+                      const result = stageNewCustomer({
                         fullName: newCustomerName,
                         phone: newCustomerPhone || phone,
                       });
@@ -579,7 +576,7 @@ export default function PosNewOrderPage() {
                     }}
                     className="mt-2 w-full rounded-lg bg-[var(--admin-brand)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    {customerBusy ? 'Creating…' : 'Create customer'}
+                    Add customer to order
                   </button>
                 </div>
               )}
@@ -595,47 +592,39 @@ export default function PosNewOrderPage() {
                       </p>
                     </div>
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-[var(--admin-brand)]">
-                      {customer.points} pts
+                      {customer.pending ? 'New' : `${customer.points} pts`}
                     </span>
                   </div>
-                  <label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
-                    Redeem points · 1 point = {formatVnd(POINT_VALUE_VND)}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max={customer.points}
-                    value={pointsToRedeem}
-                    onChange={(event) =>
-                      setPointsToRedeem(
-                        Math.max(0, Math.min(customer.points, Number(event.target.value) || 0)),
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)]"
-                  />
+                  {/* Khách chưa lưu thì chưa có điểm nào để đổi. */}
+                  {!customer.pending && (
+                    <>
+                      <label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+                        Redeem points · 1 point = {formatVnd(POINT_VALUE_VND)}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={customer.points}
+                        value={pointsToRedeem}
+                        onChange={(event) =>
+                          setPointsToRedeem(
+                            Math.max(0, Math.min(customer.points, Number(event.target.value) || 0)),
+                          )
+                        }
+                        className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)]"
+                      />
+                    </>
+                  )}
                   {totals.pointsEarned > 0 && (
                     <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
                       Customer will earn +{totals.pointsEarned} points.
                     </p>
                   )}
-                  {/* Khoá sau khi cộng để tránh bấm hai lần cộng điểm trùng cho cùng một đơn. */}
-                  <button
-                    type="button"
-                    disabled={customerBusy || totals.total <= 0 || pointsAwarded !== null}
-                    onClick={awardPoints}
-                    className="mt-2 w-full rounded-lg border border-[var(--admin-brand)] px-3 py-2 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5 disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    {customerBusy
-                      ? 'Adding…'
-                      : pointsAwarded !== null
-                        ? 'Points already added'
-                        : `Add points for ${formatVnd(totals.total)}`}
-                  </button>
-                  {pointsAwarded !== null && (
-                    <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
-                      Added +{pointsAwarded} points · new balance {customer.points} pts.
-                    </p>
-                  )}
+                  <p className="mt-2 text-[11px] text-[var(--admin-subtle)]">
+                    {customer.pending
+                      ? 'This customer and their points are saved once payment completes.'
+                      : 'Points are added once payment completes.'}
+                  </p>
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[var(--admin-subtle)]">Retail customer · no points</p>
