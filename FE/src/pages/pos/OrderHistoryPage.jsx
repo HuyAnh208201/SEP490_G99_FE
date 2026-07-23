@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
+import { requestRefund } from '../../api/posOrders.js';
+import Modal from '../../components/ui/Modal.jsx';
+import Button from '../../components/ui/Button.jsx';
 import PosPageTitle from './components/PosPageTitle.jsx';
+
+/** Cashier chỉ được xin hoàn đơn trong 5 phút kể từ khi đơn tạo. */
+const REFUND_WINDOW_MS = 5 * 60 * 1000;
 
 function formatWhen(iso) {
   if (!iso) return '—';
@@ -12,6 +18,14 @@ function formatWhen(iso) {
   }).format(new Date(iso));
 }
 
+/** Đếm ngược mm:ss (kẹp về 00:00 khi hết giờ). */
+function formatCountdown(ms) {
+  const totalSec = Math.max(0, Math.ceil(ms / 1000));
+  const mm = String(Math.floor(totalSec / 60)).padStart(2, '0');
+  const ss = String(totalSec % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
 export default function OrderHistoryPage() {
   const { orderHistory, orderHistoryLoading, loadOrderHistory } = usePosCart();
   const location = useLocation();
@@ -19,6 +33,13 @@ export default function OrderHistoryPage() {
   const [method, setMethod] = useState('ALL');
   const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState('');
+  // Đồng hồ đếm giây để cập nhật đếm ngược và tự ẩn nút khi hết cửa sổ 5 phút.
+  const [now, setNow] = useState(() => Date.now());
+  const [refundOrder, setRefundOrder] = useState(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundError, setRefundError] = useState('');
+  const [refundSubmitting, setRefundSubmitting] = useState(false);
+  const [refundNotice, setRefundNotice] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -26,6 +47,47 @@ export default function OrderHistoryPage() {
       if (!result.ok) setError(result.message);
     })();
   }, [loadOrderHistory]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  function openRefund(order) {
+    setRefundOrder(order);
+    setRefundReason('');
+    setRefundError('');
+  }
+
+  function closeRefund() {
+    if (refundSubmitting) return;
+    setRefundOrder(null);
+    setRefundReason('');
+    setRefundError('');
+  }
+
+  async function submitRefund() {
+    if (refundSubmitting || !refundOrder) return;
+    const reason = refundReason.trim();
+    if (!reason) {
+      setRefundError('Please enter a reason for the refund.');
+      return;
+    }
+    setRefundSubmitting(true);
+    setRefundError('');
+    try {
+      await requestRefund(refundOrder.id, reason);
+      setRefundOrder(null);
+      setRefundReason('');
+      setRefundNotice('Refund requested — pending manager approval.');
+      const result = await loadOrderHistory();
+      if (!result.ok) setError(result.message);
+    } catch (err) {
+      setRefundError(err?.message || 'Could not request the refund.');
+    } finally {
+      setRefundSubmitting(false);
+    }
+  }
 
   const filteredOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -60,6 +122,20 @@ export default function OrderHistoryPage() {
         <div className="mb-4 rounded-xl border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 px-4 py-3 text-sm text-[var(--admin-success)]">
           <span className="font-semibold">{location.state.completedInvoice}</span> completed successfully.
           {location.state.change != null && ` Change returned: ${formatVnd(location.state.change)}.`}
+        </div>
+      )}
+
+      {refundNotice && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 px-4 py-3 text-sm text-[var(--admin-success)]">
+          <span>{refundNotice}</span>
+          <button
+            type="button"
+            onClick={() => setRefundNotice('')}
+            className="shrink-0 font-semibold text-[var(--admin-success)]/80 hover:text-[var(--admin-success)]"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -103,6 +179,7 @@ export default function OrderHistoryPage() {
                 <th className="px-4 py-3">Items</th>
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3 text-right">Refund</th>
               </tr>
             </thead>
             <tbody>
@@ -128,11 +205,38 @@ export default function OrderHistoryPage() {
                   <td className="px-4 py-3 text-right font-semibold">
                     {formatVnd(order.total)}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    {order.status === 'REFUNDED' ? (
+                      <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                        Refunded
+                      </span>
+                    ) : (() => {
+                      const remainingMs =
+                        new Date(order.createdAt).getTime() + REFUND_WINDOW_MS - now;
+                      const canRefund = order.status === 'COMPLETED' && remainingMs > 0;
+                      if (!canRefund) return <span className="text-[var(--admin-subtle)]">—</span>;
+                      return (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openRefund(order);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[var(--admin-brand)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
+                        >
+                          Request refund
+                          <span className="tabular-nums text-[var(--admin-subtle)]">
+                            {formatCountdown(remainingMs)}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                  </td>
                 </tr>
               ))}
               {filteredOrders.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-[var(--admin-subtle)]">
+                  <td colSpan={7} className="px-4 py-12 text-center text-[var(--admin-subtle)]">
                     No matching orders.
                   </td>
                 </tr>
@@ -211,6 +315,52 @@ export default function OrderHistoryPage() {
           )}
         </aside>
       </div>
+
+      <Modal
+        open={Boolean(refundOrder)}
+        onClose={closeRefund}
+        title="Request refund"
+        description={
+          refundOrder
+            ? `Invoice ${refundOrder.invoiceCode} · ${formatVnd(refundOrder.total)}`
+            : undefined
+        }
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={closeRefund} disabled={refundSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitRefund}
+              loading={refundSubmitting}
+              disabled={refundSubmitting || !refundReason.trim()}
+            >
+              Submit request
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-[var(--admin-muted)]">
+            This will send the order to your branch manager for approval. Refunds are only
+            allowed within 5 minutes of checkout.
+          </p>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-[var(--admin-text)]">
+              Reason <span className="text-red-600">*</span>
+            </span>
+            <textarea
+              className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+              rows={4}
+              placeholder="Explain why this order needs to be refunded…"
+              value={refundReason}
+              onChange={(event) => setRefundReason(event.target.value)}
+              autoFocus
+            />
+          </label>
+          {refundError && <p className="text-sm text-red-600">{refundError}</p>}
+        </div>
+      </Modal>
     </main>
   );
 }

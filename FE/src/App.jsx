@@ -27,6 +27,7 @@ import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
 import BranchManagerDashboardPage, {
   CashDiscrepancyPage,
+  RefundApprovalPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
 import BranchReceivePage from './pages/branch-manager/BranchReceivePage.jsx';
 import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
@@ -319,6 +320,14 @@ export default function App() {
           element={
             <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
               <CashDiscrepancyPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/branch-manager/refunds"
+          element={
+            <PermissionRoute permission="REFUND_APPROVAL">
+              <RefundApprovalPage />
             </PermissionRoute>
           }
         />
