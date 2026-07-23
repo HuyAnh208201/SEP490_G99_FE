@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
-import { MOCK_PRODUCTS, unitPrice } from './data/mockData.js';
 import PosPageTitle from './components/PosPageTitle.jsx';
 
 function formatWhen(iso) {
@@ -14,19 +13,27 @@ function formatWhen(iso) {
 }
 
 export default function OrderHistoryPage() {
-  const { orderHistory } = usePosCart();
+  const { orderHistory, orderHistoryLoading, loadOrderHistory } = usePosCart();
   const location = useLocation();
   const [query, setQuery] = useState('');
   const [method, setMethod] = useState('ALL');
-  const [selectedId, setSelectedId] = useState(orderHistory[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const result = await loadOrderHistory();
+      if (!result.ok) setError(result.message);
+    })();
+  }, [loadOrderHistory]);
 
   const filteredOrders = useMemo(() => {
     const term = query.trim().toLowerCase();
     return orderHistory.filter((order) => {
       const matchesSearch =
         !term ||
-        order.invoiceCode.toLowerCase().includes(term) ||
-        order.customerName.toLowerCase().includes(term);
+        (order.invoiceCode ?? '').toLowerCase().includes(term) ||
+        (order.customerName ?? '').toLowerCase().includes(term);
       const matchesMethod = method === 'ALL' || order.paymentMethod === method;
       return matchesSearch && matchesMethod;
     });
@@ -37,17 +44,13 @@ export default function OrderHistoryPage() {
     filteredOrders[0] ??
     null;
 
-  const detailLines =
-    selected?.lines ??
-    MOCK_PRODUCTS.slice(0, 2).map((product) => ({
-      key: String(product.id),
-      name: product.name,
-      unit: product.unit,
-      qty: product.id === 1 ? 1 : 3,
-      unitPrice: unitPrice(product),
-      unitOriginal: product.price,
-      hasPromo: Boolean(product.promoPrice),
-    }));
+  // OrderItemResponse (BE) → shape mà bảng chi tiết bên dưới đang dùng.
+  const detailLines = (selected?.lines ?? []).map((line) => ({
+    key: String(line.id ?? line.productId),
+    name: line.productName,
+    qty: line.quantity,
+    unitPrice: Number(line.unitPrice),
+  }));
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">

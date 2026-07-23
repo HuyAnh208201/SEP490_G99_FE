@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import { formatVnd } from '../../../lib/money.js';
-import { unitPrice } from '../data/mockData.js';
+import { unitPrice } from '../posProduct.js';
 
 export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
   const [qty, setQty] = useState(1);

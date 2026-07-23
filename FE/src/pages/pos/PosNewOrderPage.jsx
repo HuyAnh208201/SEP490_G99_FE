@@ -4,7 +4,6 @@ import { usePosCart } from '../../contexts/PosCartContext.jsx';
 import { scanBarcode } from '../../api/barcode.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchScanEvents, pushScanEvent } from '../../api/posScan.js';
-import { MOCK_DISCOUNT_CODES, POINT_VALUE_VND } from './data/mockData.js';
 import { toPosProduct } from './posProduct.js';
 import CheckoutDialog from './components/CheckoutDialog.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
@@ -24,9 +23,10 @@ export default function PosNewOrderPage() {
     customerBusy,
     pointsToRedeem,
     setPointsToRedeem,
+    loyalty,
     discountCodeInput,
     setDiscountCodeInput,
-    appliedCode,
+    appliedVoucher,
     discountCodeError,
     totals,
     addProduct,
@@ -420,7 +420,7 @@ export default function PosNewOrderPage() {
               </div>
             </section>
 
-            <OrderSummary totals={totals} appliedCode={appliedCode} />
+            <OrderSummary totals={totals} appliedCode={appliedVoucher?.code} />
           </div>
 
           <aside className="space-y-4 2xl:sticky 2xl:top-0">
@@ -434,13 +434,13 @@ export default function PosNewOrderPage() {
                 placeholder="Enter a discount code"
                 className="mt-3 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm uppercase outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
               />
-              {appliedCode ? (
+              {appliedVoucher ? (
                 <div className="mt-2 rounded-lg border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 p-2.5">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold text-[var(--admin-success)]">Code applied</p>
                       <p className="text-xs text-[var(--admin-muted)]">
-                        {MOCK_DISCOUNT_CODES[appliedCode]?.label}
+                        {appliedVoucher.name}
                       </p>
                     </div>
                     <button
@@ -596,7 +596,7 @@ export default function PosNewOrderPage() {
                   {customer.points > 0 && (
                     <>
                       <label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
-                        Redeem points · 1 point = {formatVnd(POINT_VALUE_VND)}
+                        Redeem points · 1 point = {formatVnd(loyalty.pointValueVnd)}
                       </label>
                       <input
                         type="number"
