@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, Outlet } from 'react-router-dom';
 import LoginPage from './pages/login/LoginPage.jsx';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx';
@@ -42,9 +42,15 @@ import InventoryPage from './pages/pos/InventoryPage.jsx';
 import SettingsPage from './pages/pos/SettingsPage.jsx';
 import CashPaymentPage from './pages/pos/CashPaymentPage.jsx';
 import PayOSPaymentPage from './pages/pos/PayOSPaymentPage.jsx';
+import ShiftOpeningPage from './pages/shift/ShiftOpeningPage.jsx';
+import ShiftClosingPage from './pages/shift/ShiftClosingPage.jsx';
+import ShiftHistoryPage from './pages/shift/ShiftHistoryPage.jsx';
+import ShiftHomePage from './pages/shift/ShiftHomePage.jsx';
+import ShiftCurrentPage from './pages/shift/ShiftCurrentPage.jsx';
 import AppLayout from './components/layout/AppLayout.jsx';
 import ProtectedRoute, { PermissionRoute } from './routes/ProtectedRoute.jsx';
 import PosRoute from './routes/PosRoute.jsx';
+import RequireOpenShift from './routes/RequireOpenShift.jsx';
 
 function AppShell() {
   return (
@@ -58,7 +64,7 @@ function PosShell() {
   return (
     <ProtectedRoute>
       <PosRoute>
-        <PosLayout />
+        <Outlet />
       </PosRoute>
     </ProtectedRoute>
   );
@@ -73,12 +79,21 @@ export default function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<PosShell />}>
-        <Route path="/pos" element={<PosNewOrderPage />} />
-        <Route path="/pos/history" element={<OrderHistoryPage />} />
-        <Route path="/pos/inventory" element={<InventoryPage />} />
-        <Route path="/pos/settings" element={<SettingsPage />} />
-        <Route path="/pos/payment/cash" element={<CashPaymentPage />} />
-        <Route path="/pos/payment/payos" element={<PayOSPaymentPage />} />
+        <Route element={<PosLayout />}>
+          <Route path="/pos/shift" element={<ShiftHomePage />} />
+          <Route path="/pos/shift/opening" element={<ShiftOpeningPage />} />
+          <Route path="/pos/shift/current" element={<ShiftCurrentPage />} />
+          <Route path="/pos/shift/closing" element={<ShiftClosingPage />} />
+          <Route path="/pos/shift/history" element={<ShiftHistoryPage />} />
+          <Route element={<RequireOpenShift />}>
+            <Route path="/pos" element={<PosNewOrderPage />} />
+            <Route path="/pos/history" element={<OrderHistoryPage />} />
+            <Route path="/pos/inventory" element={<InventoryPage />} />
+            <Route path="/pos/settings" element={<SettingsPage />} />
+            <Route path="/pos/payment/cash" element={<CashPaymentPage />} />
+            <Route path="/pos/payment/payos" element={<PayOSPaymentPage />} />
+          </Route>
+        </Route>
       </Route>
 
       <Route element={<AppShell />}>

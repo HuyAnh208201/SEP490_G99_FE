@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './contexts/AuthContext.jsx';
 import { PermissionsProvider } from './contexts/PermissionsContext.jsx';
+import { ShiftSessionProvider } from './contexts/ShiftSessionContext.jsx';
 import { ReferenceDataProvider } from './contexts/ReferenceDataContext.jsx';
 import './styles/global.css';
 
@@ -12,9 +13,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <PermissionsProvider>
-          <ReferenceDataProvider>
-            <App />
-          </ReferenceDataProvider>
+          <ShiftSessionProvider>
+            <ReferenceDataProvider>
+              <App />
+            </ReferenceDataProvider>
+          </ShiftSessionProvider>
         </PermissionsProvider>
       </AuthProvider>
     </BrowserRouter>
