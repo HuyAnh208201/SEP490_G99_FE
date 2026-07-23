@@ -45,6 +45,8 @@ export default function ShiftsPage() {
   const [assignCtx, setAssignCtx] = useState(null);
   const [cashierIds, setCashierIds] = useState([]);
   const [inventoryIds, setInventoryIds] = useState([]);
+  /** Cash float for the first slot of the day; null means "let the backend apply its default". */
+  const [openingCash, setOpeningCash] = useState(null);
   const [availableCashiers, setAvailableCashiers] = useState([]);
   const [availableIs, setAvailableIs] = useState([]);
   const [availableLoaded, setAvailableLoaded] = useState(false);
@@ -173,6 +175,7 @@ export default function ShiftsPage() {
       setAssignError('');
       setCashierIds(cashiers);
       setInventoryIds(inventory);
+      setOpeningCash(shift?.openingCash != null ? Number(shift.openingCash) : null);
       setAssignCtx({ date: dayDate, slot, shift: shift || null });
     },
     [grid],
@@ -287,6 +290,7 @@ export default function ShiftsPage() {
         branchId,
         startTime: localIso(assignCtx.date, assignCtx.slot.start),
         endTime: localIso(assignCtx.date, assignCtx.slot.end),
+        openingCash: assignCtx.slot.isFirst ? openingCash : null,
         cashiers: cashierIds,
         inventoryStaff: inventoryIds,
       });
@@ -397,6 +401,8 @@ export default function ShiftsPage() {
           slotIndex: slot.slotIndex,
           first: Boolean(slot.first),
           last: Boolean(slot.last),
+          // Backend prefills the configured default on first slots, so this is rarely blank.
+          openingCash: slot.openingCash != null ? Number(slot.openingCash) : null,
           readOnly: Boolean(slot.readOnly || slot.published),
           published: Boolean(slot.published),
           cashiers: [...(slot.cashiers || [])],
@@ -451,6 +457,14 @@ export default function ShiftsPage() {
     });
   }, []);
 
+  const setSetupOpeningCash = useCallback((slotKey, value) => {
+    setSetupSlots((prev) => {
+      const slot = prev[slotKey];
+      if (!slot || slot.readOnly) return prev;
+      return { ...prev, [slotKey]: { ...slot, openingCash: value } };
+    });
+  }, []);
+
   async function handleSetupPublish() {
     if (!branchId || !setupWeekStart) return;
     const editable = Object.values(setupSlots).filter((s) => !s.readOnly);
@@ -472,6 +486,7 @@ export default function ShiftsPage() {
       const slotsPayload = editable.map((s) => ({
         startTime: s.startTime.length === 16 ? `${s.startTime}:00` : s.startTime,
         endTime: s.endTime.length === 16 ? `${s.endTime}:00` : s.endTime,
+        openingCash: s.first ? (s.openingCash ?? null) : null,
         cashiers: s.cashiers,
         inventoryStaff: s.inventoryStaff,
       }));
@@ -624,6 +639,7 @@ export default function ShiftsPage() {
         availableIs={availableIs}
         cashierIds={cashierIds}
         inventoryIds={inventoryIds}
+        openingCash={openingCash}
         busy={busy}
         onClose={() => setAssignCtx(null)}
         onClear={() => {
@@ -633,6 +649,7 @@ export default function ShiftsPage() {
         }}
         onSave={handleSaveAssign}
         onToggle={toggleRoleSelection}
+        onOpeningCashChange={setOpeningCash}
       />
 
       <WeekSetupModal
@@ -649,6 +666,7 @@ export default function ShiftsPage() {
         onPublish={handleSetupPublish}
         onSelectSlot={setActiveSetupKey}
         onToggleSelection={toggleSetupSelection}
+        onOpeningCashChange={setSetupOpeningCash}
       />
     </div>
   );

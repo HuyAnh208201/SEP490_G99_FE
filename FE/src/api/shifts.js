@@ -54,15 +54,32 @@ export async function removeEmployee(shiftId, employeeId) {
   return unwrap(data);
 }
 
-/** Upsert DRAFT for a slot window and sync cashiers + inventory staff. Empty lists clears the slot. */
-export async function assignToSlot({ branchId, startTime, endTime, cashiers, inventoryStaff }) {
+/**
+ * Upsert DRAFT for a slot window and sync cashiers + inventory staff. Empty lists clears the slot.
+ * `openingCash` only applies to the first slot of the day; null lets the backend use its default.
+ */
+export async function assignToSlot({
+  branchId,
+  startTime,
+  endTime,
+  openingCash,
+  cashiers,
+  inventoryStaff,
+}) {
   const { data } = await http.post('/shifts/slot/assign', {
     branchId,
     startTime,
     endTime,
+    openingCash: openingCash ?? null,
     cashiers: cashiers || [],
     inventoryStaff: inventoryStaff || [],
   });
+  return unwrap(data);
+}
+
+/** Adjust the cash float of a shift by hand. Allowed while the shift is DRAFT or PUBLISHED. */
+export async function updateOpeningCash(id, openingCash) {
+  const { data } = await http.patch(`/shifts/${id}/opening-cash`, { openingCash });
   return unwrap(data);
 }
 
