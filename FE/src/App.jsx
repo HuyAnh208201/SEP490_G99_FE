@@ -36,6 +36,7 @@ import DirectorDashboardPage, {
   DirectorPlanningPage,
   DirectorReportsPage,
 } from './pages/director/DirectorPages.jsx';
+import ReportsPage from './pages/reports/ReportsPage.jsx';
 import PosLayout from './pages/pos/PosLayout.jsx';
 import PosNewOrderPage from './pages/pos/PosNewOrderPage.jsx';
 import OrderHistoryPage from './pages/pos/OrderHistoryPage.jsx';
@@ -353,6 +354,15 @@ export default function App() {
           element={
             <PermissionRoute permission="STRATEGIC_PLANNING_OVERVIEW">
               <DirectorPlanningPage />
+            </PermissionRoute>
+          }
+        />
+
+        <Route
+          path="/reports"
+          element={
+            <PermissionRoute permission="REPORTS_VIEW">
+              <ReportsPage />
             </PermissionRoute>
           }
         />
