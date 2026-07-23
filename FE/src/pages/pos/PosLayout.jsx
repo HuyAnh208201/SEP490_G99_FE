@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
+import { isShiftOpen } from '../../api/shiftSessions.js';
 import { PosCartProvider } from '../../contexts/PosCartContext.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
 
-const NAV = [
+const SHIFT_NAV = [{ to: '/pos/shift', end: true, label: 'Shift' }];
+
+const ORDER_NAV = [
   {
     to: '/pos',
     end: true,
@@ -105,9 +109,32 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-2 py-4">
         <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">
+          Shift
+        </p>
+        {SHIFT_NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            onClick={onNavigate}
+            className={({ isActive }) => {
+              const active = isActive || location.pathname.startsWith('/pos/shift/');
+              return [
+                'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition lg:py-2.5',
+                active
+                  ? 'bg-[#0058be]/10 text-[var(--admin-brand)]'
+                  : 'text-[var(--admin-muted)] hover:bg-[#f0f4f8] hover:text-[var(--admin-text)]',
+              ].join(' ');
+            }}
+          >
+            {item.label}
+          </NavLink>
+        ))}
+
+        <p className="mb-2 mt-4 px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">
           Order
         </p>
-        {NAV.map((item) => (
+        {ORDER_NAV.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -117,7 +144,6 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
               const active =
                 isActive || (item.to === '/pos' && location.pathname.startsWith('/pos/payment/'));
               return [
-                // py-3 trên mobile cho dễ bấm bằng ngón tay
                 'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition lg:py-2.5',
                 active
                   ? 'bg-[#0058be]/10 text-[var(--admin-brand)]'
@@ -153,15 +179,25 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
 
 export default function PosLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { session } = useShiftSession();
   const isPayment = location.pathname.startsWith('/pos/payment/');
+  const onWorkPage =
+    !location.pathname.startsWith('/pos/shift/') &&
+    !location.pathname.startsWith('/pos/payment/');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
-  // Đổi trang thì đóng ngăn kéo, tránh nó che nội dung vừa mở.
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
+
+  const headerTitle = location.pathname.startsWith('/pos/shift/')
+    ? 'Shift'
+    : isPayment
+      ? 'Payment'
+      : 'Point of Sale';
 
   return (
     <PosCartProvider>
@@ -169,12 +205,10 @@ export default function PosLayout() {
         className="flex h-screen overflow-hidden bg-[var(--admin-bg)] text-[var(--admin-text)]"
         style={{ '--pos-sidebar-width': '240px' }}
       >
-        {/* Desktop: cột cố định */}
         <aside className="hidden h-full w-[var(--pos-sidebar-width)] shrink-0 flex-col border-r border-[var(--admin-border)] bg-[var(--admin-surface)] lg:flex">
           <PosSidebarContent onSignOutClick={() => setConfirmSignOut(true)} />
         </aside>
 
-        {/* Mobile: ngăn kéo trượt ra, không chiếm chỗ khi đóng */}
         {drawerOpen && (
           <div className="fixed inset-0 z-40 lg:hidden">
             <button
@@ -195,7 +229,7 @@ export default function PosLayout() {
           </div>
         )}
 
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between gap-2 border-b border-[var(--admin-border)] bg-white px-3 lg:px-5">
             <div className="flex min-w-0 items-center gap-2">
               <button
@@ -208,16 +242,22 @@ export default function PosLayout() {
                   <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
                 </svg>
               </button>
-              <span className="truncate text-sm font-medium text-[var(--admin-muted)]">
-                {isPayment ? 'Payment' : 'Point of Sale'}
-              </span>
+              <span className="truncate text-sm font-medium text-[var(--admin-muted)]">{headerTitle}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs text-[var(--admin-muted)] lg:gap-3">
+              {isShiftOpen(session) && onWorkPage && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/pos/shift/closing')}
+                  className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] hover:bg-[#f0f4f8]"
+                >
+                  End shift
+                </button>
+              )}
               <span className="flex items-center gap-1.5 font-semibold text-[var(--admin-success)]">
                 <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
                 ONLINE
               </span>
-              {/* Ngày giờ chiếm nhiều chỗ trên máy nhỏ → chỉ hiện từ sm trở lên */}
               <span className="hidden sm:inline">
                 {new Intl.DateTimeFormat('en-GB', {
                   dateStyle: 'short',
@@ -226,7 +266,9 @@ export default function PosLayout() {
               </span>
             </div>
           </div>
-          <Outlet />
+          <main className="min-h-0 flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
         </div>
       </div>
 
