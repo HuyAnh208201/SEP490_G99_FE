@@ -65,6 +65,21 @@ export async function fetchShiftSessionHistory() {
   return unwrap(data);
 }
 
+export async function fetchPendingApprovals() {
+  const { data } = await http.get('/shift-sessions/pending');
+  return unwrap(data) ?? [];
+}
+
+export async function approveSession(id, note) {
+  const { data } = await http.post(`/shift-sessions/${id}/approve`, { note });
+  return unwrap(data);
+}
+
+export async function rejectSession(id, note) {
+  const { data } = await http.post(`/shift-sessions/${id}/reject`, { note });
+  return unwrap(data);
+}
+
 export function isShiftOpen(session) {
   return session?.status === 'OPEN';
 }
