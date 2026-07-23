@@ -31,11 +31,16 @@ export async function createCustomer({ fullName, phone }) {
   return unwrap(data);
 }
 
-/** Tích điểm từ hóa đơn → { customerName, customerEmail, pointsEarned, totalPoints, invoiceAmount }. */
-export async function addPoints({ phoneOrEmail, invoiceAmount }) {
+/**
+ * Chốt điểm cho hoá đơn: trừ điểm khách đổi rồi cộng điểm kiếm được, trong cùng
+ * một transaction phía BE.
+ * → { customerName, customerEmail, pointsRedeemed, pointsEarned, totalPoints, invoiceAmount }
+ */
+export async function addPoints({ phoneOrEmail, invoiceAmount, pointsToRedeem = 0 }) {
   const { data } = await http.post('/cashier/add-points', {
     phoneOrEmail,
     invoiceAmount,
+    pointsToRedeem,
   });
   return unwrap(data);
 }

@@ -4,7 +4,7 @@ import { usePosCart } from '../../contexts/PosCartContext.jsx';
 import { scanBarcode } from '../../api/barcode.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchScanEvents, pushScanEvent } from '../../api/posScan.js';
-import { MOCK_DISCOUNT_CODES } from './data/mockData.js';
+import { MOCK_DISCOUNT_CODES, POINT_VALUE_VND } from './data/mockData.js';
 import { toPosProduct } from './posProduct.js';
 import CheckoutDialog from './components/CheckoutDialog.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
@@ -22,6 +22,8 @@ export default function PosNewOrderPage() {
     customerResults,
     customerNotFound,
     customerBusy,
+    pointsToRedeem,
+    setPointsToRedeem,
     discountCodeInput,
     setDiscountCodeInput,
     appliedCode,
@@ -590,6 +592,33 @@ export default function PosNewOrderPage() {
                       {customer.pending ? 'New' : `${customer.points} pts`}
                     </span>
                   </div>
+                  {/* Khách mới chưa có điểm nào để đổi. */}
+                  {customer.points > 0 && (
+                    <>
+                      <label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+                        Redeem points · 1 point = {formatVnd(POINT_VALUE_VND)}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max={customer.points}
+                        value={pointsToRedeem}
+                        onChange={(event) =>
+                          setPointsToRedeem(
+                            Math.max(0, Math.min(customer.points, Number(event.target.value) || 0)),
+                          )
+                        }
+                        className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)]"
+                      />
+                      {/* Đổi nhiều hơn giá trị đơn thì phần thừa không bị trừ. */}
+                      {totals.pointsUsed < pointsToRedeem && (
+                        <p className="mt-1 text-[11px] text-amber-700">
+                          Only {totals.pointsUsed} points fit this order · the rest stays on the
+                          account.
+                        </p>
+                      )}
+                    </>
+                  )}
                   {totals.pointsEarned > 0 && (
                     <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
                       Customer will earn +{totals.pointsEarned} points.
@@ -598,7 +627,7 @@ export default function PosNewOrderPage() {
                   <p className="mt-2 text-[11px] text-[var(--admin-subtle)]">
                     {customer.pending
                       ? 'This customer and their points are saved once payment completes.'
-                      : 'Points are added once payment completes.'}
+                      : 'Points are settled once payment completes.'}
                   </p>
                 </div>
               ) : (
