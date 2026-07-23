@@ -1,17 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
+import { scanBarcode } from '../../api/barcode.js';
+import { fetchProducts } from '../../api/products.js';
+import { fetchScanEvents, pushScanEvent } from '../../api/posScan.js';
 import {
   MOCK_DISCOUNT_CODES,
-  MOCK_PRODUCTS,
   POINT_VALUE_VND,
 } from './data/mockData.js';
+import { toPosProduct } from './posProduct.js';
 import CheckoutDialog from './components/CheckoutDialog.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
 import OrderSummary from './components/OrderSummary.jsx';
 import PosOrderTable from './components/PosOrderTable.jsx';
 import PosPageTitle from './components/PosPageTitle.jsx';
 import ProductQtyPopup from './components/ProductQtyPopup.jsx';
+import BarcodeScannerModal from './components/BarcodeScannerModal.jsx';
 
 export default function PosNewOrderPage() {
   const {
@@ -43,19 +47,106 @@ export default function PosNewOrderPage() {
   const [pendingProduct, setPendingProduct] = useState(null);
   const [pendingQty, setPendingQty] = useState(1);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanMessage, setScanMessage] = useState('');
+  const [catalog, setCatalog] = useState([]);
+  // Bật trên điện thoại: quét xong GỬI mã sang máy bán hàng thay vì thêm vào giỏ máy này.
+  // Nhớ vào localStorage để điện thoại không phải bật lại mỗi lần mở trang.
+  const [relayMode, setRelayMode] = useState(
+    () => localStorage.getItem('pos_relay_mode') === '1',
+  );
+
+  useEffect(() => {
+    localStorage.setItem('pos_relay_mode', relayMode ? '1' : '0');
+  }, [relayMode]);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const rows = await fetchProducts();
+      setCatalog(rows.map(toPosProduct));
+      if (!rows.length) setScanMessage('Chi nhánh chưa có sản phẩm nào.');
+    } catch (error) {
+      setCatalog([]);
+      setScanMessage(
+        `Không tải được sản phẩm từ server: ${error.message || 'lỗi kết nối'}. Kiểm tra backend (cổng 4313) rồi tải lại trang.`,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => {
+      if (active) loadCatalog();
+    };
+    const onVisible = () => {
+      if (!document.hidden) refresh();
+    };
+    refresh();
+    // Sản phẩm vừa tạo ở tab khác sẽ không có trong catalog đã nạp — nạp lại khi
+    // quay lại tab/cửa sổ, để thu ngân không phải F5 thủ công.
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [loadCatalog]);
+
+  // Máy bán hàng (không bật chế độ máy quét) hỏi mã mới từ điện thoại mỗi 2 giây
+  // rồi tự thêm vào giỏ. Dùng chuỗi setTimeout thay vì setInterval để 2 nhịp
+  // không chồng lên nhau khi mạng chậm.
+  useEffect(() => {
+    if (relayMode) return undefined;
+
+    let active = true;
+    let cursor = null;
+    let timer;
+
+    const tick = async () => {
+      try {
+        const feed = await fetchScanEvents(cursor);
+        if (!active) return;
+        for (const event of feed.events ?? []) {
+          try {
+            const product = toPosProduct(await scanBarcode(event.barcode));
+            addProduct(product, 1);
+            setScanMessage(`Từ điện thoại: đã thêm "${product.name}" vào giỏ.`);
+          } catch (error) {
+            setScanMessage(
+              `Mã ${event.barcode} từ điện thoại: ${error.message || 'không xử lý được.'}`,
+            );
+          }
+        }
+        cursor = feed.latestId ?? cursor;
+      } catch {
+        // Mạng chập chờn thì bỏ nhịp này, nhịp sau hỏi lại — không cần báo lỗi.
+      } finally {
+        if (active) timer = setTimeout(tick, 2000);
+      }
+    };
+
+    tick();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [relayMode, addProduct]);
 
   const searchTerm = pendingProduct ? '' : query.trim().toLowerCase();
 
   const results = useMemo(() => {
     if (!searchTerm || pendingProduct) return [];
-    return MOCK_PRODUCTS.filter(
-      (product) =>
-        product.name.toLowerCase().includes(searchTerm) ||
-        product.code.toLowerCase().includes(searchTerm) ||
-        product.barcode.includes(searchTerm) ||
-        product.category.toLowerCase().includes(searchTerm),
-    ).slice(0, 8);
-  }, [searchTerm, pendingProduct]);
+    return catalog
+      .filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchTerm) ||
+          product.code.toLowerCase().includes(searchTerm) ||
+          (product.barcode ?? '').includes(searchTerm) ||
+          (product.category ?? '').toLowerCase().includes(searchTerm),
+      )
+      .slice(0, 8);
+  }, [searchTerm, pendingProduct, catalog]);
 
   function openProductPopup(product) {
     setPopupProduct(product);
@@ -76,28 +167,83 @@ export default function PosNewOrderPage() {
     setQuery('');
   }
 
-  function commitPendingToCart() {
-    if (pendingProduct) {
-      addProduct(pendingProduct, pendingQty);
-      clearPending();
+  /** Enter = CHỈ tìm sản phẩm, chưa thêm vào giỏ. Thêm vào giỏ là việc của nút "Add item". */
+  async function lookupProduct() {
+    if (pendingProduct) return; // đã tìm ra rồi, bấm "Add item" để thêm
+
+    const term = query.trim();
+    if (!term) return;
+
+    // Chuỗi toàn số = barcode → tra DB qua API, đưa vào trạng thái chờ thêm.
+    if (/^\d{6,}$/.test(term)) {
+      setScanMessage(`Đang tra mã ${term}…`);
+      try {
+        if (relayMode) {
+          const sent = await pushScanEvent(term);
+          setScanMessage(`Đã gửi "${sent.name}" sang máy bán hàng.`);
+          setQuery('');
+          setShowResults(false);
+          return;
+        }
+        const product = toPosProduct(await scanBarcode(term));
+        confirmPendingProduct(product, 1);
+        setScanMessage(`Đã tìm thấy "${product.name}". Bấm "Add item" để thêm vào giỏ.`);
+      } catch (error) {
+        setScanMessage(error.message || 'Product not found.');
+        setShowResults(true);
+      }
       return;
     }
 
-    const exact = MOCK_PRODUCTS.find(
-      (product) =>
-        product.barcode === query.trim() ||
-        product.code.toLowerCase() === query.trim().toLowerCase(),
+    // Gõ đúng mã sản phẩm (SKU) → mở popup chọn số lượng.
+    const exact = catalog.find(
+      (product) => product.code.toLowerCase() === term.toLowerCase(),
     );
     if (exact) {
       openProductPopup(exact);
       return;
     }
+
     setShowResults(true);
+  }
+
+  /** Nút "Add item" — chỉ thêm sản phẩm đã tìm ra trước đó. */
+  function commitPendingToCart() {
+    if (!pendingProduct) {
+      setScanMessage('Chưa chọn sản phẩm. Gõ mã hoặc tên rồi nhấn Enter để tìm trước.');
+      setShowResults(true);
+      return;
+    }
+    addProduct(pendingProduct, pendingQty);
+    setScanMessage(`Đã thêm "${pendingProduct.name}" vào giỏ.`);
+    clearPending();
   }
 
   function handleProductSearch(event) {
     event.preventDefault();
-    commitPendingToCart();
+    lookupProduct();
+  }
+
+  /**
+   * Camera đọc được mã → tra DB và THÊM THẲNG vào giỏ (không cần bấm "Add item").
+   * Khác với gõ tay + Enter: gõ tay chỉ tìm, phải bấm "Add item" mới thêm.
+   */
+  async function handleCameraDetected(barcode) {
+    try {
+      if (relayMode) {
+        const sent = await pushScanEvent(barcode);
+        setScanMessage(`Đã đọc mã ${barcode} → đã gửi "${sent.name}" sang máy bán hàng.`);
+        return;
+      }
+      const product = toPosProduct(await scanBarcode(barcode));
+      addProduct(product, 1);
+      setScanMessage(`Đã đọc mã ${barcode} → đã thêm "${product.name}" vào giỏ.`);
+    } catch (error) {
+      // Luôn kèm mã đọc được để biết camera đọc ra cái gì khi tra không thấy.
+      setScanMessage(`Mã ${barcode}: ${error.message || 'không xử lý được.'}`);
+    } finally {
+      setScannerOpen(false);
+    }
   }
 
   return (
@@ -110,6 +256,9 @@ export default function PosNewOrderPage() {
             <section className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)]">
               <div className="border-b border-[var(--admin-border)] px-4 py-4">
                 <form onSubmit={handleProductSearch} className="relative">
+                  {/* Bọc riêng icon + input: trên mobile hàng nút nằm trong luồng làm
+                      form cao lên, nếu căn icon theo form thì icon bị tụt khỏi ô nhập. */}
+                  <div className="relative">
                   <svg
                     viewBox="0 0 24 24"
                     className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-subtle)]"
@@ -135,14 +284,31 @@ export default function PosNewOrderPage() {
                       if (!pendingProduct) setShowResults(true);
                     }}
                     placeholder="Scan barcode or search products to add to cart..."
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-white py-2.5 pl-10 pr-24 text-sm outline-none transition placeholder:text-[var(--admin-subtle)] focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                    className="w-full rounded-lg border border-[var(--admin-border)] bg-white py-3 pl-10 pr-3 text-base outline-none transition placeholder:text-[var(--admin-subtle)] focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15 sm:py-2.5 sm:pr-24 sm:text-sm"
                   />
-                  <button
-                    type="submit"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md bg-[var(--admin-brand)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--admin-brand-hover)]"
-                  >
-                    Add item
-                  </button>
+                  </div>
+                  {/* Mobile: 2 nút xuống dòng, to đủ để bấm bằng ngón tay.
+                      Từ sm trở lên: nhét lại vào trong ô input như thiết kế gốc. */}
+                  <div className="mt-2 flex gap-2 sm:absolute sm:right-1.5 sm:top-1/2 sm:mt-0 sm:-translate-y-1/2 sm:gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setScannerOpen(true)}
+                      title="Scan with camera"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--admin-brand)] py-3 text-sm font-semibold text-[var(--admin-brand)] hover:bg-[#0058be]/5 sm:flex-none sm:rounded-md sm:px-2 sm:py-1.5 sm:text-xs"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth="1.7">
+                        <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
+                      </svg>
+                      Scan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={commitPendingToCart}
+                      className="flex-1 rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white hover:bg-[var(--admin-brand-hover)] sm:flex-none sm:rounded-md sm:px-3 sm:py-1.5 sm:text-xs"
+                    >
+                      Add item
+                    </button>
+                  </div>
                   {showResults && !pendingProduct && query && (
                     <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]">
                       {results.length ? (
@@ -183,10 +349,45 @@ export default function PosNewOrderPage() {
                 </form>
                 {pendingProduct && (
                   <p className="mt-2 text-xs text-[var(--admin-muted)]">
-                    Ready to add: <span className="font-semibold text-[var(--admin-text)]">{pendingProduct.name}</span>
-                    {' · '}Quantity {pendingQty}. Press <strong>Add item</strong> or Enter.
+                    Đã tìm thấy: <span className="font-semibold text-[var(--admin-text)]">{pendingProduct.name}</span>
+                    {' · '}Số lượng {pendingQty}. Bấm <strong>Add item</strong> để thêm vào giỏ.
                   </p>
                 )}
+                <label
+                  className={[
+                    'mt-3 flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition',
+                    relayMode
+                      ? 'border-[var(--admin-brand)]/40 bg-[#0058be]/5'
+                      : 'border-[var(--admin-border)] bg-white',
+                  ].join(' ')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={relayMode}
+                    onChange={(event) => setRelayMode(event.target.checked)}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-brand)]"
+                  />
+                  <span className="text-xs leading-relaxed text-[var(--admin-muted)]">
+                    <strong className="block text-sm text-[var(--admin-text)]">Chế độ máy quét</strong>
+                    Bật trên <strong>điện thoại</strong>: quét xong gửi mã sang máy bán hàng thay vì
+                    thêm vào giỏ của máy này. Máy bán hàng để <strong>tắt</strong>.
+                  </span>
+                </label>
+
+                {relayMode && (
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] py-4 text-base font-bold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)]"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
+                    </svg>
+                    Quét mã gửi sang máy bán hàng
+                  </button>
+                )}
+
+                {scanMessage && <p className="mt-2 text-xs text-[var(--admin-muted)]">{scanMessage}</p>}
               </div>
 
               <PosOrderTable
@@ -297,7 +498,8 @@ export default function PosNewOrderPage() {
                     <div>
                       <p className="text-sm font-semibold">{customer.fullName}</p>
                       <p className="text-xs text-[var(--admin-muted)]">
-                        {customer.memberCode} · {customer.tier}
+                        {customer.phone}
+                        {customer.email ? ` · ${customer.email}` : ''}
                       </p>
                     </div>
                     <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-[var(--admin-brand)]">
@@ -361,6 +563,11 @@ export default function PosNewOrderPage() {
       />
 
       <CheckoutDialog open={paymentOpen} onClose={() => setPaymentOpen(false)} />
+      <BarcodeScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onDetected={handleCameraDetected}
+      />
     </>
   );
 }
