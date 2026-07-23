@@ -4,5 +4,6 @@ import { normalizeWebRole } from '../constants/userRoles.js';
 export function postLoginPath(user, fallback = '/dashboard') {
   const role = normalizeWebRole(user?.role);
   if (role === 'CASHIER') return '/pos';
+  if (role === 'INVENTORY_STAFF') return '/catalog/products';
   return fallback;
 }
