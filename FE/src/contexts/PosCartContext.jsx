@@ -309,17 +309,21 @@ export function PosCartProvider({ children }) {
           }
         }
 
-        // BE từ chối hoá đơn dưới 10.000đ vì không đủ 1 điểm — đừng để nó chặn thanh toán.
+        // totals.pointsUsed là số điểm ĐÃ bị chặn trên theo tổng đơn, không phải số thô
+        // cashier gõ vào — gửi số thô sẽ trừ nhiều hơn phần giảm giá thực tế.
         let pointsEarned = 0;
-        if (saved && totals.pointsEarned > 0) {
+        let pointsRedeemed = 0;
+        if (saved && (totals.pointsEarned > 0 || totals.pointsUsed > 0)) {
           try {
             const data = await apiAddPoints({
               phoneOrEmail: saved.phone || saved.email,
               invoiceAmount: totals.total,
+              pointsToRedeem: totals.pointsUsed,
             });
             pointsEarned = data.pointsEarned ?? 0;
+            pointsRedeemed = data.pointsRedeemed ?? 0;
           } catch (error) {
-            return { ok: false, message: error.message || 'Could not add loyalty points' };
+            return { ok: false, message: error.message || 'Could not settle loyalty points' };
           }
         }
 
@@ -335,7 +339,7 @@ export function PosCartProvider({ children }) {
           status: 'COMPLETED',
           lines: [...lines],
           pointsEarned,
-          pointsUsed: totals.pointsUsed,
+          pointsUsed: pointsRedeemed,
         };
 
         setOrderHistory((prev) => [order, ...prev]);
