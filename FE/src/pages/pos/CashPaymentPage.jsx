@@ -12,6 +12,7 @@ export default function CashPaymentPage() {
     lines,
     totals,
     appliedCode,
+    checkoutBusy,
     completeCashPayment,
   } = usePosCart();
   const [receivedRaw, setReceivedRaw] = useState('');
@@ -28,8 +29,8 @@ export default function CashPaymentPage() {
 
   if (!lines.length) return <Navigate to="/pos" replace />;
 
-  function complete() {
-    const result = completeCashPayment({ receivedAmount: received });
+  async function complete() {
+    const result = await completeCashPayment({ receivedAmount: received });
     if (!result.ok) {
       setError(result.message);
       return;
@@ -136,7 +137,7 @@ export default function CashPaymentPage() {
           </button>
           <button
             type="button"
-            disabled={received < totals.total}
+            disabled={received < totals.total || checkoutBusy}
             onClick={complete}
             className="inline-flex items-center gap-2 rounded-lg bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
           >
