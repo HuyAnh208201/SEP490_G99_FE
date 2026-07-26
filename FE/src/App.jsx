@@ -26,9 +26,10 @@ import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
 import BranchManagerDashboardPage, {
-  CashDiscrepancyPage,
   RefundApprovalPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
+import CashReconciliationListPage from './pages/branch-manager/CashReconciliationListPage.jsx';
+import CashReconciliationReviewPage from './pages/branch-manager/CashReconciliationReviewPage.jsx';
 import BranchReceivePage from './pages/branch-manager/BranchReceivePage.jsx';
 import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
@@ -317,12 +318,24 @@ export default function App() {
           }
         />
         <Route
-          path="/branch-manager/cash-discrepancy"
+          path="/branch-manager/cash-reconciliation"
           element={
             <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
-              <CashDiscrepancyPage />
+              <CashReconciliationListPage />
             </PermissionRoute>
           }
+        />
+        <Route
+          path="/branch-manager/cash-reconciliation/:sessionId"
+          element={
+            <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
+              <CashReconciliationReviewPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/branch-manager/cash-discrepancy"
+          element={<Navigate to="/branch-manager/cash-reconciliation" replace />}
         />
         <Route
           path="/branch-manager/refunds"

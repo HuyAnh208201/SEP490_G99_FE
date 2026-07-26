@@ -186,8 +186,8 @@ export const NAV_GROUPS = [
         permissions: ['SHIFT_MANAGEMENT'],
       },
       {
-        path: '/branch-manager/cash-discrepancy',
-        label: 'Cash reconciliation',
+        path: '/branch-manager/cash-reconciliation',
+        label: 'Cash Reconciliation',
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },

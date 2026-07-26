@@ -7,6 +7,7 @@ import {
   closeCashierShift,
   confirmHandover,
   confirmVerification,
+  differenceStatusLabel,
   fetchClosingShiftSession,
   saveClosingDraft,
 } from '../../api/shiftSessions.js';
@@ -129,13 +130,20 @@ export default function ShiftClosingPage() {
   }
 
   const isPendingApproval = data?.status === 'PENDING_APPROVAL';
-  const wasRejected = data?.status === 'PENDING_HANDOVER' && Boolean(data?.reviewNote);
+  const managerRejectionNote = data?.managerNote || data?.reviewNote;
+  const wasRejected =
+    (data?.status === 'REJECTED' || data?.status === 'CLOSING') &&
+    Boolean(managerRejectionNote?.trim());
 
   const canCloseCashier =
     data?.verificationConfirmed &&
     data?.handoverConfirmed &&
-    data?.status !== 'CLOSED' &&
-    !isPendingApproval;
+    !['COMPLETED', 'CLOSED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(data?.status);
+
+  const differenceLabel = differenceStatusLabel(
+    data?.differenceStatus ??
+      (cashDiff === 0 ? 'BALANCED' : cashDiff < 0 ? 'CASH_SHORTAGE' : 'CASH_EXCESS'),
+  );
 
   const shift = data?.shift;
 
@@ -166,7 +174,7 @@ export default function ShiftClosingPage() {
             <Card className="border-red-200 bg-red-50">
               <p className="font-semibold text-red-800">Manager rejected this shift</p>
               <p className="mt-1 text-sm text-red-700">
-                Manager rejected: {data.reviewNote} — please recount the cash and resubmit.
+                Manager rejected: {managerRejectionNote} — please recount the cash and resubmit.
               </p>
             </Card>
           )}
@@ -187,6 +195,10 @@ export default function ShiftClosingPage() {
               <h2 className="text-sm font-semibold">Shift summary</h2>
               <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
+                  <dt className="text-[var(--admin-muted)]">Opening fund</dt>
+                  <dd className="font-semibold">{formatMoney(data.openingFundAmount)}</dd>
+                </div>
+                <div>
                   <dt className="text-[var(--admin-muted)]">Transactions</dt>
                   <dd className="font-semibold">{data.transactionCount ?? 0}</dd>
                 </div>
@@ -204,10 +216,10 @@ export default function ShiftClosingPage() {
                 </div>
               </dl>
               <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--admin-border)] bg-white px-4 py-3 text-sm">
-                <span className="text-[var(--admin-muted)]">Actual cash (handover)</span>
+                <span className="text-[var(--admin-muted)]">Actual cash counted</span>
                 <span className="font-semibold">{formatMoney(actualCash || data.actualCash)}</span>
                 <Badge tone={cashDiff === 0 ? 'success' : 'warning'}>
-                  Difference {formatMoney(cashDiff)}
+                  Difference {formatMoney(cashDiff)} · {differenceLabel}
                 </Badge>
               </div>
             </Card>

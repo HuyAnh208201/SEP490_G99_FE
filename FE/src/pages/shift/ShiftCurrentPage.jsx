@@ -7,6 +7,11 @@ import { isShiftClosing, isShiftOpen } from '../../api/shiftSessions.js';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
 import { formatDateTime } from '../../lib/datetime.js';
 
+function formatMoney(value) {
+  const n = Number(value ?? 0);
+  return `${n.toLocaleString('en-US')} VND`;
+}
+
 export default function ShiftCurrentPage() {
   const navigate = useNavigate();
   const { session, loading } = useShiftSession();
@@ -60,6 +65,10 @@ export default function ShiftCurrentPage() {
           <div>
             <dt className="text-[var(--admin-muted)]">Branch</dt>
             <dd className="font-medium">{session?.branchName ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-[var(--admin-muted)]">Opening fund</dt>
+            <dd className="font-medium">{formatMoney(session?.openingFundAmount)}</dd>
           </div>
           <div>
             <dt className="text-[var(--admin-muted)]">Opened at</dt>
