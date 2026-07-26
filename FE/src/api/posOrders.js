@@ -1,5 +1,7 @@
 import { http } from './http.js';
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 function unwrap(body) {
   if (!body?.success) {
     const err = new Error(body?.message || 'Request failed');
@@ -42,6 +44,11 @@ export async function fetchOrders({ from, to } = {}) {
   if (to) params.to = to;
   const { data } = await http.get('/pos/orders', { params });
   return unwrap(data) ?? [];
+}
+
+export async function fetchOrdersPage(params = {}) {
+  const { data } = await http.get('/pos/orders/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 /** Tra mã giảm giá trước khi chốt đơn. */

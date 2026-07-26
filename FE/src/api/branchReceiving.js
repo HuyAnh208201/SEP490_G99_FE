@@ -5,6 +5,8 @@ import { http } from './http.js';
  * BE bọc response trong { success, data, message, statusCode }.
  */
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 const BASE = '/branch-receiving';
 
 function unwrap(body) {
@@ -29,6 +31,11 @@ export async function listIncomingOrders() {
   return asList(unwrap(data));
 }
 
+export async function listIncomingOrdersPage(params = {}) {
+  const { data } = await http.get(`${BASE}/orders/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
+}
+
 /** Chi tiết một lô/yêu cầu để nhập kho (Receive Shipment). */
 export async function getShipmentDetail(dispatchOrderId, requestId) {
   const { data } = await http.get(`${BASE}/orders/${dispatchOrderId}/requests/${requestId}`);
@@ -48,6 +55,11 @@ export async function receiveShipment(dispatchOrderId, requestId, items) {
 export async function listReceivingHistory() {
   const { data } = await http.get(`${BASE}/receipts`);
   return asList(unwrap(data));
+}
+
+export async function listReceivingHistoryPage(params = {}) {
+  const { data } = await http.get(`${BASE}/receipts/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function getReceiptDetail(receiptId) {

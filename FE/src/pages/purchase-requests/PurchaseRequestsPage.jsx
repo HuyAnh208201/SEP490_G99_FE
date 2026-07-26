@@ -12,9 +12,12 @@ import {
   canCreateRequest,
   canFilterByBranch,
 } from '../../constants/purchaseRequests.js';
-import { listRequests, fetchRequestBranches, getRequest } from '../../api/purchaseRequests.js';
+import { listRequestsPage, fetchRequestBranches, getRequest } from '../../api/purchaseRequests.js';
 import RequestFormModal from './components/RequestFormModal.jsx';
 import RequestDetailModal from './components/RequestDetailModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -26,10 +29,9 @@ export default function PurchaseRequestsPage() {
   const currentUserId = user?.id ?? null;
   const [userBranchId, setUserBranchId] = useState(user?.branchId ?? user?.branch_id ?? null);
 
-  const [rows, setRows] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
 
@@ -40,23 +42,14 @@ export default function PurchaseRequestsPage() {
 
   const showBranchFilter = canFilterByBranch(has);
   const showCreate = canCreateRequest(has);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const params = {};
-      if (statusFilter) params.status = statusFilter;
-      if (showBranchFilter && branchFilter) params.branchId = branchFilter;
-      const data = await listRequests(params);
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load requests');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, branchFilter, showBranchFilter]);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(listRequestsPage, {
+    search: debouncedQuery,
+    status: statusFilter,
+    branchId: showBranchFilter ? branchFilter : undefined,
+  });
+  const { items: rows, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
   useEffect(() => {
     if (userBranchId) return;
@@ -68,21 +61,17 @@ export default function PurchaseRequestsPage() {
   }, [userBranchId]);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
     if (showBranchFilter) fetchRequestBranches().then(setBranches).catch(() => {});
   }, [showBranchFilter]);
 
   async function openDetail(request) {
     setOpeningId(request.id);
-    setError('');
+    setActionError('');
     try {
       const full = await getRequest(request.id);
       setDetail(full);
     } catch (err) {
-      setError(err?.message || 'Failed to load request details');
+      setActionError(err?.message || 'Failed to load request details');
     } finally {
       setOpeningId(null);
     }
@@ -95,7 +84,7 @@ export default function PurchaseRequestsPage() {
       setEditing(full);
       setFormOpen(true);
     } catch (err) {
-      setError(err?.message || 'Failed to load request for editing');
+      setActionError(err?.message || 'Failed to load request for editing');
     }
   }
 
@@ -157,8 +146,10 @@ export default function PurchaseRequestsPage() {
             </select>
           )}
 
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
+
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{summary.total}</strong> requests
+            <strong>{pageData.totalRecords}</strong> requests
           </span>
         </div>
 
@@ -220,6 +211,7 @@ export default function PurchaseRequestsPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <RequestFormModal

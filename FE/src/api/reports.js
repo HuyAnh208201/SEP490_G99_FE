@@ -1,4 +1,5 @@
 import { http } from './http.js';
+import { compactPageParams, unwrapPage } from './pagination.js';
 
 function unwrap(body) {
   if (!body?.success) {
@@ -31,12 +32,30 @@ export async function fetchRevenue({ groupBy, from, to, branchId } = {}) {
   return unwrap(data) ?? [];
 }
 
+export async function fetchRevenuePage(params = {}) {
+  const groupBy = params.groupBy || 'shift';
+  const { data } = await http.get('/reports/revenue/page', { params: compactPageParams(params) });
+  return unwrapPage(data, (row) => ({
+    ...row,
+    shiftId: groupBy === 'shift' ? row.id : undefined,
+    cashierId: groupBy === 'employee' ? row.id : undefined,
+    cashierName: groupBy === 'employee' ? row.name : undefined,
+    branchId: groupBy === 'branch' ? row.id : undefined,
+    branchName: groupBy === 'branch' ? row.name : undefined,
+  }));
+}
+
 /** Invoice history within the range (server scopes by role). */
 export async function fetchInvoices({ from, to, branchId } = {}) {
   const { data } = await http.get('/reports/invoices', {
     params: buildParams({ from, to, branchId }),
   });
   return unwrap(data) ?? [];
+}
+
+export async function fetchInvoicesPage(params = {}) {
+  const { data } = await http.get('/reports/invoices/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 /** Closed-shift cash discrepancy history within the range. */
@@ -47,10 +66,20 @@ export async function fetchCashDiscrepancies({ from, to, branchId } = {}) {
   return unwrap(data) ?? [];
 }
 
+export async function fetchCashDiscrepanciesPage(params = {}) {
+  const { data } = await http.get('/reports/cash-discrepancies/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
+}
+
 /** Loyalty point earn/redeem history within the range. */
 export async function fetchPointTransactions({ from, to, branchId } = {}) {
   const { data } = await http.get('/reports/point-transactions', {
     params: buildParams({ from, to, branchId }),
   });
   return unwrap(data) ?? [];
+}
+
+export async function fetchPointTransactionsPage(params = {}) {
+  const { data } = await http.get('/reports/point-transactions/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
 }

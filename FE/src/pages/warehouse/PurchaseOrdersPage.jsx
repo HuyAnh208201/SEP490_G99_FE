@@ -11,49 +11,36 @@ import {
   normalizePoStatus,
 } from '../../constants/purchaseOrders.js';
 import {
-  listPurchaseOrders,
+  listPurchaseOrdersPage,
   receivePurchaseOrder,
 } from '../../api/purchaseOrders.js';
 import CreatePurchaseOrderModal from './components/CreatePurchaseOrderModal.jsx';
 import PurchaseOrderDetailModal from './components/PurchaseOrderDetailModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function PurchaseOrdersPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState(null);
   const [receivingId, setReceivingId] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listPurchaseOrders();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load purchase orders');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(listPurchaseOrdersPage, {
+    search: debouncedQuery,
+    status: statusFilter ? statusFilter.toUpperCase() : undefined,
+  });
+  const { items: rows, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      if (statusFilter && normalizePoStatus(r.status) !== statusFilter) return false;
-      return true;
-    });
-  }, [rows, statusFilter]);
+  const filteredRows = rows;
 
   const awaitingCount = useMemo(
     () => rows.filter((r) => normalizePoStatus(r.status) === PO_STATUS.ORDERED).length,
@@ -62,16 +49,16 @@ export default function PurchaseOrdersPage() {
 
   async function receive(order) {
     setReceivingId(order.id);
-    setError('');
+    setActionError('');
     setMessage('');
     try {
       await receivePurchaseOrder(order.id);
       setMessage(
         `Purchase order ${order.orderNumber || ''} received. Central stock updated and awaiting requests re-checked.`,
       );
-      await load();
+      load();
     } catch (err) {
-      setError(err?.message || 'Failed to receive purchase order');
+      setActionError(err?.message || 'Failed to receive purchase order');
     } finally {
       setReceivingId(null);
     }
@@ -109,11 +96,12 @@ export default function PurchaseOrdersPage() {
               </option>
             ))}
           </select>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search purchase orders…" className={selectClass} />
           <span className="text-sm text-[var(--admin-muted)]">
             <strong>{awaitingCount}</strong> awaiting receipt
           </span>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{filteredRows.length}</strong> purchase orders
+            <strong>{pageData.totalRecords}</strong> purchase orders
           </span>
         </div>
 
@@ -190,6 +178,7 @@ export default function PurchaseOrdersPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <CreatePurchaseOrderModal

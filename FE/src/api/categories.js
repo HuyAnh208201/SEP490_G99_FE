@@ -1,5 +1,7 @@
 import { http } from './http.js';
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 function unwrap(body) {
   if (!body?.success) {
     const err = new Error(body?.message || 'Request failed');
@@ -12,6 +14,11 @@ function unwrap(body) {
 export async function fetchCategories() {
   const { data } = await http.get('/categories');
   return unwrap(data);
+}
+
+export async function fetchCategoriesPage(params = {}) {
+  const { data } = await http.get('/categories/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function fetchCategoryById(id) {
