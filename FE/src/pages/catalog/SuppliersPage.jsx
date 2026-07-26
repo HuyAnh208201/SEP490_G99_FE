@@ -2,13 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   createSupplier,
   deleteSupplier,
-  fetchSuppliers,
+  fetchSuppliersPage,
   updateSupplier,
 } from '../../api/suppliers.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const EMPTY = {
   name: '',
@@ -26,31 +29,17 @@ function fieldErrors(err) {
 }
 
 export default function SuppliersPage() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchSuppliersPage, { search: debouncedQuery, status: statusFilter });
+  const [actionError, setActionError] = useState('');
+  const { items, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchSuppliers();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(fieldErrors(err));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   function update(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -93,7 +82,7 @@ export default function SuppliersPage() {
         await createSupplier(payload);
       }
       cancelEdit();
-      await load();
+      load();
     } catch (err) {
       setFormError(fieldErrors(err));
     } finally {
@@ -106,9 +95,9 @@ export default function SuppliersPage() {
     try {
       await deleteSupplier(id);
       if (editingId === id) cancelEdit();
-      await load();
+      load();
     } catch (err) {
-      setError(fieldErrors(err));
+      setActionError(fieldErrors(err));
     }
   }
 
@@ -208,10 +197,14 @@ export default function SuppliersPage() {
         </Card>
 
         <Card className="lg:col-span-2 !p-0 overflow-hidden">
-          <div className="border-b border-[var(--admin-border)] px-4 py-3">
-            <p className="text-sm text-[var(--admin-muted)]">
-              Total <strong>{items.length}</strong> suppliers
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] px-4 py-3">
+            <p className="text-sm text-[var(--admin-muted)]">Total <strong>{pageData.totalRecords}</strong> suppliers</p>
+            <div className="flex flex-1 justify-end gap-2">
+              <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search suppliers…" className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm">
+                <option value="all">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
+              </select>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -280,6 +273,7 @@ export default function SuppliersPage() {
               </p>
             )}
           </div>
+          <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
         </Card>
       </div>
     </div>

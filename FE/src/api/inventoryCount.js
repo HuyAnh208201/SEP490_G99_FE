@@ -5,6 +5,8 @@ import { http } from './http.js';
  * BE bọc response trong { success, data, message, statusCode }.
  */
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 const BASE = '/inventory-counts';
 
 function unwrap(body) {
@@ -39,6 +41,11 @@ export async function submitCount({ note, items }) {
 export async function listCountHistory() {
   const { data } = await http.get(BASE);
   return asList(unwrap(data));
+}
+
+export async function listCountHistoryPage(params = {}) {
+  const { data } = await http.get(`${BASE}/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function getCountSession(id) {

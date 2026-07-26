@@ -9,7 +9,10 @@ import {
   SHIPMENT_STATUS_OPTIONS,
   shipmentStatusMeta,
 } from '../../constants/inventoryStaff.js';
-import { listIncomingOrders } from '../../api/branchReceiving.js';
+import { listIncomingOrdersPage } from '../../api/branchReceiving.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -17,41 +20,11 @@ const inputClass = selectClass;
 
 export default function OrderTrackingPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listIncomingOrders();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load incoming orders');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filteredRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (statusFilter && String(r.status).toUpperCase() !== statusFilter) return false;
-      if (term) {
-        const hay = `${r.dispatchNumber || ''} ${r.requestNumber || ''}`.toLowerCase();
-        if (!hay.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [rows, statusFilter, search]);
+  const debouncedSearch = useDebouncedValue(search);
+  const pageData = useServerPage(listIncomingOrdersPage, { search: debouncedSearch, status: statusFilter });
+  const { items: filteredRows, loading, error } = pageData;
 
   return (
     <div className="w-full">
@@ -86,7 +59,7 @@ export default function OrderTrackingPage() {
             ))}
           </select>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{filteredRows.length}</strong> orders
+            <strong>{pageData.totalRecords}</strong> orders
           </span>
         </div>
 
@@ -177,6 +150,7 @@ export default function OrderTrackingPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
     </div>
   );

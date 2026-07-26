@@ -6,6 +6,7 @@ import {
   toApprovePayload,
   toDraftPayload,
 } from '../lib/purchaseRequestMappers.js';
+import { compactPageParams, unwrapPage } from './pagination.js';
 
 /**
  * Purchase Requests API — real backend only.
@@ -34,6 +35,11 @@ function unwrapList(data) {
 export async function listRequests(params = {}) {
   const { data } = await http.get(BASE, { params });
   return unwrapList(data).map(normalizeRequestSummary);
+}
+
+export async function listRequestsPage(params = {}) {
+  const { data } = await http.get(BASE, { params: compactPageParams(params) });
+  return unwrapPage(data, normalizeRequestSummary);
 }
 
 export async function getRequest(id) {
@@ -83,6 +89,12 @@ export async function getConsolidated(params = {}) {
     return flattenConsolidated(raw);
   }
   return Array.isArray(raw) ? raw : [];
+}
+
+export async function getConsolidatedPage(params = {}) {
+  const { data } = await http.get(`${BASE}/consolidated/page`, { params: compactPageParams(params) });
+  const page = unwrapPage(data);
+  return { ...page, items: flattenConsolidated(page.items) };
 }
 
 export async function saveDraft(payload) {

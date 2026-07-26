@@ -11,56 +11,39 @@ import {
   normalizeStatus,
 } from '../../constants/purchaseRequests.js';
 import {
-  listRequests,
+  listRequestsPage,
   getRequest,
   approveRequest,
   fetchRequestBranches,
 } from '../../api/purchaseRequests.js';
 import IncomingRequestDetailModal from './components/IncomingRequestDetailModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function IncomingRequestsPage() {
-  const [rows, setRows] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [detail, setDetail] = useState(null);
   const [openingId, setOpeningId] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listRequests();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load requests');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(listRequestsPage, { search: debouncedQuery, status: statusFilter, branchId: branchFilter });
+  const { items: rows, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
   useEffect(() => {
     fetchRequestBranches().then(setBranches).catch(() => {});
   }, []);
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      if (statusFilter && normalizeStatus(r.status) !== statusFilter) return false;
-      if (branchFilter && String(r.branchId) !== String(branchFilter)) return false;
-      return true;
-    });
-  }, [rows, statusFilter, branchFilter]);
+  const filteredRows = rows;
 
   const counts = useMemo(() => {
     let pending = 0;
@@ -75,12 +58,12 @@ export default function IncomingRequestsPage() {
 
   async function openDetail(request) {
     setOpeningId(request.id);
-    setError('');
+    setActionError('');
     try {
       const full = await getRequest(request.id);
       setDetail(full);
     } catch (err) {
-      setError(err?.message || 'Failed to load request details');
+      setActionError(err?.message || 'Failed to load request details');
     } finally {
       setOpeningId(null);
     }
@@ -88,12 +71,12 @@ export default function IncomingRequestsPage() {
 
   async function quickApprove(request) {
     setApprovingId(request.id);
-    setError('');
+    setActionError('');
     try {
       await approveRequest(request.id, []);
-      await load();
+      load();
     } catch (err) {
-      setError(err?.message || 'Failed to approve request');
+      setActionError(err?.message || 'Failed to approve request');
     } finally {
       setApprovingId(null);
     }
@@ -138,6 +121,8 @@ export default function IncomingRequestsPage() {
               </option>
             ))}
           </select>
+
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
 
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
             <strong>{counts.pending}</strong> pending review · <strong>{counts.approved}</strong>{' '}
@@ -217,6 +202,7 @@ export default function IncomingRequestsPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <IncomingRequestDetailModal

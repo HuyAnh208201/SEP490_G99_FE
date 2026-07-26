@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { deleteUser, fetchUsers, updateUserStatus } from '../../api/users.js';
+import { deleteUser, fetchUsersPage, updateUserStatus } from '../../api/users.js';
 import { fetchBranches } from '../../api/branches.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
@@ -12,6 +12,9 @@ import CreateUserModal from '../../components/domain/CreateUserModal.jsx';
 import CriticalUserActionModal from '../../components/domain/CriticalUserActionModal.jsx';
 import UserDetailDrawer from '../../components/domain/UserDetailDrawer.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const ROLE_FILTERS = [
   { id: 'all', label: 'All roles' },
@@ -33,16 +36,22 @@ export default function UsersPage() {
   const currentUserId = currentUser?.id ?? null;
   const [actionLoading, setActionLoading] = useState(null);
 
-  const [users, setUsers] = useState([]);
   const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [criticalAction, setCriticalAction] = useState(null);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchUsersPage, {
+    search: debouncedQuery,
+    role: roleFilter,
+    branchId: branchFilter,
+  });
+  const { items: users, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
   const roleFilters = useMemo(() => {
     if (!isBranchManager) return ROLE_FILTERS;
@@ -64,27 +73,9 @@ export default function UsersPage() {
     }
   }, [isBranchManager]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [userList, branchList] = await Promise.all([
-        fetchUsers(),
-        fetchBranches().catch(() => []),
-      ]);
-      setUsers(Array.isArray(userList) ? userList : []);
-      setBranches(Array.isArray(branchList) ? branchList : []);
-    } catch (err) {
-      setError(err.message || 'Failed to load team members');
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchBranches().then((data) => setBranches(Array.isArray(data) ? data : [])).catch(() => setBranches([]));
+  }, []);
 
   const branchMap = useMemo(() => {
     const map = {};
@@ -94,30 +85,7 @@ export default function UsersPage() {
     return map;
   }, [branches]);
 
-  const filtered = useMemo(() => {
-    let list = users || [];
-    if (roleFilter !== 'all') {
-      list = list.filter((u) => {
-        if (roleFilter === 'DIRECTOR') {
-          return ['DIRECTOR', 'PROMOTION_DIRECTOR', 'OWNER'].includes(u.role);
-        }
-        return u.role === roleFilter;
-      });
-    }
-    if (branchFilter !== 'all') {
-      list = list.filter((u) => String(u.branchId) === String(branchFilter));
-    }
-    if (!query.trim()) return list;
-    const q = query.toLowerCase();
-    return list.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q) ||
-        u.phone?.includes(q) ||
-        ROLE_LABELS[u.role]?.toLowerCase().includes(q),
-    );
-  }, [users, query, roleFilter, branchFilter]);
+  const filtered = users;
 
   function isCriticalUser(user) {
     return ['ADMIN', 'DIRECTOR', 'OWNER', 'PROMOTION_DIRECTOR'].includes(user.role);
@@ -130,12 +98,12 @@ export default function UsersPage() {
     }
     if (!window.confirm(`Deactivate account for ${targetUser.name}?`)) return;
     setActionLoading(`deactivate-${targetUser.id}`);
-    setError('');
+    setActionError('');
     try {
       await updateUserStatus(targetUser.id, false);
-      await load();
+      load();
     } catch (err) {
-      setError(err.message || 'Failed to deactivate user');
+      setActionError(err.message || 'Failed to deactivate user');
     } finally {
       setActionLoading(null);
     }
@@ -148,12 +116,12 @@ export default function UsersPage() {
     }
     if (!window.confirm(`Delete account for ${targetUser.name}? This cannot be undone.`)) return;
     setActionLoading(`delete-${targetUser.id}`);
-    setError('');
+    setActionError('');
     try {
       await deleteUser(targetUser.id);
-      await load();
+      load();
     } catch (err) {
-      setError(err.message || 'Failed to delete user');
+      setActionError(err.message || 'Failed to delete user');
     } finally {
       setActionLoading(null);
     }
@@ -175,7 +143,7 @@ export default function UsersPage() {
         <div className="space-y-3 border-b border-[var(--admin-border)] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-[var(--admin-muted)]">
-              <strong>{filtered.length}</strong> of {users?.length ?? 0} members
+              <strong>{pageData.totalRecords}</strong> members
             </p>
             <input
               type="search"
@@ -313,6 +281,7 @@ export default function UsersPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <CreateUserModal

@@ -6,6 +6,8 @@ import { http } from './http.js';
  * BE bọc response trong { success, data, message, statusCode }.
  */
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 const BASE = '/purchase-orders';
 
 function unwrap(body) {
@@ -47,6 +49,11 @@ export async function createPurchaseOrder({ supplierId, notes, items }) {
 export async function listPurchaseOrders() {
   const { data } = await http.get(BASE);
   return asList(unwrap(data));
+}
+
+export async function listPurchaseOrdersPage(params = {}) {
+  const { data } = await http.get(`${BASE}/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function getPurchaseOrder(id) {
