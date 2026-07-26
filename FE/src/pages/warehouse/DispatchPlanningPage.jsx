@@ -4,15 +4,17 @@ import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate } from '../../lib/datetime.js';
 import { VEHICLE_OPTIONS } from '../../constants/dispatch.js';
-import { listApprovedRequests, createDispatchOrder } from '../../api/dispatch.js';
+import { listApprovedRequestsPage, createDispatchOrder } from '../../api/dispatch.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function DispatchPlanningPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [routeFilter, setRouteFilter] = useState('');
@@ -20,24 +22,12 @@ export default function DispatchPlanningPage() {
   const [vehicle, setVehicle] = useState(VEHICLE_OPTIONS[0]);
   const [creating, setCreating] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listApprovedRequests();
-      setRows(Array.isArray(data) ? data : []);
-      setSelected(new Set());
-    } catch (err) {
-      setError(err?.message || 'Failed to load approved requests');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(listApprovedRequestsPage, { search: debouncedQuery, area: areaFilter, route: routeFilter });
+  const { items: rows, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => setSelected(new Set()), [rows]);
 
   const areas = useMemo(
     () => [...new Set(rows.map((r) => r.area).filter(Boolean))],
@@ -48,13 +38,7 @@ export default function DispatchPlanningPage() {
     [rows],
   );
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      if (areaFilter && r.area !== areaFilter) return false;
-      if (routeFilter && r.route !== routeFilter) return false;
-      return true;
-    });
-  }, [rows, areaFilter, routeFilter]);
+  const filteredRows = rows;
 
   const allVisibleSelected =
     filteredRows.length > 0 && filteredRows.every((r) => selected.has(r.id));
@@ -85,16 +69,16 @@ export default function DispatchPlanningPage() {
     const requestIds = [...selected];
     if (!requestIds.length) return;
     setCreating(true);
-    setError('');
+    setActionError('');
     setMessage('');
     try {
       const order = await createDispatchOrder({ requestIds, vehicle });
       setMessage(
         `Dispatch order ${order?.dispatchNumber || ''} created with ${requestIds.length} request(s).`,
       );
-      await load();
+      load();
     } catch (err) {
-      setError(err?.message || 'Failed to create dispatch order');
+      setActionError(err?.message || 'Failed to create dispatch order');
     } finally {
       setCreating(false);
     }
@@ -132,6 +116,7 @@ export default function DispatchPlanningPage() {
               </option>
             ))}
           </select>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
           <select
             value={areaFilter}
             onChange={(e) => setAreaFilter(e.target.value)}
@@ -231,6 +216,7 @@ export default function DispatchPlanningPage() {
             Create Dispatch Order
           </Button>
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
     </div>
   );

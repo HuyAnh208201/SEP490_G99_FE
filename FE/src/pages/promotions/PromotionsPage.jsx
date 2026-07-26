@@ -12,7 +12,7 @@ import {
 
   fetchCampaignById,
 
-  fetchCampaigns,
+  fetchCampaignsPage,
 
   suspendCampaign,
 
@@ -54,6 +54,9 @@ import Badge from '../../components/ui/Badge.jsx';
 
 import CampaignFormModal from '../../components/domain/CampaignFormModal.jsx';
 import Modal from '../../components/ui/Modal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 
 
@@ -197,15 +200,11 @@ export default function PromotionsPage() {
 
 
 
-  const [items, setItems] = useState([]);
-
   const [branches, setBranches] = useState([]);
 
   const [users, setUsers] = useState([]);
 
-  const [loading, setLoading] = useState(true);
-
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -224,6 +223,15 @@ export default function PromotionsPage() {
   const [reactivateTarget, setReactivateTarget] = useState(null);
   const [reactivateDates, setReactivateDates] = useState({ startAt: '', endAt: '' });
   const [reactivateError, setReactivateError] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchCampaignsPage, {
+    search: debouncedQuery,
+    status: statusFilter,
+    branchId: branchFilter,
+    creatorTier: creatorFilter,
+  });
+  const { items, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
 
 
@@ -259,97 +267,16 @@ export default function PromotionsPage() {
 
 
 
-  const load = useCallback(async () => {
-
-    setLoading(true);
-
-    setError('');
-
-    try {
-
-      const [campaigns, branchList, userList] = await Promise.all([
-
-        fetchCampaigns(),
-
-        fetchBranches().catch(() => []),
-
-        fetchUsers().catch(() => []),
-
-      ]);
-
-      setItems(Array.isArray(campaigns) ? campaigns : []);
-
+  useEffect(() => {
+    Promise.all([fetchBranches().catch(() => []), fetchUsers().catch(() => [])]).then(([branchList, userList]) => {
       setBranches(Array.isArray(branchList) ? branchList : []);
-
       setUsers(Array.isArray(userList) ? userList : []);
-
-    } catch (err) {
-
-      setError(err.message || 'Failed to load campaigns');
-
-      setItems([]);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
+    });
   }, []);
 
 
 
-  useEffect(() => {
-
-    load();
-
-  }, [load]);
-
-
-
-  const filtered = useMemo(() => {
-
-    let list = items;
-
-    if (statusFilter !== 'all') {
-
-      list = list.filter((c) => c.status === statusFilter);
-
-    }
-
-    if (creatorFilter !== 'all') {
-
-      list = list.filter((c) => getCreatorTier(c, userMap) === creatorFilter);
-
-    }
-
-    if (branchFilter !== 'all') {
-
-      const bid = Number(branchFilter);
-
-      list = list.filter((c) => {
-
-        if (c.scope === 'BRANCH') return c.branchIds?.includes(bid);
-
-        if (!c.branchIds?.length) return true;
-
-        return c.branchIds.includes(bid);
-
-      });
-
-    }
-
-    if (query.trim()) {
-
-      const q = query.toLowerCase();
-
-      list = list.filter((c) => c.name?.toLowerCase().includes(q));
-
-    }
-
-    return list;
-
-  }, [items, statusFilter, creatorFilter, branchFilter, query, userMap]);
+  const filtered = items;
 
 
 
@@ -377,7 +304,7 @@ export default function PromotionsPage() {
 
     } catch (err) {
 
-      setError(err.message || 'Failed to load campaign details');
+      setActionError(err.message || 'Failed to load campaign details');
 
     }
 
@@ -389,7 +316,7 @@ export default function PromotionsPage() {
 
     setActionLoading(id);
 
-    setError('');
+    setActionError('');
 
     try {
 
@@ -433,7 +360,7 @@ export default function PromotionsPage() {
 
     } catch (err) {
 
-      setError(err.message || 'Action failed');
+      setActionError(err.message || 'Action failed');
 
     } finally {
 
@@ -670,7 +597,7 @@ export default function PromotionsPage() {
 
           <p className="text-sm text-[var(--admin-muted)]">
 
-            Showing <strong>{filtered.length}</strong> of <strong>{items.length}</strong> campaigns
+            Total <strong>{pageData.totalRecords}</strong> campaigns
 
           </p>
 
@@ -993,6 +920,8 @@ export default function PromotionsPage() {
           )}
 
         </div>
+
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
 
       </Card>
 

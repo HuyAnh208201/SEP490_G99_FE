@@ -5,6 +5,8 @@ import { http } from './http.js';
  * BE bọc response trong { success, data, message, statusCode }.
  */
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 const BASE = '/dispatch-orders';
 
 function unwrap(body) {
@@ -29,6 +31,11 @@ export async function listApprovedRequests() {
   return asList(unwrap(data));
 }
 
+export async function listApprovedRequestsPage(params = {}) {
+  const { data } = await http.get(`${BASE}/approved-requests/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
+}
+
 /** Tạo lô vận chuyển từ các yêu cầu được chọn. */
 export async function createDispatchOrder({ requestIds, vehicle }) {
   const { data } = await http.post(BASE, { requestIds, vehicle });
@@ -39,6 +46,11 @@ export async function createDispatchOrder({ requestIds, vehicle }) {
 export async function listDispatchOrders() {
   const { data } = await http.get(BASE);
   return asList(unwrap(data));
+}
+
+export async function listDispatchOrdersPage(params = {}) {
+  const { data } = await http.get(`${BASE}/page`, { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function getDispatchOrder(id) {

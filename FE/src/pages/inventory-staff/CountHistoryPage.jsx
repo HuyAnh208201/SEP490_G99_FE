@@ -8,49 +8,23 @@ import {
   APPROVAL_STATUS_OPTIONS,
   approvalStatusMeta,
 } from '../../constants/inventoryStaff.js';
-import { listCountHistory } from '../../api/inventoryCount.js';
+import { listCountHistoryPage } from '../../api/inventoryCount.js';
 import CountSessionDetailModal from './components/CountSessionDetailModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function CountHistoryPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listCountHistory();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load count history');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filteredRows = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (statusFilter && String(r.status).toUpperCase() !== statusFilter) return false;
-      if (term) {
-        const hay = `${r.sessionCode || ''} ${r.countedByName || ''}`.toLowerCase();
-        if (!hay.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [rows, statusFilter, search]);
+  const debouncedSearch = useDebouncedValue(search);
+  const pageData = useServerPage(listCountHistoryPage, { search: debouncedSearch, status: statusFilter });
+  const { items: filteredRows, loading, error, reload: load } = pageData;
 
   return (
     <div className="w-full">
@@ -85,7 +59,7 @@ export default function CountHistoryPage() {
             ))}
           </select>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{filteredRows.length}</strong> sessions
+            <strong>{pageData.totalRecords}</strong> sessions
           </span>
         </div>
 
@@ -152,6 +126,7 @@ export default function CountHistoryPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <CountSessionDetailModal

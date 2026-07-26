@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchMe } from '../../api/users.js';
 import { listRequests, receiveRequest } from '../../api/purchaseRequests.js';
-import { fetchBranchInventory } from '../../api/inventory.js';
+import { fetchBranchInventoryPage } from '../../api/inventory.js';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -9,37 +9,45 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import RequestDetailModal from '../purchase-requests/components/RequestDetailModal.jsx';
 import { PR_STATUS, statusMeta, normalizeStatus } from '../../constants/purchaseRequests.js';
 import { formatDateTime } from '../../lib/datetime.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const RECEIVABLE = new Set([PR_STATUS.APPROVED, PR_STATUS.IN_TRANSIT]);
 
 export default function BranchReceivePage() {
   const [branchId, setBranchId] = useState(null);
   const [requests, setRequests] = useState([]);
-  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [detail, setDetail] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [inventorySearch, setInventorySearch] = useState('');
+  const debouncedInventorySearch = useDebouncedValue(inventorySearch);
+  const inventoryFetcher = useCallback(
+    (params) => branchId
+      ? fetchBranchInventoryPage(branchId, params)
+      : Promise.resolve({ items: [], page: 1, size: params.size, totalRecords: 0, totalPages: 0 }),
+    [branchId],
+  );
+  const inventoryPage = useServerPage(inventoryFetcher, { search: debouncedInventorySearch });
+  const { items: inventory, loading: inventoryLoading } = inventoryPage;
 
   const load = useCallback(async () => {
     if (!branchId) return;
     setLoading(true);
     setError('');
     try {
-      const [reqData, stockData] = await Promise.all([
-        listRequests({ branchId }),
-        fetchBranchInventory(branchId),
-      ]);
+      const reqData = await listRequests({ branchId });
       setRequests(Array.isArray(reqData) ? reqData : []);
-      setInventory(Array.isArray(stockData) ? stockData : []);
+      inventoryPage.reload();
     } catch (err) {
       setError(err?.message || 'Failed to load receive queue');
       setRequests([]);
-      setInventory([]);
     } finally {
       setLoading(false);
     }
-  }, [branchId]);
+  }, [branchId, inventoryPage.reload]);
 
   useEffect(() => {
     fetchMe()
@@ -120,8 +128,9 @@ export default function BranchReceivePage() {
           <div className="border-b border-[var(--admin-border)] px-4 py-3">
             <h2 className="font-semibold text-[var(--admin-text)]">Branch stock</h2>
             <p className="text-xs text-[var(--admin-muted)]">Updates after goods are received</p>
+            <input value={inventorySearch} onChange={(e) => setInventorySearch(e.target.value)} placeholder="Search stock…" className="mt-2 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
           </div>
-          {loading ? (
+          {inventoryLoading ? (
             <p className="p-4 text-sm text-[var(--admin-muted)]">Loading…</p>
           ) : inventory.length === 0 ? (
             <p className="p-4 text-sm text-[var(--admin-muted)]">No branch stock yet.</p>
@@ -148,6 +157,7 @@ export default function BranchReceivePage() {
               </table>
             </div>
           )}
+          <Pagination {...inventoryPage} onPageChange={inventoryPage.setPage} onSizeChange={inventoryPage.setSize} disabled={inventoryLoading} />
         </Card>
       </div>
 

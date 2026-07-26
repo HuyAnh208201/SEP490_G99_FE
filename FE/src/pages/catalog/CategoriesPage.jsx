@@ -3,41 +3,35 @@ import {
   createCategory,
   deleteCategory,
   fetchCategories,
+  fetchCategoriesPage,
   updateCategory,
 } from '../../api/categories.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const EMPTY = { name: '', description: '', parentId: '' };
 
 export default function CategoriesPage() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [allCategories, setAllCategories] = useState([]);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchCategoriesPage, { search: debouncedQuery });
+  const [actionError, setActionError] = useState('');
+  const { items, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchCategories();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err.message || 'Failed to load categories');
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    fetchCategories().then((data) => setAllCategories(Array.isArray(data) ? data : [])).catch(() => setAllCategories([]));
+  }, []);
 
   function updateField(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -75,7 +69,8 @@ export default function CategoriesPage() {
         await createCategory(payload);
       }
       cancelEdit();
-      await load();
+      load();
+      fetchCategories().then((data) => setAllCategories(Array.isArray(data) ? data : [])).catch(() => {});
     } catch (err) {
       setFormError(err.message || 'Failed to save category');
     } finally {
@@ -88,9 +83,9 @@ export default function CategoriesPage() {
     try {
       await deleteCategory(id);
       if (editingId === id) cancelEdit();
-      await load();
+      load();
     } catch (err) {
-      setError(err.message || 'Failed to delete category');
+      setActionError(err.message || 'Failed to delete category');
     }
   }
 
@@ -134,7 +129,7 @@ export default function CategoriesPage() {
                 className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
               >
                 <option value="">None (top level)</option>
-                {items
+                {allCategories
                   .filter((c) => c.id !== editingId)
                   .map((c) => (
                     <option key={c.id} value={c.id}>
@@ -176,10 +171,9 @@ export default function CategoriesPage() {
         </Card>
 
         <Card className="lg:col-span-2 !p-0 overflow-hidden">
-          <div className="border-b border-[var(--admin-border)] px-4 py-3">
-            <p className="text-sm text-[var(--admin-muted)]">
-              Total <strong>{items.length}</strong> categories
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
+            <p className="text-sm text-[var(--admin-muted)]">Total <strong>{pageData.totalRecords}</strong> categories</p>
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search categories…" className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -233,6 +227,7 @@ export default function CategoriesPage() {
               </p>
             )}
           </div>
+          <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
         </Card>
       </div>
     </div>

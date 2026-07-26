@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import StatCard from '../../components/ui/StatCard.jsx';
-import { getConsolidated } from '../../api/purchaseRequests.js';
+import { getConsolidatedPage } from '../../api/purchaseRequests.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 /**
  * Màn hình tổng hợp / gom đơn (read-only).
@@ -11,28 +14,11 @@ import { getConsolidated } from '../../api/purchaseRequests.js';
  * FE hiển thị dạng bảng group-by, hỗ trợ in ấn và xuất Excel (CSV).
  */
 export default function ConsolidatedPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState({});
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getConsolidated();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load consolidated data');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(getConsolidatedPage, { search: debouncedQuery });
+  const { items: rows, loading, error } = pageData;
 
   // Gom theo chi nhánh để hiển thị dạng cây
   const grouped = useMemo(() => {
@@ -55,11 +41,11 @@ export default function ConsolidatedPage() {
   }, [rows]);
 
   const totals = useMemo(() => {
-    const branchCount = grouped.length;
+    const branchCount = pageData.totalRecords;
     const categoryCount = rows.length;
     const totalQty = rows.reduce((s, r) => s + r.totalQuantity, 0);
     return { branchCount, categoryCount, totalQty };
-  }, [grouped, rows]);
+  }, [grouped, pageData.totalRecords, rows]);
 
   function toggle(id) {
     setExpanded((s) => ({ ...s, [id]: !s[id] }));
@@ -111,6 +97,9 @@ export default function ConsolidatedPage() {
       </div>
 
       <Card className="!p-0 overflow-hidden">
+        <div className="flex justify-end border-b border-[var(--admin-border)] p-3 print:hidden">
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search branch, category, product…" className="w-full max-w-sm rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
@@ -149,6 +138,7 @@ export default function ConsolidatedPage() {
             </tbody>
           </table>
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} className="print:hidden" />
       </Card>
     </>
   );
