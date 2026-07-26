@@ -15,4 +15,6 @@ dist-ssr
 *.sln
 *.sw?
 .vite
+.playwright-cli/
+output/playwright/
 

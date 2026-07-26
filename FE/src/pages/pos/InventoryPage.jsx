@@ -1,24 +1,36 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatVnd } from '../../lib/money.js';
-import { fetchProducts } from '../../api/products.js';
+import { fetchProductsPage } from '../../api/products.js';
+import { fetchCategories } from '../../api/categories.js';
 import { hasPromo, unitPrice } from './posProduct.js';
 import { toPosProduct } from './posProduct.js';
 import PosPageTitle from './components/PosPageTitle.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 export default function InventoryPage() {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('ALL');
   const [allProducts, setAllProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const [, setLoadError] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const fetchPosProducts = useCallback(async (params) => {
+    const page = await fetchProductsPage(params);
+    return { ...page, items: page.items.map(toPosProduct) };
+  }, []);
+  const pageData = useServerPage(fetchPosProducts, {
+    search: debouncedQuery,
+    categoryId: category === 'ALL' ? undefined : category,
+  });
+  const { items: products, loading, error: loadError } = pageData;
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    fetchProducts()
+    fetchCategories()
       .then((rows) => {
         if (!active) return;
-        setAllProducts(rows.map(toPosProduct));
+        setAllProducts(rows.map((item) => ({ categoryId: item.id, category: item.name })));
         setLoadError('');
       })
       .catch((error) => {
@@ -29,7 +41,6 @@ export default function InventoryPage() {
         );
       })
       .finally(() => {
-        if (active) setLoading(false);
       });
     return () => {
       active = false;
@@ -37,21 +48,12 @@ export default function InventoryPage() {
   }, []);
 
   const categories = useMemo(
-    () => [...new Set(allProducts.map((product) => product.category))],
+    () => Array.from(new Map(allProducts.map((product) => [product.categoryId, {
+      id: product.categoryId,
+      name: product.category,
+    }])).values()).filter((item) => item.id != null),
     [allProducts],
   );
-
-  const products = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return allProducts.filter((product) => {
-      const matchesQuery =
-        !term ||
-        product.name.toLowerCase().includes(term) ||
-        product.code.toLowerCase().includes(term) ||
-        (product.barcode ?? '').includes(term);
-      return matchesQuery && (category === 'ALL' || product.category === category);
-    });
-  }, [query, category, allProducts]);
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
@@ -78,11 +80,11 @@ export default function InventoryPage() {
           >
             <option value="ALL">All Categories</option>
             {categories.map((item) => (
-              <option key={item} value={item}>{item}</option>
+              <option key={item.id} value={item.id}>{item.name}</option>
             ))}
           </select>
           <span className="ml-auto text-xs text-[var(--admin-subtle)]">
-            {products.length} products
+            {pageData.totalRecords} products
           </span>
         </div>
 
@@ -150,7 +152,7 @@ export default function InventoryPage() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-subtle)]">
+        <div className="hidden items-center justify-between border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-subtle)]">
           <span>1–{products.length} of {allProducts.length}</span>
           <div className="flex gap-1">
             <button type="button" disabled className="h-8 w-8 rounded-lg border border-[var(--admin-border)] disabled:opacity-40">‹</button>
@@ -158,6 +160,7 @@ export default function InventoryPage() {
             <button type="button" disabled className="h-8 w-8 rounded-lg border border-[var(--admin-border)] disabled:opacity-40">›</button>
           </div>
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </section>
     </main>
   );

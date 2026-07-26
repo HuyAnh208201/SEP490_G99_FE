@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
-import { requestRefund } from '../../api/posOrders.js';
+import { fetchOrdersPage, requestRefund } from '../../api/posOrders.js';
 import Modal from '../../components/ui/Modal.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PosPageTitle from './components/PosPageTitle.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 /** Cashier chỉ được xin hoàn đơn trong 5 phút kể từ khi đơn tạo. */
 const REFUND_WINDOW_MS = 5 * 60 * 1000;
@@ -27,10 +30,10 @@ function formatCountdown(ms) {
 }
 
 export default function OrderHistoryPage() {
-  const { orderHistory, orderHistoryLoading, loadOrderHistory } = usePosCart();
   const location = useLocation();
   const [query, setQuery] = useState('');
   const [method, setMethod] = useState('ALL');
+  const [date, setDate] = useState('');
   const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState('');
   // Đồng hồ đếm giây để cập nhật đếm ngược và tự ẩn nút khi hết cửa sổ 5 phút.
@@ -40,6 +43,18 @@ export default function OrderHistoryPage() {
   const [refundError, setRefundError] = useState('');
   const [refundSubmitting, setRefundSubmitting] = useState(false);
   const [refundNotice, setRefundNotice] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchOrdersPage, {
+    search: debouncedQuery,
+    paymentMethod: method,
+    from: date || undefined,
+    to: date || undefined,
+  });
+  const { items: orderHistory, loading: orderHistoryLoading } = pageData;
+  const loadOrderHistory = useCallback(async () => {
+    pageData.reload();
+    return { ok: true };
+  }, [pageData.reload]);
 
   useEffect(() => {
     (async () => {
@@ -89,17 +104,7 @@ export default function OrderHistoryPage() {
     }
   }
 
-  const filteredOrders = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return orderHistory.filter((order) => {
-      const matchesSearch =
-        !term ||
-        (order.invoiceCode ?? '').toLowerCase().includes(term) ||
-        (order.customerName ?? '').toLowerCase().includes(term);
-      const matchesMethod = method === 'ALL' || order.paymentMethod === method;
-      return matchesSearch && matchesMethod;
-    });
-  }, [orderHistory, query, method]);
+  const filteredOrders = orderHistory;
 
   const selected =
     orderHistory.find((order) => order.id === selectedId) ??
@@ -165,6 +170,8 @@ export default function OrderHistoryPage() {
             </select>
             <input
               type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
               className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-[var(--admin-muted)] outline-none focus:border-[var(--admin-brand)]"
             />
           </div>
@@ -244,7 +251,7 @@ export default function OrderHistoryPage() {
             </tbody>
           </table>
         </div>
-          <div className="flex items-center justify-between border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-subtle)]">
+          <div className="hidden items-center justify-between border-t border-[var(--admin-border)] px-4 py-3 text-xs text-[var(--admin-subtle)]">
             <span>1–{filteredOrders.length} of {orderHistory.length}</span>
             <div className="flex gap-1">
               <button type="button" disabled className="h-8 w-8 rounded-lg border border-[var(--admin-border)] disabled:opacity-40">‹</button>
@@ -252,6 +259,7 @@ export default function OrderHistoryPage() {
               <button type="button" disabled className="h-8 w-8 rounded-lg border border-[var(--admin-border)] disabled:opacity-40">›</button>
             </div>
           </div>
+          <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={orderHistoryLoading} />
         </section>
 
         <aside className="space-y-4 xl:sticky xl:top-0">

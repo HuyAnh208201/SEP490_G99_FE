@@ -10,62 +10,49 @@ import {
   isWarehouseEditableStatus,
   normalizeDispatchStatus,
 } from '../../constants/dispatch.js';
-import { listDispatchOrders, updateDispatchStatus } from '../../api/dispatch.js';
+import { listDispatchOrdersPage, updateDispatchStatus } from '../../api/dispatch.js';
 import DispatchOrderDetailModal from './components/DispatchOrderDetailModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function DispatchOrdersPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [detail, setDetail] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [draftStatus, setDraftStatus] = useState({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await listDispatchOrders();
-      const list = Array.isArray(data) ? data : [];
-      setRows(list);
-      const drafts = {};
-      list.forEach((r) => {
-        drafts[r.id] = normalizeDispatchStatus(r.status) || 'preparing';
-      });
-      setDraftStatus(drafts);
-    } catch (err) {
-      setError(err?.message || 'Failed to load dispatch orders');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(listDispatchOrdersPage, {
+    search: debouncedQuery,
+    status: statusFilter ? statusFilter.toUpperCase() : undefined,
+  });
+  const { items: rows, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
   useEffect(() => {
-    load();
-  }, [load]);
+    const drafts = {};
+    rows.forEach((r) => { drafts[r.id] = normalizeDispatchStatus(r.status) || 'preparing'; });
+    setDraftStatus(drafts);
+  }, [rows]);
 
-  const filteredRows = useMemo(() => {
-    return rows.filter((r) => {
-      if (statusFilter && normalizeDispatchStatus(r.status) !== statusFilter) return false;
-      return true;
-    });
-  }, [rows, statusFilter]);
+  const filteredRows = rows;
 
   async function applyStatus(order) {
     const next = draftStatus[order.id];
     if (!next || normalizeDispatchStatus(order.status) === next) return;
     setUpdatingId(order.id);
-    setError('');
+    setActionError('');
     try {
       await updateDispatchStatus(order.id, next);
-      await load();
+      load();
     } catch (err) {
-      setError(err?.message || 'Failed to update status');
+      setActionError(err?.message || 'Failed to update status');
     } finally {
       setUpdatingId(null);
     }
@@ -101,8 +88,9 @@ export default function DispatchOrdersPage() {
               </option>
             ))}
           </select>
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search dispatches…" className={selectClass} />
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{filteredRows.length}</strong> dispatch orders
+            <strong>{pageData.totalRecords}</strong> dispatch orders
           </span>
         </div>
 
@@ -202,6 +190,7 @@ export default function DispatchOrdersPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <DispatchOrderDetailModal

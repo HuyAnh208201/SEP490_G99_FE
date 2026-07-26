@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
-import { fetchBranches, updateBranchStatus } from '../../api/branches.js';
+import { fetchBranchesPage, updateBranchStatus } from '../../api/branches.js';
 import {
   branchStatusLabel,
   branchStatusTone,
@@ -13,6 +13,9 @@ import Badge from '../../components/ui/Badge.jsx';
 import BranchFormModal from '../../components/domain/BranchFormModal.jsx';
 import BranchAssignStaffModal from '../../components/domain/BranchAssignStaffModal.jsx';
 import BranchSuspendModal from '../../components/domain/BranchSuspendModal.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 function fieldErrors(err) {
   if (err?.errors && typeof err.errors === 'object') {
@@ -26,48 +29,29 @@ export default function BranchesPage() {
   const canManage = has('MANAGE_BRANCH_INFORMATION');
   const canList = has('BRANCH_LIST_ADMIN') || has('BRANCH_LIST_DIRECTOR');
 
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [actionError, setActionError] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchBranchesPage, { search: debouncedQuery, status: statusFilter });
+  const { items, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [assignModal, setAssignModal] = useState(null);
   const [suspendModal, setSuspendModal] = useState(null);
   const [statusLoading, setStatusLoading] = useState(null);
 
-  const load = useCallback(async () => {
-    if (!canList) {
-      setLoading(false);
-      setItems([]);
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchBranches();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(fieldErrors(err));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [canList]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
   async function handleActivate(branch) {
     if (!canManage) return;
     if (!window.confirm(`Reactivate branch "${branch.name}"?`)) return;
     setStatusLoading(branch.id);
-    setError('');
+    setActionError('');
     try {
       await updateBranchStatus(branch.id, 'ACTIVE');
-      await load();
+      load();
     } catch (err) {
-      setError(fieldErrors(err));
+      setActionError(fieldErrors(err));
     } finally {
       setStatusLoading(null);
     }
@@ -108,10 +92,14 @@ export default function BranchesPage() {
       )}
 
       <Card className="!p-0 overflow-hidden">
-        <div className="border-b border-[var(--admin-border)] px-4 py-3">
-          <p className="text-sm text-[var(--admin-muted)]">
-            Total <strong>{items.length}</strong> branches
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--admin-border)] px-4 py-3">
+          <p className="text-sm text-[var(--admin-muted)]">Total <strong>{pageData.totalRecords}</strong> branches</p>
+          <div className="flex flex-1 justify-end gap-2">
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search branches…" className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm">
+              <option value="all">All statuses</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Deactivated</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -218,6 +206,7 @@ export default function BranchesPage() {
             </p>
           )}
         </div>
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
       <BranchFormModal

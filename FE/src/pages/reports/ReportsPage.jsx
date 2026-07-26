@@ -5,11 +5,14 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatVnd } from '../../lib/money.js';
 import { formatDateTime } from '../../lib/datetime.js';
 import {
-  fetchRevenue,
-  fetchInvoices,
-  fetchCashDiscrepancies,
-  fetchPointTransactions,
+  fetchRevenuePage,
+  fetchInvoicesPage,
+  fetchCashDiscrepanciesPage,
+  fetchPointTransactionsPage,
 } from '../../api/reports.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const inputClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-[var(--admin-text)] focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -123,44 +126,24 @@ export default function ReportsPage() {
   const [to, setTo] = useState(() => toDateInput(today));
   const [activeTab, setActiveTab] = useState('revenue');
   const [groupBy, setGroupBy] = useState('shift');
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      let data = [];
-      if (activeTab === 'revenue') data = await fetchRevenue({ groupBy, from, to });
-      else if (activeTab === 'invoices') data = await fetchInvoices({ from, to });
-      else if (activeTab === 'discrepancies') data = await fetchCashDiscrepancies({ from, to });
-      else if (activeTab === 'points') data = await fetchPointTransactions({ from, to });
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load report data');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, groupBy, from, to]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const fetchReportPage = useCallback((params) => {
+    if (activeTab === 'revenue') return fetchRevenuePage(params);
+    if (activeTab === 'invoices') return fetchInvoicesPage(params);
+    if (activeTab === 'discrepancies') return fetchCashDiscrepanciesPage(params);
+    return fetchPointTransactionsPage(params);
+  }, [activeTab]);
+  const pageData = useServerPage(fetchReportPage, { groupBy, from, to, search: debouncedQuery });
+  const { items: rows, loading, error } = pageData;
 
   function selectTab(tab) {
     if (tab === activeTab) return;
-    setRows([]);
-    setLoading(true);
-    setError('');
     setActiveTab(tab);
   }
 
   function selectGroupBy(g) {
     if (g === groupBy) return;
-    setRows([]);
-    setLoading(true);
     setGroupBy(g);
   }
 
@@ -195,6 +178,10 @@ export default function ReportsPage() {
               onChange={(e) => setFrom(e.target.value)}
               className={inputClass}
             />
+          </label>
+          <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--admin-muted)]">Search</span>
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search report rows…" className={inputClass} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium text-[var(--admin-muted)]">To</span>
@@ -281,7 +268,7 @@ export default function ReportsPage() {
           )}
           footer={
             <tr className="border-t-2 border-[var(--admin-border)] bg-[#f7f9fb] font-semibold">
-              <td className="px-4 py-3">Total</td>
+              <td className="px-4 py-3">Page total</td>
               <td className="px-4 py-3 text-right tabular-nums">{revenueTotals.orders}</td>
               <td className="px-4 py-3 text-right text-[var(--admin-brand)]">
                 {formatVnd(revenueTotals.revenue)}
@@ -393,6 +380,8 @@ export default function ReportsPage() {
           )}
         />
       )}
+
+      <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} className="rounded-xl border border-[var(--admin-border)] bg-white" />
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { http } from './http.js';
 
+import { compactPageParams, unwrapPage } from './pagination.js';
+
 function unwrap(body) {
   if (!body?.success) {
     const err = new Error(body?.message || 'Request failed');
@@ -13,6 +15,11 @@ function unwrap(body) {
 export async function fetchProducts() {
   const { data } = await http.get('/products');
   return unwrap(data);
+}
+
+export async function fetchProductsPage(params = {}) {
+  const { data } = await http.get('/products/page', { params: compactPageParams(params) });
+  return unwrapPage(data);
 }
 
 export async function fetchProductById(id) {

@@ -1,4 +1,5 @@
 import { http } from './http.js';
+import { compactPageParams, unwrapPage } from './pagination.js';
 
 function unwrap(body) {
   if (!body?.success) {
@@ -29,6 +30,11 @@ export async function fetchUsers() {
   const { data } = await http.get('/auth/get-list-users');
   const list = unwrap(data);
   return (Array.isArray(list) ? list : []).map(normalizeUser);
+}
+
+export async function fetchUsersPage(params = {}) {
+  const { data } = await http.get('/auth/get-list-users/page', { params: compactPageParams(params) });
+  return unwrapPage(data, normalizeUser);
 }
 
 export async function fetchUserById(id) {

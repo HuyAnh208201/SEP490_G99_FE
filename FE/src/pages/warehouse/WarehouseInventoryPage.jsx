@@ -2,47 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import { fetchWarehouseInventory } from '../../api/inventory.js';
+import { fetchWarehouseInventoryPage } from '../../api/inventory.js';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function WarehouseInventoryPage() {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchWarehouseInventory();
-      setRows(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setError(err?.message || 'Failed to load inventory');
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return rows.filter((row) => {
-      if (lowStockOnly && !row.lowStock) return false;
-      if (!q) return true;
-      return (
-        String(row.productCode || '').toLowerCase().includes(q) ||
-        String(row.productName || '').toLowerCase().includes(q)
-      );
-    });
-  }, [rows, search, lowStockOnly]);
+  const debouncedSearch = useDebouncedValue(search);
+  const pageData = useServerPage(fetchWarehouseInventoryPage, {
+    search: debouncedSearch,
+    lowStockOnly: lowStockOnly || undefined,
+  });
+  const { items: rows, loading, error } = pageData;
+  const filtered = rows;
 
   const lowStockCount = rows.filter((r) => r.lowStock).length;
 
@@ -56,7 +33,7 @@ export default function WarehouseInventoryPage() {
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">SKUs tracked</p>
-          <p className="mt-1 text-2xl font-semibold text-[var(--admin-text)]">{rows.length}</p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--admin-text)]">{pageData.totalRecords}</p>
         </Card>
         <Card className="p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">Low stock</p>
@@ -130,6 +107,7 @@ export default function WarehouseInventoryPage() {
             </table>
           </div>
         )}
+        <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
     </div>
   );

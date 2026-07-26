@@ -9,6 +9,7 @@ export function toPosProduct(product) {
     price: Number(product.defaultSalePrice),
     promoPrice: null,
     stock: product.branchStock ?? product.warehouseStock ?? 0,
+    categoryId: product.categoryId,
     category: product.categoryName ?? 'Uncategorized',
   };
 }

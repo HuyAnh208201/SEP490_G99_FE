@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   createProduct,
   deleteProduct,
-  fetchProducts,
+  fetchProductsPage,
   generateBarcode,
   updateProduct,
 } from '../../api/products.js';
@@ -37,6 +37,9 @@ import BarcodeInput from '../../components/ui/BarcodeInput.jsx';
 import PrintableBarcode from '../../components/ui/PrintableBarcode.jsx';
 import MoneyInput from '../../components/ui/MoneyInput.jsx';
 import InventoryCountPanel from '../../components/domain/InventoryCountPanel.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import useServerPage from '../../hooks/useServerPage.js';
 
 const EMPTY = {
   code: '',
@@ -80,7 +83,7 @@ function pageDescription(role, canManage, isWm) {
 
 export default function ProductsPage() {
   const { has, role } = usePermissions();
-  const { getProducts, getCategories, invalidate } = useReferenceData();
+  const { getCategories, invalidate } = useReferenceData();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const canManage = canManageProducts(role, { has });
@@ -92,10 +95,8 @@ export default function ProductsPage() {
   const showCount = showInventoryCountAction(role, { has });
 
   const barcodeRef = useRef(null);
-  const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -104,28 +105,19 @@ export default function ProductsPage() {
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [formError, setFormError] = useState('');
   const [countOpen, setCountOpen] = useState(searchParams.get('count') === '1');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [products, cats] = await Promise.all([
-        getProducts(),
-        canManage || isWm ? getCategories().catch(() => []) : Promise.resolve([]),
-      ]);
-      setItems(Array.isArray(products) ? products : []);
-      setCategories(Array.isArray(cats) ? cats : []);
-    } catch (err) {
-      setError(fieldErrors(err));
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [canManage, getProducts, getCategories, isWm]);
+  const debouncedQuery = useDebouncedValue(query);
+  const pageData = useServerPage(fetchProductsPage, {
+    search: debouncedQuery,
+    lowStockOnly: lowStockOnly || undefined,
+  });
+  const { items, loading, reload: load } = pageData;
+  const error = actionError || pageData.error;
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (canManage || isWm) {
+      getCategories().then((cats) => setCategories(Array.isArray(cats) ? cats : [])).catch(() => setCategories([]));
+    }
+  }, [canManage, getCategories, isWm]);
 
   useEffect(() => {
     if (searchParams.get('count') === '1') {
@@ -134,25 +126,14 @@ export default function ProductsPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return items.filter((p) => {
-      if (lowStockOnly && !p.lowStock) return false;
-      if (!q) return true;
-      return (
-        p.code?.toLowerCase().includes(q) ||
-        p.name?.toLowerCase().includes(q) ||
-        p.barcode?.toLowerCase().includes(q)
-      );
-    });
-  }, [items, query, lowStockOnly]);
+  const filtered = items;
 
   const summary = useMemo(() => {
     if (!showWarehouseStock) return null;
     const low = items.filter((p) => p.lowStock).length;
     const totalUnits = items.reduce((sum, p) => sum + (p.warehouseStock || 0), 0);
-    return { skus: items.length, low, totalUnits };
-  }, [items, showWarehouseStock]);
+    return { skus: pageData.totalRecords, low, totalUnits };
+  }, [items, pageData.totalRecords, showWarehouseStock]);
 
   function patchForm(patch) {
     setForm((f) => {
@@ -258,7 +239,7 @@ export default function ProductsPage() {
       }
       cancelEdit();
       invalidate('products');
-      await load();
+      load();
     } catch (err) {
       setFormError(fieldErrors(err));
     } finally {
@@ -273,9 +254,9 @@ export default function ProductsPage() {
       await deleteProduct(id);
       if (editingId === id) cancelEdit();
       invalidate('products');
-      await load();
+      load();
     } catch (err) {
-      setError(fieldErrors(err));
+      setActionError(fieldErrors(err));
     }
   }
 
@@ -544,7 +525,7 @@ export default function ProductsPage() {
         <Card className={`${showForm ? 'xl:col-span-8' : ''} !p-0 overflow-hidden`}>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
             <p className="text-sm text-[var(--admin-muted)]">
-              <strong>{filtered.length}</strong> / {items.length} products
+              <strong>{pageData.totalRecords}</strong> products
             </p>
             <div className="flex flex-wrap items-center gap-3">
               {showWarehouseStock && (
@@ -675,6 +656,7 @@ export default function ProductsPage() {
               </p>
             )}
           </div>
+          <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
         </Card>
       </div>
     </div>
