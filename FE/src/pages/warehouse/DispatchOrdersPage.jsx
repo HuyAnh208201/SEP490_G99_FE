@@ -99,9 +99,8 @@ export default function DispatchOrdersPage() {
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               <tr>
                 <th className="px-4 py-3">Dispatch ID</th>
-                <th className="px-4 py-3">Related Requests</th>
-                <th className="px-4 py-3">Stores</th>
-                <th className="px-4 py-3">Vehicle</th>
+                <th className="px-4 py-3">Request ID</th>
+                <th className="px-4 py-3">Store</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -110,7 +109,7 @@ export default function DispatchOrdersPage() {
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={5} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -129,16 +128,9 @@ export default function DispatchOrdersPage() {
                           {r.dispatchNumber}
                         </td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          <div className="flex flex-col gap-0.5">
-                            {(r.requests || []).map((req) => (
-                              <span key={req.requestId} className="font-mono text-xs">
-                                {req.requestNumber}
-                              </span>
-                            ))}
-                          </div>
+                          {(r.requests || [])[0]?.requestNumber || '—'}
                         </td>
-                        <td className="px-4 py-3">{storesOf(r).join(', ') || '—'}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.vehicle || '—'}</td>
+                        <td className="px-4 py-3">{storesOf(r)[0] || '—'}</td>
                         <td className="px-4 py-3">
                           {editable ? (
                             <select

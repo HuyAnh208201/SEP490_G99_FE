@@ -110,7 +110,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
           productId: product.productId,
           productCode: product.productCode,
           productName: product.productName,
-          unit: product.unit,
+          unit: product.unit || product.topPackagingLabel,
           quantity: qty,
           unitPrice: product.referencePrice != null ? Number(product.referencePrice) : '',
         });
@@ -130,7 +130,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
           productId: product.productId,
           productCode: product.productCode,
           productName: product.productName,
-          unit: product.unit,
+          unit: product.unit || product.topPackagingLabel,
           quantity: product.suggestedQty,
           unitPrice: product.referencePrice != null ? Number(product.referencePrice) : '',
         });
@@ -301,7 +301,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
             <h3 className="text-sm font-semibold text-[var(--admin-text)]">
               Recommended products
               <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
-                (central stock is short)
+                (order qty in import units; warehouse stock in base units)
               </span>
             </h3>
             {availableRecommended.length > 0 && (
@@ -320,9 +320,9 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
                 <tr>
                   <th className="px-4 py-2">Product</th>
                   <th className="px-4 py-2">Category</th>
-                  <th className="px-4 py-2 text-right">Current</th>
-                  <th className="px-4 py-2 text-right">Required</th>
-                  <th className="px-4 py-2 text-right">Suggested</th>
+                  <th className="px-4 py-2 text-right">Current (base)</th>
+                  <th className="px-4 py-2 text-right">Required (import)</th>
+                  <th className="px-4 py-2 text-right">Suggested (import)</th>
                   <th className="px-4 py-2 text-right">Action</th>
                 </tr>
               </thead>
@@ -336,7 +336,7 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
                 ) : availableRecommended.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-6 text-center text-sm text-[var(--admin-muted)]">
-                      No recommended products. Central stock is sufficient.
+                      No products need replenishment from suppliers.
                     </td>
                   </tr>
                 ) : (
@@ -349,10 +349,24 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-[var(--admin-muted)]">{r.categoryName || '—'}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-red-600">{r.currentQty}</td>
-                      <td className="px-4 py-2 text-right tabular-nums">{r.requiredQty}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-red-600">
+                        {r.currentQtyBase ?? r.currentQty}
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {r.requiredQty}
+                        {r.unit ? (
+                          <span className="ml-1 text-xs font-normal text-[var(--admin-muted)]">
+                            {r.unit}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-2 text-right font-semibold tabular-nums">
                         {r.suggestedQty}
+                        {r.unit ? (
+                          <span className="ml-1 text-xs font-normal text-[var(--admin-muted)]">
+                            {r.unit}
+                          </span>
+                        ) : null}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <Button

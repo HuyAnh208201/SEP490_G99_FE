@@ -78,7 +78,9 @@ export default function ReceiveShipmentPage() {
     setSubmitting(true);
     try {
       await receiveShipment(dispatchOrderId, requestId, payload);
-      navigate('/inventory/receiving-history');
+      navigate('/inventory/receiving-history', {
+        state: { message: 'Receipt submitted for branch manager approval.' },
+      });
     } catch (err) {
       setError(err?.message || 'Failed to receive shipment');
     } finally {
@@ -90,7 +92,7 @@ export default function ReceiveShipmentPage() {
     <div className="w-full">
       <PageHeader
         title="Receive Shipment"
-        description="Confirm received quantities for incoming dispatch orders."
+        description="Record actual received quantities. Branch manager must approve before stock is updated."
         actions={
           <Button variant="secondary" onClick={() => navigate('/inventory/order-tracking')}>
             Back

@@ -1,5 +1,5 @@
 /**
- * Dispatch (shipment batch) constants — status machine, badges, vehicle options, permissions.
+ * Dispatch constants — status machine, badges, permissions.
  * The backend returns statuses in uppercase (PREPARING/DELIVERING/REDELIVERY/RECEIVED).
  */
 
@@ -49,14 +49,6 @@ export const DISPATCH_STATUS_OPTIONS = [
     value,
     label: DISPATCH_STATUS_META[value].label,
   })),
-];
-
-/** Vehicle options for a dispatch order. */
-export const VEHICLE_OPTIONS = [
-  'Small Van',
-  'Refrigerated Van',
-  '6-Wheel Truck',
-  'Motorbike',
 ];
 
 export function normalizeDispatchStatus(status) {
