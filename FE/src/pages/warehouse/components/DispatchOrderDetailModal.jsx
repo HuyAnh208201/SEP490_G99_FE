@@ -48,12 +48,11 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
       open={open}
       onClose={onClose}
       title={`Dispatch ${order.dispatchNumber || ''}`}
-      description="Delivery batch details. Delivered status is set when branch inventory staff confirms receipt."
+      description="Delivery details. Delivered status is set when branch inventory staff confirms receipt."
       size="xl"
     >
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-4">
-          <Info label="Vehicle" value={order.vehicle || '—'} />
+        <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-3">
           <Info label="Delivery area" value={order.deliveryArea || '—'} />
           <Info label="Route" value={order.route || '—'} />
           <div>

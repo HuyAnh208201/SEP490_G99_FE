@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate } from '../../lib/datetime.js';
-import { VEHICLE_OPTIONS } from '../../constants/dispatch.js';
 import { listApprovedRequestsPage, createDispatchOrder } from '../../api/dispatch.js';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
@@ -18,16 +17,12 @@ export default function DispatchPlanningPage() {
   const [message, setMessage] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [routeFilter, setRouteFilter] = useState('');
-  const [selected, setSelected] = useState(() => new Set());
-  const [vehicle, setVehicle] = useState(VEHICLE_OPTIONS[0]);
-  const [creating, setCreating] = useState(false);
+  const [shippingId, setShippingId] = useState(null);
 
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(listApprovedRequestsPage, { search: debouncedQuery, area: areaFilter, route: routeFilter });
   const { items: rows, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
-
-  useEffect(() => setSelected(new Set()), [rows]);
 
   const areas = useMemo(
     () => [...new Set(rows.map((r) => r.area).filter(Boolean))],
@@ -38,57 +33,28 @@ export default function DispatchPlanningPage() {
     [rows],
   );
 
-  const filteredRows = rows;
-
-  const allVisibleSelected =
-    filteredRows.length > 0 && filteredRows.every((r) => selected.has(r.id));
-
-  function toggle(id) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setSelected((prev) => {
-      if (filteredRows.every((r) => prev.has(r.id))) {
-        const next = new Set(prev);
-        filteredRows.forEach((r) => next.delete(r.id));
-        return next;
-      }
-      const next = new Set(prev);
-      filteredRows.forEach((r) => next.add(r.id));
-      return next;
-    });
-  }
-
-  async function handleCreate() {
-    const requestIds = [...selected];
-    if (!requestIds.length) return;
-    setCreating(true);
+  async function handleShip(requestId, requestNumber) {
+    setShippingId(requestId);
     setActionError('');
     setMessage('');
     try {
-      const order = await createDispatchOrder({ requestIds, vehicle });
+      const order = await createDispatchOrder({ requestId });
       setMessage(
-        `Dispatch order ${order?.dispatchNumber || ''} created with ${requestIds.length} request(s).`,
+        `Dispatch order ${order?.dispatchNumber || ''} created for ${requestNumber || 'request'}.`,
       );
       load();
     } catch (err) {
       setActionError(err?.message || 'Failed to create dispatch order');
     } finally {
-      setCreating(false);
+      setShippingId(null);
     }
   }
 
   return (
     <div className="w-full">
       <PageHeader
-        title="Dispatch Planning"
-        description="Select approved requests and group them into a dispatch order by delivery area and route."
+        title="Ship Orders"
+        description="Ship approved requests one at a time. Each request creates its own dispatch order."
       />
 
       {error && (
@@ -130,7 +96,7 @@ export default function DispatchPlanningPage() {
             ))}
           </select>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{selected.size}</strong> selected
+            <strong>{rows.length}</strong> ready to ship
           </span>
         </div>
 
@@ -138,20 +104,13 @@ export default function DispatchPlanningPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               <tr>
-                <th className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={toggleAll}
-                    aria-label="Select all"
-                  />
-                </th>
                 <th className="px-4 py-3">Request ID</th>
                 <th className="px-4 py-3">Store</th>
                 <th className="px-4 py-3">Delivery Area</th>
                 <th className="px-4 py-3">Route</th>
                 <th className="px-4 py-3">Categories</th>
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -163,19 +122,11 @@ export default function DispatchPlanningPage() {
                       </td>
                     </tr>
                   ))
-                : filteredRows.map((r) => (
+                : rows.map((r) => (
                     <tr
                       key={r.id}
                       className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
                     >
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(r.id)}
-                          onChange={() => toggle(r.id)}
-                          aria-label={`Select ${r.requestNumber}`}
-                        />
-                      </td>
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
                         {r.requestNumber}
                       </td>
@@ -188,33 +139,26 @@ export default function DispatchPlanningPage() {
                       <td className="px-4 py-3 text-[var(--admin-muted)]">
                         {formatDate(r.createdAt)}
                       </td>
+                      <td className="px-4 py-3 text-right">
+                        <Button
+                          className="!px-3 !py-1 !text-xs"
+                          loading={shippingId === r.id}
+                          onClick={() => handleShip(r.id, r.requestNumber)}
+                        >
+                          Ship
+                        </Button>
+                      </td>
                     </tr>
                   ))}
             </tbody>
           </table>
-          {!loading && filteredRows.length === 0 && (
+          {!loading && rows.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
-              No approved requests to group.
+              No approved requests ready to ship. Approved requests only appear here when warehouse
+              stock (in base units) covers the approved quantity after packaging conversion. Check
+              Incoming Requests for approved items that may still be awaiting stock replenishment.
             </p>
           )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[var(--admin-border)] px-4 py-3">
-          <label className="text-sm text-[var(--admin-muted)]">Vehicle</label>
-          <select
-            value={vehicle}
-            onChange={(e) => setVehicle(e.target.value)}
-            className={selectClass}
-          >
-            {VEHICLE_OPTIONS.map((v) => (
-              <option key={v} value={v}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <Button loading={creating} disabled={selected.size === 0} onClick={handleCreate}>
-            Create Dispatch Order
-          </Button>
         </div>
         <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
