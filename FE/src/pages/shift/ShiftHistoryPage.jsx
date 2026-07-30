@@ -8,8 +8,13 @@ import { formatDateTime } from '../../lib/datetime.js';
 const STATUS_TONE = {
   SCHEDULED: 'default',
   OPEN: 'brand',
+  CLOSING: 'warning',
   PENDING_HANDOVER: 'warning',
   CLOSED: 'success',
+  COMPLETED: 'success',
+  PENDING_APPROVAL: 'warning',
+  APPROVED: 'success',
+  REJECTED: 'danger',
 };
 
 export default function ShiftHistoryPage() {

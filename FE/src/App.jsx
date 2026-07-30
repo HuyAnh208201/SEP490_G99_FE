@@ -26,10 +26,11 @@ import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
 import BranchManagerDashboardPage, {
-  CashDiscrepancyPage,
   RefundApprovalPage,
 } from './pages/branch-manager/BranchManagerPages.jsx';
-import BranchReceivePage from './pages/branch-manager/BranchReceivePage.jsx';
+import CashReconciliationListPage from './pages/branch-manager/CashReconciliationListPage.jsx';
+import CashReconciliationReviewPage from './pages/branch-manager/CashReconciliationReviewPage.jsx';
+import SupplyReceiptApprovalPage from './pages/branch-manager/SupplyReceiptApprovalPage.jsx';
 import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
 import DirectorDashboardPage, {
@@ -301,14 +302,6 @@ export default function App() {
           element={<Navigate to="/purchase-requests" replace />}
         />
         <Route
-          path="/branch-manager/receive"
-          element={
-            <PermissionRoute permission="SUPPLY_IMPORT_RECEIPT_APPROVE">
-              <BranchReceivePage />
-            </PermissionRoute>
-          }
-        />
-        <Route
           path="/my-shifts"
           element={
             <PermissionRoute permission="MY_SHIFTS">
@@ -317,18 +310,38 @@ export default function App() {
           }
         />
         <Route
-          path="/branch-manager/cash-discrepancy"
+          path="/branch-manager/cash-reconciliation"
           element={
             <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
-              <CashDiscrepancyPage />
+              <CashReconciliationListPage />
             </PermissionRoute>
           }
+        />
+        <Route
+          path="/branch-manager/cash-reconciliation/:sessionId"
+          element={
+            <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
+              <CashReconciliationReviewPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/branch-manager/cash-discrepancy"
+          element={<Navigate to="/branch-manager/cash-reconciliation" replace />}
         />
         <Route
           path="/branch-manager/refunds"
           element={
             <PermissionRoute permission="REFUND_APPROVAL">
               <RefundApprovalPage />
+            </PermissionRoute>
+          }
+        />
+        <Route
+          path="/branch-manager/supply-receipts"
+          element={
+            <PermissionRoute permission="SUPPLY_IMPORT_RECEIPT_APPROVE">
+              <SupplyReceiptApprovalPage />
             </PermissionRoute>
           }
         />

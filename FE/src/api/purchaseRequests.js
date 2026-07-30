@@ -32,13 +32,24 @@ function unwrapList(data) {
   return [];
 }
 
+/** Map FE status (approved, awaiting_stock) to BE enum (APPROVED, AWAITING_STOCK). */
+function toApiStatus(status) {
+  if (!status) return undefined;
+  return String(status).toUpperCase();
+}
+
+function toListParams(params = {}) {
+  const { status, ...rest } = params;
+  return compactPageParams({ ...rest, status: toApiStatus(status) });
+}
+
 export async function listRequests(params = {}) {
-  const { data } = await http.get(BASE, { params });
+  const { data } = await http.get(BASE, { params: toListParams(params) });
   return unwrapList(data).map(normalizeRequestSummary);
 }
 
 export async function listRequestsPage(params = {}) {
-  const { data } = await http.get(BASE, { params: compactPageParams(params) });
+  const { data } = await http.get(BASE, { params: toListParams(params) });
   return unwrapPage(data, normalizeRequestSummary);
 }
 
@@ -138,7 +149,7 @@ export async function receiveRequest(id) {
 }
 
 export async function fetchRequestBranches() {
-  const { data } = await http.get('/branches');
+  const { data } = await http.get(`${BASE}/branches`);
   const rows = unwrap(data);
   return (Array.isArray(rows) ? rows : []).map((b) => ({
     id: b.id,
