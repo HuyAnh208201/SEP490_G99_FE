@@ -85,7 +85,7 @@ const QUICK_LINKS = {
     { to: '/branch-manager/shifts', label: 'Shifts' },
     { to: '/users', label: 'Team & accounts' },
     { to: '/purchase-requests', label: 'Import requests' },
-    { to: '/branch-manager/cash-discrepancy', label: 'Cash reconciliation' },
+    { to: '/branch-manager/cash-reconciliation', label: 'Cash Reconciliation' },
   ],
   WAREHOUSE_MANAGER: [
     { to: '/warehouse/inventory', label: 'Inventory' },

@@ -9,14 +9,12 @@ import {
   statusMeta,
   normalizeStatus,
   canApproveRequest,
-  canReceiveRequest,
   canCreateRequest,
 } from '../../../constants/purchaseRequests.js';
 import { usePermissions } from '../../../contexts/PermissionsContext.jsx';
 import {
   approveRequest,
   rejectRequest,
-  receiveRequest,
   cancelRequest,
 } from '../../../api/purchaseRequests.js';
 import { unitLabel } from '../../../constants/productUnits.js';
@@ -46,7 +44,6 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
     const status = normalizeStatus(request.status);
     if (status === PR_STATUS.DRAFT && canCreateRequest(has)) return 'draft';
     if (status === PR_STATUS.PENDING && canApproveRequest(has)) return 'approve';
-    if (status === PR_STATUS.APPROVED && canReceiveRequest(has)) return 'receive';
     return 'view';
   }, [request, has]);
 
@@ -192,12 +189,6 @@ export default function RequestDetailModal({ open, onClose, request, currentUser
                   Approve
                 </Button>
               </>
-            )}
-
-            {mode === 'receive' && (
-              <Button loading={busy === 'receive'} onClick={() => run('receive', () => receiveRequest(request.id))}>
-                Receive goods
-              </Button>
             )}
           </div>
         </div>

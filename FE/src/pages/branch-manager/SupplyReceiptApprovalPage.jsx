@@ -1,4 +1,3 @@
-import { useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -10,7 +9,7 @@ import {
   approvalStatusMeta,
 } from '../../constants/inventoryStaff.js';
 import { listReceivingHistoryPage } from '../../api/branchReceiving.js';
-import ReceivingReceiptDetailModal from './components/ReceivingReceiptDetailModal.jsx';
+import SupplyReceiptDetailModal from './components/SupplyReceiptDetailModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
@@ -18,29 +17,25 @@ import useServerPage from '../../hooks/useServerPage.js';
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
-export default function ReceivingHistoryPage() {
-  const location = useLocation();
-  const [flash, setFlash] = useState(location.state?.message || '');
-  const [statusFilter, setStatusFilter] = useState('');
+export default function SupplyReceiptApprovalPage() {
+  const [statusFilter, setStatusFilter] = useState('PENDING_APPROVAL');
   const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState(null);
 
   const debouncedSearch = useDebouncedValue(search);
-  const pageData = useServerPage(listReceivingHistoryPage, { search: debouncedSearch, status: statusFilter });
-  const { items: filteredRows, loading, error } = pageData;
+  const pageData = useServerPage(
+    listReceivingHistoryPage,
+    { search: debouncedSearch, status: statusFilter },
+    { initialPage: 1 },
+  );
+  const { items: rows, loading, error, reload: load } = pageData;
 
   return (
     <div className="w-full">
       <PageHeader
-        title="Receiving History"
-        description="Submitted receipts await branch manager approval before stock is finalized."
+        title="Supply Receipt Approval"
+        description="Review inventory staff receipts and approve stock updates for your branch."
       />
-
-      {flash && (
-        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          {flash}
-        </div>
-      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -95,7 +90,7 @@ export default function ReceivingHistoryPage() {
                       </td>
                     </tr>
                   ))
-                : filteredRows.map((r) => {
+                : rows.map((r) => {
                     const meta = approvalStatusMeta(r.status);
                     return (
                       <tr
@@ -128,7 +123,7 @@ export default function ReceivingHistoryPage() {
                               className="!px-3 !py-1 !text-xs"
                               onClick={() => setDetailId(r.receiptId)}
                             >
-                              View Details
+                              Review
                             </Button>
                           </div>
                         </td>
@@ -137,19 +132,20 @@ export default function ReceivingHistoryPage() {
                   })}
             </tbody>
           </table>
-          {!loading && filteredRows.length === 0 && (
+          {!loading && rows.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
-              No receiving history yet.
+              No receipts match this filter.
             </p>
           )}
         </div>
         <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
 
-      <ReceivingReceiptDetailModal
+      <SupplyReceiptDetailModal
         open={Boolean(detailId)}
         receiptId={detailId}
         onClose={() => setDetailId(null)}
+        onChanged={load}
       />
     </div>
   );

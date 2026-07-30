@@ -106,7 +106,7 @@ export const NAV_GROUPS = [
       },
       {
         path: '/warehouse/dispatch-planning',
-        label: 'Dispatch planning',
+        label: 'Ship orders',
         icon: 'plan',
         permissions: ['MANAGE_DISPATCH_ORDERS'],
       },
@@ -151,12 +151,6 @@ export const NAV_GROUPS = [
     label: 'Branch staff',
     items: [
       {
-        path: '/branch-manager/receive',
-        label: 'Receive goods',
-        icon: 'boxes',
-        permissions: ['SUPPLY_IMPORT_RECEIPT_APPROVE'],
-      },
-      {
         path: '/my-shifts',
         label: 'My shifts',
         icon: 'clock',
@@ -186,8 +180,8 @@ export const NAV_GROUPS = [
         permissions: ['SHIFT_MANAGEMENT'],
       },
       {
-        path: '/branch-manager/cash-discrepancy',
-        label: 'Cash reconciliation',
+        path: '/branch-manager/cash-reconciliation',
+        label: 'Cash Reconciliation',
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },
@@ -196,6 +190,12 @@ export const NAV_GROUPS = [
         label: 'Refund approvals',
         icon: 'report',
         permissions: ['REFUND_APPROVAL'],
+      },
+      {
+        path: '/branch-manager/supply-receipts',
+        label: 'Supply receipt approval',
+        icon: 'inbox',
+        permissions: ['SUPPLY_IMPORT_RECEIPT_APPROVE'],
       },
     ],
   },

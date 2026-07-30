@@ -6,7 +6,24 @@ import { isShiftOpen } from '../../api/shiftSessions.js';
 import { PosCartProvider } from '../../contexts/PosCartContext.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
 
-const SHIFT_NAV = [{ to: '/pos/shift', end: true, label: 'Shift' }];
+const SHIFT_NAV = [
+  {
+    to: '/pos/shift',
+    end: true,
+    label: 'Shift',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 8v4l2.5 2M8 4h8"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+  },
+];
 
 const ORDER_NAV = [
   {
@@ -127,6 +144,11 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
               ].join(' ');
             }}
           >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f7f9fb]">
+              <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+                {item.icon}
+              </svg>
+            </span>
             {item.label}
           </NavLink>
         ))}

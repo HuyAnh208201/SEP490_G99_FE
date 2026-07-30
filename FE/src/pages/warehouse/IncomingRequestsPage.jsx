@@ -48,12 +48,14 @@ export default function IncomingRequestsPage() {
   const counts = useMemo(() => {
     let pending = 0;
     let approved = 0;
+    let awaitingStock = 0;
     rows.forEach((r) => {
       const s = normalizeStatus(r.status);
       if (s === PR_STATUS.PENDING) pending += 1;
       if (s === PR_STATUS.APPROVED) approved += 1;
+      if (s === PR_STATUS.AWAITING_STOCK) awaitingStock += 1;
     });
-    return { pending, approved };
+    return { pending, approved, awaitingStock };
   }, [rows]);
 
   async function openDetail(request) {
@@ -126,7 +128,7 @@ export default function IncomingRequestsPage() {
 
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
             <strong>{counts.pending}</strong> pending review · <strong>{counts.approved}</strong>{' '}
-            approved
+            approved · <strong>{counts.awaitingStock}</strong> awaiting stock
           </span>
         </div>
 

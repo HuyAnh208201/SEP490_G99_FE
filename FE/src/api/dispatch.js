@@ -36,9 +36,9 @@ export async function listApprovedRequestsPage(params = {}) {
   return unwrapPage(data);
 }
 
-/** Tạo lô vận chuyển từ các yêu cầu được chọn. */
-export async function createDispatchOrder({ requestIds, vehicle }) {
-  const { data } = await http.post(BASE, { requestIds, vehicle });
+/** Tạo lô vận chuyển cho một yêu cầu đã duyệt. */
+export async function createDispatchOrder({ requestId }) {
+  const { data } = await http.post(BASE, { requestId });
   return unwrap(data);
 }
 
