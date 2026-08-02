@@ -138,60 +138,67 @@ export default function PosPaymentPage() {
           ← Cart
         </button>
         <h1 className="text-sm font-bold uppercase tracking-[0.1em] text-[var(--admin-text)]">Payment</h1>
-        <div className="ml-auto inline-flex rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] p-0.5">
-          {METHODS.map((item, index) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => selectMethod(item.id)}
-              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                method === item.id
-                  ? 'bg-[var(--admin-brand)] text-white shadow-sm'
-                  : 'text-[var(--admin-muted)] hover:bg-white hover:text-[var(--admin-text)]'
-              }`}
-            >
-              {item.label}
-              <kbd
-                className={`rounded px-1 py-0.5 text-[10px] font-bold ${
-                  method === item.id ? 'bg-white/20' : 'bg-[#e8eef5] text-[var(--admin-brand)]'
-                }`}
-              >
-                {index + 1}
-              </kbd>
-            </button>
-          ))}
-        </div>
+        <p className="ml-auto text-xs text-[var(--admin-subtle)]">
+          {METHODS.find((item) => item.id === method)?.hint}
+        </p>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-3 overflow-hidden p-3 lg:p-4 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
         <section className="min-h-0 overflow-y-auto rounded-2xl border border-[var(--admin-border)] bg-white p-3 shadow-[var(--shadow-card)] lg:p-4">
-          {method === 'cash' ? (
-            <div className="mx-auto flex h-full max-w-3xl flex-col gap-3">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Due</p>
-                  <p className="mt-0.5 truncate text-lg font-extrabold text-[var(--admin-brand)]">
-                    {formatVnd(totals.total)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Received</p>
-                  <p className="mt-0.5 truncate text-lg font-extrabold text-[var(--admin-text)]">
-                    {receivedRaw ? formatVnd(received) : '—'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Change</p>
-                  <p
-                    className={`mt-0.5 truncate text-lg font-extrabold ${
-                      received >= totals.total ? 'text-[var(--admin-success)]' : 'text-[var(--admin-subtle)]'
+          <div className="mx-auto flex h-full max-w-3xl flex-col gap-3">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Due</p>
+                <p className="mt-0.5 truncate text-lg font-extrabold text-[var(--admin-brand)]">
+                  {formatVnd(totals.total)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Received</p>
+                <p className="mt-0.5 truncate text-lg font-extrabold text-[var(--admin-text)]">
+                  {method === 'cash' && receivedRaw ? formatVnd(received) : '—'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Change</p>
+                <p
+                  className={`mt-0.5 truncate text-lg font-extrabold ${
+                    method === 'cash' && received >= totals.total
+                      ? 'text-[var(--admin-success)]'
+                      : 'text-[var(--admin-subtle)]'
+                  }`}
+                >
+                  {method === 'cash' && receivedRaw ? formatVnd(change) : '—'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {METHODS.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectMethod(item.id)}
+                  className={`inline-flex min-h-[3.5rem] items-center justify-center gap-2 rounded-xl border-2 px-4 text-base font-bold transition sm:min-h-[4rem] sm:text-lg ${
+                    method === item.id
+                      ? 'border-[var(--admin-brand)] bg-[var(--admin-brand)] text-white shadow-sm'
+                      : 'border-[var(--admin-border)] bg-white text-[var(--admin-text)] hover:border-[#0058be]/40 hover:bg-[#0058be]/5'
+                  }`}
+                >
+                  {item.label}
+                  <kbd
+                    className={`rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                      method === item.id ? 'bg-white/20' : 'bg-[#e8eef5] text-[var(--admin-brand)]'
                     }`}
                   >
-                    {receivedRaw ? formatVnd(change) : '—'}
-                  </p>
-                </div>
-              </div>
+                    {index + 1}
+                  </kbd>
+                </button>
+              ))}
+            </div>
 
+            {method === 'cash' ? (
+              <>
               <div className="relative">
                 <input
                   autoFocus
@@ -264,16 +271,16 @@ export default function PosPaymentPage() {
                   <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="mx-auto flex h-full max-w-3xl flex-col gap-3">
+              </>
+            ) : (
+              <>
               <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] p-4">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
                   PayOS checkout
                 </p>
                 <p className="mt-1 text-3xl font-extrabold text-[var(--admin-brand)]">{formatVnd(totals.total)}</p>
                 <p className="mt-2 text-sm text-[var(--admin-muted)]">
-                  Opens the PayOS screen: creates the pending order, shows the real QR, and polls until the customer pays.
+                  Continues to the PayOS screen with a real VietQR code and automatic payment polling.
                 </p>
               </div>
 
@@ -288,26 +295,20 @@ export default function PosPaymentPage() {
                 </div>
               </div>
 
-              <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-[1fr_1.6fr]">
-                <button
-                  type="button"
-                  onClick={() => selectMethod('cash')}
-                  className="min-h-12 rounded-xl border border-[var(--admin-border)] bg-white text-sm font-semibold text-[var(--admin-muted)] transition hover:bg-[#f7f9fb]"
-                >
-                  Use cash instead
-                </button>
+              <div className="mt-auto grid gap-2 pt-2">
                 <button
                   type="button"
                   disabled={checkoutBusy || !lines.length}
                   onClick={openPayOsCheckout}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-base font-bold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  Continue to PayOS QR
+                  Open PayOS QR
                   <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
                 </button>
               </div>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </section>
 
         <div className="hidden min-h-0 xl:block">
