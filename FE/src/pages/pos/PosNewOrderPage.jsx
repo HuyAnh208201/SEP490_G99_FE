@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
 import { scanBarcode } from '../../api/barcode.js';
-import { fetchProducts } from '../../api/products.js';
+import { fetchPosCatalog } from '../../api/products.js';
 import { fetchScanEvents, pushScanEvent } from '../../api/posScan.js';
 import { toPosProduct } from './posProduct.js';
 import { ALL_PRODUCTS_ID, categoryAccent, categoryInitials } from './categoryAccent.js';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import { isTypingTarget } from './posHotkeys.js';
 import Modal from '../../components/ui/Modal.jsx';
+import Button from '../../components/ui/Button.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
 import ProductInfoPopup from './components/ProductInfoPopup.jsx';
 import BarcodeScannerModal from './components/BarcodeScannerModal.jsx';
@@ -20,9 +21,12 @@ import { validateEmail, validateRequiredName, validateVnPhone } from '../../lib/
 
 // Cảnh báo sắp hết hàng cho thu ngân, không phải ngưỡng đặt hàng lại của kho.
 const LOW_STOCK_THRESHOLD = 5;
+const SUCCESS_POPUP_MS = 3000;
 
 export default function PosNewOrderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
   const {
     lines,
     customer,
@@ -83,6 +87,27 @@ export default function PosNewOrderPage() {
     localStorage.setItem('pos_relay_mode', relayMode ? '1' : '0');
   }, [relayMode]);
 
+  const dismissPaymentSuccess = useCallback(() => {
+    setPaymentSuccess(null);
+  }, []);
+
+  // After cash/PayOS success: show popup on /pos, then clear location.state so refresh does not re-open.
+  useEffect(() => {
+    const invoice = location.state?.completedInvoice;
+    if (!invoice) return;
+    setPaymentSuccess({
+      invoice,
+      change: location.state?.change,
+    });
+    navigate('.', { replace: true, state: null });
+  }, [location.state, navigate]);
+
+  useEffect(() => {
+    if (!paymentSuccess) return undefined;
+    const timer = setTimeout(dismissPaymentSuccess, SUCCESS_POPUP_MS);
+    return () => clearTimeout(timer);
+  }, [paymentSuccess, dismissPaymentSuccess]);
+
   // Keep cart selection valid when lines change.
   useEffect(() => {
     if (!selectedLineKey) return;
@@ -94,7 +119,14 @@ export default function PosNewOrderPage() {
   useEffect(() => {
     function onKeyDown(event) {
       if (event.key === 'F1') return; // handled in PosLayout help
-      if (customerOpen || scannerOpen || popupProduct || confirmClear || confirmRemoveKey) {
+      if (
+        customerOpen ||
+        scannerOpen ||
+        popupProduct ||
+        confirmClear ||
+        confirmRemoveKey ||
+        paymentSuccess
+      ) {
         if (event.key === 'Escape') {
           event.preventDefault();
           setCustomerOpen(false);
@@ -103,6 +135,7 @@ export default function PosNewOrderPage() {
           setConfirmClear(false);
           setConfirmRemoveKey(null);
           setAddCustomerOpen(false);
+          dismissPaymentSuccess();
         }
         return;
       }
@@ -176,8 +209,10 @@ export default function PosNewOrderPage() {
     confirmClear,
     confirmRemoveKey,
     customerOpen,
+    dismissPaymentSuccess,
     lines,
     navigate,
+    paymentSuccess,
     popupProduct,
     scannerOpen,
     selectedLineKey,
@@ -203,7 +238,7 @@ export default function PosNewOrderPage() {
     catalogRequestRef.current = requestId;
     if (!silent) setCatalogLoading(true);
     try {
-      const rows = await fetchProducts();
+      const rows = await fetchPosCatalog();
       if (requestId !== catalogRequestRef.current) return false;
       setCatalog(rows.map(toPosProduct));
       setCatalogError('');
@@ -237,15 +272,11 @@ export default function PosNewOrderPage() {
     (async () => {
       const ok = await loadCatalog({ silent: false });
       if (cancelled || ok) return;
-      // BE vừa restart / mạng chập chờn: tự thử lại tối đa 3 lần.
-      for (let attempt = 1; attempt <= 3 && !cancelled; attempt += 1) {
-        await new Promise((resolve) => {
-          retryTimer = window.setTimeout(resolve, 1500 * attempt);
-        });
-        if (cancelled) return;
-        const recovered = await loadCatalog({ silent: false });
-        if (recovered) return;
-      }
+      // One quick retry only — avoid multi-minute skeleton loops.
+      await new Promise((resolve) => {
+        retryTimer = window.setTimeout(resolve, 800);
+      });
+      if (!cancelled) await loadCatalog({ silent: false });
     })();
 
     window.addEventListener('focus', softRefresh);
@@ -698,6 +729,36 @@ export default function PosNewOrderPage() {
           setConfirmRemoveKey(null);
         }}
       />
+
+      <Modal
+        open={Boolean(paymentSuccess)}
+        onClose={dismissPaymentSuccess}
+        title="Payment successful"
+        size="sm"
+        footer={
+          <Button type="button" onClick={dismissPaymentSuccess}>
+            Close
+          </Button>
+        }
+      >
+        {paymentSuccess ? (
+          <div className="space-y-3 text-sm text-[var(--admin-text)]">
+            <p>
+              Invoice{' '}
+              <span className="font-semibold">{paymentSuccess.invoice}</span> completed
+              successfully.
+            </p>
+            {paymentSuccess.change != null && Number(paymentSuccess.change) > 0 ? (
+              <p className="text-[var(--admin-muted)]">
+                Change:{' '}
+                <span className="font-semibold text-[var(--admin-text)]">
+                  {formatVnd(paymentSuccess.change)}
+                </span>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={customerOpen}
