@@ -372,6 +372,50 @@ export function PosCartProvider({ children }) {
     [lines, totals, customer, appliedVoucher, clearCart],
   );
 
+  /**
+   * Chốt đơn PayOS. Server ghi đơn ở trạng thái PENDING_PAYMENT (kho đã trừ) rồi
+   * mới tạo được link thanh toán từ orderId. Cố ý KHÔNG dọn giỏ ở đây — giỏ chỉ
+   * được dọn khi payOS xác nhận đã nhận tiền, xem finishPayOSOrder.
+   */
+  const createPayOSOrder = useCallback(async () => {
+    if (lines.length === 0) {
+      return { ok: false, message: 'Cart is empty' };
+    }
+    if (checkoutInFlight.current) {
+      return { ok: false, message: 'Payment is already being processed' };
+    }
+    checkoutInFlight.current = true;
+    setCheckoutBusy(true);
+
+    try {
+      const order = await apiCheckout({
+        lines: lines.map((line) => ({ productId: line.productId, quantity: line.qty })),
+        paymentMethod: 'PAYOS',
+        cashReceived: null,
+        customerPhone: customer?.phone ?? null,
+        customerName: customer?.pending ? customer.fullName : null,
+        voucherCode: appliedVoucher?.code ?? null,
+        pointsToRedeem: totals.pointsUsed,
+      });
+      return { ok: true, order };
+    } catch (error) {
+      return { ok: false, message: error.message || 'Could not create the order' };
+    } finally {
+      checkoutInFlight.current = false;
+      setCheckoutBusy(false);
+    }
+  }, [lines, totals, customer, appliedVoucher]);
+
+  /** payOS báo PAID → đưa đơn vào lịch sử và dọn giỏ cho khách tiếp theo. */
+  const finishPayOSOrder = useCallback(
+    (order) => {
+      if (order) setOrderHistory((prev) => [order, ...prev]);
+      clearCart();
+      setPaymentOpen(false);
+    },
+    [clearCart],
+  );
+
   const value = useMemo(
     () => ({
       lines,
@@ -407,6 +451,8 @@ export function PosCartProvider({ children }) {
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,
+      createPayOSOrder,
+      finishPayOSOrder,
     }),
     [
       lines,
@@ -439,6 +485,8 @@ export function PosCartProvider({ children }) {
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,
+      createPayOSOrder,
+      finishPayOSOrder,
     ],
   );
 
