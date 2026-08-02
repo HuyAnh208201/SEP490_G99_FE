@@ -32,8 +32,12 @@ export async function searchCustomers(keyword) {
 }
 
 /** Tạo nhanh khách mới tại quầy → cùng shape với lookupCustomer. */
-export async function createCustomer({ fullName, phone }) {
-  const { data } = await http.post('/cashier/customer', { fullName, phone });
+export async function createCustomer({ fullName, phone, email }) {
+  const payload = { fullName, phone };
+  if (email != null && String(email).trim() !== '') {
+    payload.email = String(email).trim();
+  }
+  const { data } = await http.post('/cashier/customer', payload);
   return unwrap(data);
 }
 

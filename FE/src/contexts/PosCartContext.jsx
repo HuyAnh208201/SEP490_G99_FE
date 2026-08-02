@@ -18,9 +18,17 @@ import {
   lookupVoucher as apiLookupVoucher,
 } from '../api/posOrders.js';
 import { scanBarcode as apiScanBarcode } from '../api/barcode.js';
+import {
+  normalizePhone,
+  validateEmail,
+  validateRequiredName,
+  validateVnPhone,
+  NAME_MAX_LENGTH,
+} from '../lib/validation.js';
 
 /** Fallback khi chưa tải được cấu hình từ server; server vẫn là nguồn sự thật khi chốt đơn. */
 const DEFAULT_LOYALTY = { vndPerPoint: 10000, pointValueVnd: 1000 };
+const MAX_LINE_QTY = 10000;
 
 const PosCartContext = createContext(null);
 
@@ -139,14 +147,41 @@ export function PosCartProvider({ children }) {
   );
 
   const addProduct = useCallback((product, qty = 1) => {
-    if (!product || qty < 1) return false;
+    const requested = Math.floor(Number(qty) || 0);
+    if (!product || requested < 1) {
+      return { ok: false, message: 'Quantity must be at least 1.' };
+    }
+    const stock = Number(product.stock);
+    if (Number.isFinite(stock) && stock <= 0) {
+      return { ok: false, message: `"${product.name}" is out of stock.` };
+    }
+
+    const hardCap = Number.isFinite(stock) && stock > 0
+      ? Math.min(stock, MAX_LINE_QTY)
+      : MAX_LINE_QTY;
+
+    let outcome = { ok: true };
     setLines((prev) => {
       const key = lineKey(product.id);
       const existing = prev.find((l) => l.key === key);
+      const currentQty = existing?.qty ?? 0;
+      const nextQty = Math.min(currentQty + requested, hardCap);
+      if (nextQty <= currentQty) {
+        outcome = {
+          ok: false,
+          message: `Only ${hardCap} in stock for "${product.name}".`,
+        };
+        return prev;
+      }
+      if (nextQty < currentQty + requested) {
+        outcome = {
+          ok: true,
+          capped: true,
+          message: `Added up to stock limit (${hardCap}) for "${product.name}".`,
+        };
+      }
       if (existing) {
-        return prev.map((l) =>
-          l.key === key ? { ...l, qty: l.qty + qty } : l,
-        );
+        return prev.map((l) => (l.key === key ? { ...l, qty: nextQty, stock: product.stock } : l));
       }
       return [
         ...prev,
@@ -157,26 +192,27 @@ export function PosCartProvider({ children }) {
           code: product.code,
           name: product.name,
           category: product.category,
+          imageUrl: product.imageUrl ?? null,
           unit: product.unit,
           unitOriginal: product.price,
           unitPrice: unitPrice(product),
           hasPromo: hasPromo(product),
-          qty,
+          qty: nextQty,
           stock: product.stock,
         },
       ];
     });
-    return true;
+    return outcome;
   }, []);
 
   const addByBarcode = useCallback(
     async (barcode) => {
       const code = String(barcode ?? '').trim();
       if (!code) return { ok: false, message: 'Empty barcode' };
+      if (code.length > 64) return { ok: false, message: 'Barcode is too long' };
       try {
         const product = toPosProduct(await apiScanBarcode(code));
-        addProduct(product, 1);
-        return { ok: true, product };
+        return addProduct(product, 1);
       } catch (error) {
         return { ok: false, message: error.message || 'Product not found' };
       }
@@ -185,10 +221,35 @@ export function PosCartProvider({ children }) {
   );
 
   const updateQty = useCallback((key, qty) => {
+    const requested = Math.floor(Number(qty) || 0);
+    let outcome = { ok: true };
     setLines((prev) => {
-      if (qty <= 0) return prev.filter((l) => l.key !== key);
-      return prev.map((l) => (l.key === key ? { ...l, qty } : l));
+      const line = prev.find((l) => l.key === key);
+      if (!line) {
+        outcome = { ok: false, message: 'Cart line not found.' };
+        return prev;
+      }
+      if (requested <= 0) return prev.filter((l) => l.key !== key);
+
+      const stock = Number(line.stock);
+      if (Number.isFinite(stock) && stock <= 0) {
+        outcome = { ok: false, message: `"${line.name}" is out of stock.` };
+        return prev;
+      }
+      const hardCap = Number.isFinite(stock) && stock > 0
+        ? Math.min(stock, MAX_LINE_QTY)
+        : MAX_LINE_QTY;
+      const capped = Math.min(requested, hardCap);
+      if (capped < requested) {
+        outcome = {
+          ok: true,
+          capped: true,
+          message: `Only ${hardCap} in stock for "${line.name}".`,
+        };
+      }
+      return prev.map((l) => (l.key === key ? { ...l, qty: capped } : l));
     });
+    return outcome;
   }, []);
 
   const removeLine = useCallback((key) => {
@@ -208,70 +269,38 @@ export function PosCartProvider({ children }) {
     setPointsToRedeem(0);
   }, []);
 
-  /** Tra theo một phần SĐT / email / tên. Khớp đúng 1 người thì chọn luôn. */
-  const lookupCustomer = useCallback(async (keyword) => {
-    const value = String(keyword ?? '').trim();
-    setCustomerPhone(value);
-    setCustomerResults([]);
-    setCustomerNotFound(false);
-    if (!value) {
-      setCustomer(null);
-      setCustomerLookupError('');
-      setPointsToRedeem(0);
-      return { ok: true, retail: true };
-    }
-    setCustomerBusy(true);
-    try {
-      const matches = await apiSearchCustomers(value);
-      if (matches.length === 1) {
-        const found = toCustomer(matches[0]);
-        setCustomer(found);
-        setCustomerLookupError('');
-        return { ok: true, customer: found };
-      }
-      setCustomer(null);
-      setPointsToRedeem(0);
-      if (matches.length > 1) {
-        setCustomerResults(matches.map(toCustomer));
-        setCustomerLookupError('');
-        return { ok: true, multiple: true };
-      }
-      setCustomerNotFound(true);
-      setCustomerLookupError('');
-      return { ok: false, notFound: true };
-    } catch (error) {
-      setCustomer(null);
-      setPointsToRedeem(0);
-      setCustomerLookupError(error.message || 'Customer lookup failed');
-      return { ok: false };
-    } finally {
-      setCustomerBusy(false);
-    }
-  }, []);
-
-  const selectCustomer = useCallback((found) => {
-    setCustomer(found);
-    setCustomerResults([]);
-    setCustomerNotFound(false);
-    setCustomerLookupError('');
-    setPointsToRedeem(0);
-  }, []);
-
   /**
    * Gắn khách mới vào đơn nhưng CHƯA ghi DB — chỉ giữ tên + SĐT trong giỏ.
    * Khách chỉ được tạo thật khi thanh toán thành công, xem completeCashPayment.
    */
-  const stageNewCustomer = useCallback(({ fullName, phone }) => {
+  const stageNewCustomer = useCallback(({ fullName, phone, email = null }) => {
+    const nameError = validateRequiredName(fullName, {
+      label: 'Customer name',
+      max: NAME_MAX_LENGTH,
+    });
+    if (nameError) {
+      setCustomerLookupError(nameError);
+      return { ok: false, message: nameError };
+    }
+    const phoneError = validateVnPhone(phone, { required: true, label: 'Phone number' });
+    if (phoneError) {
+      setCustomerLookupError(phoneError);
+      return { ok: false, message: phoneError };
+    }
+    const number = normalizePhone(phone);
     const name = String(fullName ?? '').trim();
-    const number = String(phone ?? '').trim();
-    if (!name || !number) {
-      setCustomerLookupError('Enter both a name and a phone number.');
-      return { ok: false };
+    const mail = email == null || String(email).trim() === '' ? null : String(email).trim();
+    if (mail) {
+      const emailError = validateEmail(mail);
+      if (emailError) {
+        setCustomerLookupError(emailError);
+        return { ok: false, message: emailError };
+      }
     }
     setCustomer({
       id: null,
       fullName: name,
-      email: null,
+      email: mail,
       phone: number,
       points: 0,
       pending: true,
@@ -284,12 +313,66 @@ export function PosCartProvider({ children }) {
     return { ok: true };
   }, []);
 
+  /** Gỡ khách khỏi đơn hiện tại (không xóa tài khoản trong DB). */
+  const clearCustomer = useCallback(() => {
+    setCustomer(null);
+    setCustomerPhone('');
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    setCustomerLookupError('');
+    setPointsToRedeem(0);
+  }, []);
+
+  const selectCustomer = useCallback((found) => {
+    setCustomer(found);
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    setCustomerLookupError('');
+    setPointsToRedeem(0);
+  }, []);
+
+  /** Tra theo một phần SĐT / tên. Luôn hiện danh sách để cashier chọn, tránh chọn nhầm khi trùng tên. */
+  const lookupCustomer = useCallback(async (keyword) => {
+    const value = String(keyword ?? '').trim();
+    setCustomerPhone(value);
+    setCustomerResults([]);
+    setCustomerNotFound(false);
+    if (!value) {
+      setCustomerResults([]);
+      setCustomerNotFound(false);
+      setCustomerLookupError('');
+      return { ok: true, retail: true };
+    }
+    setCustomerBusy(true);
+    try {
+      const matches = await apiSearchCustomers(value);
+      if (matches.length === 0) {
+        setCustomerNotFound(true);
+        setCustomerLookupError('');
+        return { ok: false, notFound: true };
+      }
+      setCustomerResults(matches.map(toCustomer));
+      setCustomerLookupError('');
+      return { ok: true, multiple: matches.length > 1, count: matches.length };
+    } catch (error) {
+      setCustomerLookupError(error.message || 'Customer lookup failed');
+      return { ok: false };
+    } finally {
+      setCustomerBusy(false);
+    }
+  }, []);
+
   const applyDiscountCode = useCallback(async () => {
-    const code = discountCodeInput.trim();
+    const code = discountCodeInput.trim().toUpperCase();
     if (!code) {
       setAppliedVoucher(null);
       setDiscountCodeError('');
       return { ok: true };
+    }
+    if (!/^[A-Z0-9_-]{1,64}$/.test(code)) {
+      setAppliedVoucher(null);
+      setDiscountCodeError('Discount code format is invalid.');
+      return { ok: false };
     }
     setDiscountCodeBusy(true);
     try {
@@ -330,7 +413,8 @@ export function PosCartProvider({ children }) {
       if (lines.length === 0) {
         return { ok: false, message: 'Cart is empty' };
       }
-      if (receivedAmount < totals.total) {
+      const cash = Number(receivedAmount);
+      if (paymentMethod === 'CASH' && (!Number.isFinite(cash) || cash < totals.total)) {
         return { ok: false, message: 'Insufficient cash received' };
       }
       if (checkoutInFlight.current) {
@@ -347,7 +431,7 @@ export function PosCartProvider({ children }) {
           lines: lines.map((line) => ({ productId: line.productId, quantity: line.qty })),
           paymentMethod,
           cashReceived: paymentMethod === 'CASH' ? receivedAmount : null,
-          customerPhone: customer?.phone ?? null,
+          customerPhone: customer?.phone ? normalizePhone(customer.phone) : null,
           customerName: customer?.pending ? customer.fullName : null,
           voucherCode: appliedVoucher?.code ?? null,
           // pointsUsed đã bị chặn trên theo tổng đơn, không phải số thô cashier gõ.
@@ -403,6 +487,7 @@ export function PosCartProvider({ children }) {
       clearCart,
       lookupCustomer,
       selectCustomer,
+      clearCustomer,
       stageNewCustomer,
       applyDiscountCode,
       clearDiscountCode,
@@ -435,6 +520,7 @@ export function PosCartProvider({ children }) {
       clearCart,
       lookupCustomer,
       selectCustomer,
+      clearCustomer,
       stageNewCustomer,
       applyDiscountCode,
       clearDiscountCode,

@@ -50,3 +50,10 @@ body {
   color: var(--admin-text);
   background: var(--admin-bg);
 }
+
+/* Placeholder biến mất khi focus — vẫn hiện lại khi blur nếu ô trống. */
+input:focus::placeholder,
+textarea:focus::placeholder {
+  color: transparent;
+  opacity: 0;
+}

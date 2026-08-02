@@ -13,8 +13,11 @@ function unwrap(body) {
 }
 
 export async function fetchProducts() {
-  const { data } = await http.get('/products');
-  return unwrap(data);
+  // POS tải full catalog — timeout dài hơn default 15s để tránh “Could not load products”
+  // khi BE còn chậm (N+1 packaging cũ) hoặc mạng chập chờn.
+  const { data } = await http.get('/products', { timeout: 60000 });
+  const rows = unwrap(data);
+  return Array.isArray(rows) ? rows : [];
 }
 
 export async function fetchProductsPage(params = {}) {
