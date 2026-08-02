@@ -245,8 +245,7 @@ function RevenueDashboard({
           applyLabel="Apply filters"
         />
         <p className="mt-2 text-xs text-[var(--admin-muted)]">
-          Data synced · {periodLabel}
-          {isChainScope ? ` · ${selectedBranchName}` : ' · Your branch'}
+          {isChainScope ? `Scope · ${selectedBranchName}` : 'Scope · Your branch'}
         </p>
       </Card>
 
