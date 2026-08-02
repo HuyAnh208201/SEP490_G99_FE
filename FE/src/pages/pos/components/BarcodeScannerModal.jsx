@@ -67,7 +67,7 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
                 stopCamera();
                 // Tắt camera là khung hình đen ngay. Phải báo đang gọi API,
                 // không thì người dùng tưởng máy treo.
-                setStatus(`Đã đọc mã ${value} — đang tra cứu sản phẩm…`);
+                setStatus(`Read barcode ${value} — looking up product…`);
                 await onDetected(value);
               }
             } catch (error) {
@@ -75,7 +75,7 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
               // bộ giải mã hỏng thật (thường do wasm) — phải báo chứ không nuốt im lặng.
               failures += 1;
               if (failures >= 8) {
-                setStatus(`Không khởi động được bộ giải mã: ${error?.message || error}`);
+                setStatus(`Unable to start the barcode decoder: ${error?.message || error}`);
               }
             } finally {
               detectingRef.current = false;

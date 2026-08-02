@@ -132,7 +132,7 @@ export default function PosOrderTable({
                 </button>
               </div>
             ) : (
-              <p className="mt-1 text-xs text-[var(--admin-muted)]">Số lượng: {line.qty}</p>
+              <p className="mt-1 text-xs text-[var(--admin-muted)]">Quantity: {line.qty}</p>
             )}
           </li>
         ))}

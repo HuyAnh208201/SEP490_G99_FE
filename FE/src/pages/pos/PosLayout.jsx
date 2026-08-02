@@ -4,7 +4,9 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
 import { isShiftOpen } from '../../api/shiftSessions.js';
 import { PosCartProvider } from '../../contexts/PosCartContext.jsx';
+import { usePosClock } from '../../hooks/usePosClock.js';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
+import PosHelpDialog from './components/PosHelpDialog.jsx';
 
 const SHIFT_NAV = [
   {
@@ -63,21 +65,6 @@ const ORDER_NAV = [
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-    ),
-  },
-  {
-    to: '/pos/settings',
-    label: 'Account Settings',
-    icon: (
-      <>
-        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-      </>
     ),
   },
 ];
@@ -199,6 +186,24 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
   );
 }
 
+function shiftLabel(shiftNumber) {
+  if (shiftNumber === 1) return 'Morning';
+  if (shiftNumber === 2) return 'Afternoon';
+  if (shiftNumber === 3) return 'Evening';
+  return shiftNumber ? `Shift #${shiftNumber}` : 'Shift';
+}
+
+function formatShiftTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
+}
+
 export default function PosLayout() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -210,16 +215,33 @@ export default function PosLayout() {
     !location.pathname.startsWith('/pos/payment/');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const { now, online } = usePosClock();
 
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key !== 'F1') return;
+      event.preventDefault();
+      setHelpOpen(true);
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const headerTitle = location.pathname.startsWith('/pos/shift/')
     ? 'Shift'
     : isPayment
       ? 'Payment'
-      : 'Point of Sale';
+      : location.pathname.startsWith('/pos/settings')
+        ? 'Account Settings'
+        : 'Point of Sale';
+  const shift = session?.shift;
+  const currentShiftLabel = shiftLabel(shift?.shiftNumber);
+  const shiftTime = `${formatShiftTime(shift?.startTime)} – ${formatShiftTime(shift?.endTime)}`;
 
   return (
     <PosCartProvider>
@@ -227,15 +249,11 @@ export default function PosLayout() {
         className="flex h-screen overflow-hidden bg-[var(--admin-bg)] text-[var(--admin-text)]"
         style={{ '--pos-sidebar-width': '240px' }}
       >
-        <aside className="hidden h-full w-[var(--pos-sidebar-width)] shrink-0 flex-col border-r border-[var(--admin-border)] bg-[var(--admin-surface)] lg:flex">
-          <PosSidebarContent onSignOutClick={() => setConfirmSignOut(true)} />
-        </aside>
-
         {drawerOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="fixed inset-0 z-40">
             <button
               type="button"
-              aria-label="Đóng menu"
+              aria-label="Close menu"
               onClick={() => setDrawerOpen(false)}
               className="absolute inset-0 bg-black/40"
             />
@@ -252,47 +270,92 @@ export default function PosLayout() {
         )}
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between gap-2 border-b border-[var(--admin-border)] bg-white px-3 lg:px-5">
-            <div className="flex min-w-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(true)}
-                aria-label="Mở menu"
-                className="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--admin-muted)] transition hover:bg-[#f0f4f8] lg:hidden"
-              >
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
-                </svg>
-              </button>
-              <span className="truncate text-sm font-medium text-[var(--admin-muted)]">{headerTitle}</span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 text-xs text-[var(--admin-muted)] lg:gap-3">
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-[var(--admin-border)] bg-white px-3 lg:gap-3 lg:px-4">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open POS menu"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] transition hover:bg-[#f0f4f8]"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+              </svg>
+            </button>
+            <p className="min-w-0 truncate text-sm font-bold text-[var(--admin-text)]">
+              {session?.branchName || 'ChainStore'}
+              <span className="font-medium text-[var(--admin-subtle)]"> · {headerTitle}</span>
+            </p>
+
+            <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
               {isShiftOpen(session) && onWorkPage && (
                 <button
                   type="button"
                   onClick={() => navigate('/pos/shift/closing')}
-                  className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] hover:bg-[#f0f4f8]"
+                  className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--admin-text)] transition hover:bg-[#f0f4f8]"
                 >
                   End shift
                 </button>
               )}
-              <span className="flex items-center gap-1.5 font-semibold text-[var(--admin-success)]">
-                <span className="h-2 w-2 rounded-full bg-[var(--admin-success)]" />
-                ONLINE
+              <span
+                className={`hidden items-center gap-1.5 text-xs font-semibold sm:flex ${
+                  online ? 'text-[var(--admin-success)]' : 'text-[var(--admin-subtle)]'
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    online ? 'bg-[var(--admin-success)]' : 'bg-[var(--admin-subtle)]'
+                  }`}
+                />
+                {online ? 'ONLINE' : 'OFFLINE'}
               </span>
-              <span className="hidden sm:inline">
+              <span className="hidden tabular-nums text-xs text-[var(--admin-muted)] lg:inline">
                 {new Intl.DateTimeFormat('en-GB', {
                   dateStyle: 'short',
-                  timeStyle: 'short',
-                }).format(new Date())}
+                  timeStyle: 'medium',
+                  hour12: false,
+                }).format(now)}
               </span>
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                title="Quick guide (F1)"
+                aria-label="Open POS help"
+                className="hidden h-9 w-9 items-center justify-center rounded-lg border border-[var(--admin-border)] text-sm font-bold text-[var(--admin-muted)] transition hover:bg-[#f0f4f8] hover:text-[var(--admin-brand)] sm:flex"
+              >
+                ?
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/pos/settings')}
+                title="Account Settings"
+                className="flex items-center gap-2 rounded-lg border border-transparent py-1 pl-2 pr-1 transition hover:border-[var(--admin-border)] hover:bg-[#f0f4f8] lg:pl-3"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0058be]/10 text-[11px] font-bold text-[var(--admin-brand)]">
+                  {(session?.employeeName || 'Cashier')
+                    .split(' ')
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase()}
+                </div>
+                <div className="hidden min-w-0 text-left leading-tight sm:block">
+                  <p className="truncate text-xs font-semibold text-[var(--admin-text)]">
+                    {session?.employeeName || 'Cashier'}
+                  </p>
+                  <p className="truncate text-[11px] text-[var(--admin-muted)]">
+                    {isShiftOpen(session) ? `${currentShiftLabel} · ${shiftTime}` : 'No open shift'}
+                  </p>
+                </div>
+              </button>
             </div>
           </div>
-          <main className="min-h-0 flex-1 overflow-y-auto">
+          <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>
         </div>
       </div>
+
+      <PosHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
 
       <ConfirmDialog
         open={confirmSignOut}
