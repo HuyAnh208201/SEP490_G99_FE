@@ -120,7 +120,7 @@ export default function OrderHistoryPage() {
   }));
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+    <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
       <PosPageTitle title="Order History" />
 
       {location.state?.completedInvoice && (
@@ -369,6 +369,6 @@ export default function OrderHistoryPage() {
           {refundError && <p className="text-sm text-red-600">{refundError}</p>}
         </div>
       </Modal>
-    </main>
+    </div>
   );
 }

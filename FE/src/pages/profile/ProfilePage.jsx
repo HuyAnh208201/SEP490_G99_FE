@@ -9,6 +9,16 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PasswordInput from '../../components/ui/PasswordInput.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
+import {
+  normalizePhone,
+  validateBirthDate,
+  validateEmail,
+  validateNewPassword,
+  validateRequiredName,
+  validateVnPhone,
+  PASSWORD_MIN_LENGTH,
+  PROFILE_NAME_MAX_LENGTH,
+} from '../../lib/validation.js';
 
 const TABS = [
   { id: 'profile', label: 'Profile' },
@@ -19,7 +29,7 @@ const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateCurrentUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'security' ? 'security' : 'profile';
 
@@ -95,16 +105,37 @@ export default function ProfilePage() {
     e.preventDefault();
     setProfileError('');
     setProfileSuccess('');
+
+    const validationError =
+      validateRequiredName(form.firstName, {
+        label: 'First name',
+        max: PROFILE_NAME_MAX_LENGTH,
+      }) ||
+      validateRequiredName(form.lastName, {
+        label: 'Last name',
+        max: PROFILE_NAME_MAX_LENGTH,
+      }) ||
+      validateEmail(form.email, { required: true }) ||
+      validateVnPhone(form.phone, { required: false, label: 'Phone number' }) ||
+      validateBirthDate(form.birthDate);
+    if (validationError) {
+      setProfileError(validationError);
+      return;
+    }
+
     setProfileLoading(true);
     try {
+      const phone = normalizePhone(form.phone);
       await updateProfile({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        email: form.email,
-        phone: form.phone || undefined,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: phone || undefined,
         gender: form.gender || undefined,
         birthDate: form.birthDate || undefined,
       });
+      const refreshed = await fetchMe();
+      updateCurrentUser(refreshed);
       setProfileSuccess('Profile updated successfully.');
     } catch (err) {
       setProfileError(err.message || 'Unable to update profile');
@@ -118,12 +149,17 @@ export default function ProfilePage() {
     setPasswordError('');
     setPasswordSuccess('');
 
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters.');
+    if (!passwordForm.oldPassword) {
+      setPasswordError('Current password is required.');
       return;
     }
-    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      setPasswordError('Password confirmation does not match.');
+    const passwordErrorMessage = validateNewPassword(
+      passwordForm.newPassword,
+      passwordForm.confirmNewPassword,
+      { oldPassword: passwordForm.oldPassword },
+    );
+    if (passwordErrorMessage) {
+      setPasswordError(passwordErrorMessage);
       return;
     }
 
@@ -186,6 +222,7 @@ export default function ProfilePage() {
                     </span>
                     <input
                       required
+                      maxLength={PROFILE_NAME_MAX_LENGTH}
                       value={form.firstName}
                       onChange={updateProfileField('firstName')}
                       className={inputClass}
@@ -193,9 +230,11 @@ export default function ProfilePage() {
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      Last name
+                      Last name *
                     </span>
                     <input
+                      required
+                      maxLength={PROFILE_NAME_MAX_LENGTH}
                       value={form.lastName}
                       onChange={updateProfileField('lastName')}
                       className={inputClass}
@@ -275,7 +314,7 @@ export default function ProfilePage() {
         {activeTab === 'security' && (
           <form onSubmit={handlePasswordSubmit} className="space-y-5" noValidate>
             <p className="text-sm text-[var(--admin-muted)]">
-              Use a strong password you do not reuse elsewhere. Minimum 6 characters.
+                Use a strong password you do not reuse elsewhere. Minimum {PASSWORD_MIN_LENGTH} characters.
             </p>
 
             <PasswordInput
