@@ -39,6 +39,7 @@ import InventoryPage from './pages/pos/InventoryPage.jsx';
 import SettingsPage from './pages/pos/SettingsPage.jsx';
 import CashPaymentPage from './pages/pos/CashPaymentPage.jsx';
 import PayOSPaymentPage from './pages/pos/PayOSPaymentPage.jsx';
+import PosPaymentPage from './pages/pos/PosPaymentPage.jsx';
 import ShiftOpeningPage from './pages/shift/ShiftOpeningPage.jsx';
 import ShiftClosingPage from './pages/shift/ShiftClosingPage.jsx';
 import ShiftHistoryPage from './pages/shift/ShiftHistoryPage.jsx';
@@ -87,6 +88,7 @@ export default function App() {
             <Route path="/pos/history" element={<OrderHistoryPage />} />
             <Route path="/pos/inventory" element={<InventoryPage />} />
             <Route path="/pos/settings" element={<SettingsPage />} />
+            <Route path="/pos/payment" element={<PosPaymentPage />} />
             <Route path="/pos/payment/cash" element={<CashPaymentPage />} />
             <Route path="/pos/payment/payos" element={<PayOSPaymentPage />} />
           </Route>

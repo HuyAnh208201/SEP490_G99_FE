@@ -5,12 +5,17 @@ export function toPosProduct(product) {
     barcode: product.barcode,
     code: product.code,
     name: product.name,
+    description: product.description ?? null,
     unit: product.unit,
     price: Number(product.defaultSalePrice),
     promoPrice: null,
     stock: product.branchStock ?? product.warehouseStock ?? 0,
+    imageUrl: product.imageUrl ?? null,
     categoryId: product.categoryId,
     category: product.categoryName ?? 'Uncategorized',
+    // products table hiện chưa có NSX/HSD — giữ null để UI chỉ hiện khi DB bổ sung sau.
+    manufacturedAt: product.manufacturedAt ?? product.manufactureDate ?? null,
+    expiryDate: product.expiryDate ?? product.expiredAt ?? null,
   };
 }
 

@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
 import { scanBarcode } from '../../api/barcode.js';
 import { fetchProducts } from '../../api/products.js';
 import { fetchScanEvents, pushScanEvent } from '../../api/posScan.js';
 import { toPosProduct } from './posProduct.js';
-import CheckoutDialog from './components/CheckoutDialog.jsx';
+import { ALL_PRODUCTS_ID, categoryAccent, categoryInitials } from './categoryAccent.js';
+import useDebouncedValue from '../../hooks/useDebouncedValue.js';
+import { isTypingTarget } from './posHotkeys.js';
+import Modal from '../../components/ui/Modal.jsx';
 import ConfirmDialog from './components/ConfirmDialog.jsx';
-import OrderSummary from './components/OrderSummary.jsx';
-import PosOrderTable from './components/PosOrderTable.jsx';
-import PosPageTitle from './components/PosPageTitle.jsx';
-import ProductQtyPopup from './components/ProductQtyPopup.jsx';
+import ProductInfoPopup from './components/ProductInfoPopup.jsx';
 import BarcodeScannerModal from './components/BarcodeScannerModal.jsx';
+import PosProductImage from './components/PosProductImage.jsx';
+import PosCartPanel from './components/PosCartPanel.jsx';
+import { createCustomer as apiCreateCustomer } from '../../api/cashier.js';
+import { validateEmail, validateRequiredName, validateVnPhone } from '../../lib/validation.js';
+
+// Cảnh báo sắp hết hàng cho thu ngân, không phải ngưỡng đặt hàng lại của kho.
+const LOW_STOCK_THRESHOLD = 5;
 
 export default function PosNewOrderPage() {
+  const navigate = useNavigate();
   const {
     lines,
     customer,
@@ -28,6 +37,7 @@ export default function PosNewOrderPage() {
     setDiscountCodeInput,
     appliedVoucher,
     discountCodeError,
+    discountCodeBusy,
     totals,
     addProduct,
     updateQty,
@@ -35,26 +45,34 @@ export default function PosNewOrderPage() {
     clearCart,
     lookupCustomer,
     selectCustomer,
+    clearCustomer,
     stageNewCustomer,
     applyDiscountCode,
     clearDiscountCode,
-    paymentOpen,
-    setPaymentOpen,
   } = usePosCart();
 
   const [query, setQuery] = useState('');
   const [phone, setPhone] = useState('');
   const [newCustomerName, setNewCustomerName] = useState('');
-  // Bỏ trống thì lấy luôn chuỗi vừa tra — nhưng cashier tra bằng tên thì phải sửa lại được.
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
-  const [showResults, setShowResults] = useState(false);
+  const [newCustomerEmail, setNewCustomerEmail] = useState('');
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [customerFormError, setCustomerFormError] = useState('');
+  const debouncedCustomerQuery = useDebouncedValue(phone, 300);
   const [popupProduct, setPopupProduct] = useState(null);
-  const [pendingProduct, setPendingProduct] = useState(null);
-  const [pendingQty, setPendingQty] = useState(1);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmRemoveKey, setConfirmRemoveKey] = useState(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [customerOpen, setCustomerOpen] = useState(false);
+  const [selectedLineKey, setSelectedLineKey] = useState(null);
+  const searchInputRef = useRef(null);
   const [scanMessage, setScanMessage] = useState('');
   const [catalog, setCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState('');
+  const catalogRequestRef = useRef(0);
+  const [activeCategory, setActiveCategory] = useState(ALL_PRODUCTS_ID);
   // Bật trên điện thoại: quét xong GỬI mã sang máy bán hàng thay vì thêm vào giỏ máy này.
   // Nhớ vào localStorage để điện thoại không phải bật lại mỗi lần mở trang.
   const [relayMode, setRelayMode] = useState(
@@ -65,35 +83,177 @@ export default function PosNewOrderPage() {
     localStorage.setItem('pos_relay_mode', relayMode ? '1' : '0');
   }, [relayMode]);
 
-  const loadCatalog = useCallback(async () => {
+  // Keep cart selection valid when lines change.
+  useEffect(() => {
+    if (!selectedLineKey) return;
+    if (!lines.some((line) => line.key === selectedLineKey)) {
+      setSelectedLineKey(lines[0]?.key ?? null);
+    }
+  }, [lines, selectedLineKey]);
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key === 'F1') return; // handled in PosLayout help
+      if (customerOpen || scannerOpen || popupProduct || confirmClear || confirmRemoveKey) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setCustomerOpen(false);
+          setScannerOpen(false);
+          setPopupProduct(null);
+          setConfirmClear(false);
+          setConfirmRemoveKey(null);
+          setAddCustomerOpen(false);
+        }
+        return;
+      }
+
+      if (event.key === 'F2') {
+        event.preventDefault();
+        setScannerOpen(true);
+        return;
+      }
+      if (event.key === 'F3') {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select?.();
+        return;
+      }
+      if (event.key === 'F4') {
+        event.preventDefault();
+        if (lines.length) navigate('/pos/payment');
+        return;
+      }
+      if (event.key === 'F9') {
+        event.preventDefault();
+        setCustomerOpen(true);
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        return;
+      }
+
+      if (isTypingTarget(event.target)) return;
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        if (!lines.length) return;
+        event.preventDefault();
+        const index = Math.max(0, lines.findIndex((line) => line.key === selectedLineKey));
+        const next =
+          event.key === 'ArrowDown'
+            ? lines[Math.min(lines.length - 1, (index < 0 ? -1 : index) + 1)]
+            : lines[Math.max(0, (index < 0 ? 0 : index) - 1)];
+        if (next) setSelectedLineKey(next.key);
+        return;
+      }
+
+      const selected = lines.find((line) => line.key === selectedLineKey) || lines[0];
+      if (!selected) return;
+
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        if (!selectedLineKey) setSelectedLineKey(selected.key);
+        updateQty(selected.key, selected.qty + 1);
+        return;
+      }
+      if (event.key === '-' || event.key === '_') {
+        event.preventDefault();
+        if (!selectedLineKey) setSelectedLineKey(selected.key);
+        if (selected.qty <= 1) setConfirmRemoveKey(selected.key);
+        else updateQty(selected.key, selected.qty - 1);
+        return;
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        if (!selectedLineKey) setSelectedLineKey(selected.key);
+        setConfirmRemoveKey(selected.key);
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    confirmClear,
+    confirmRemoveKey,
+    customerOpen,
+    lines,
+    navigate,
+    popupProduct,
+    scannerOpen,
+    selectedLineKey,
+    updateQty,
+  ]);
+
+  // Gõ tên/SĐT → sau 300ms tự search, hiện list ngay dưới để cashier bấm chọn.
+  useEffect(() => {
+    if (!customerOpen || addCustomerOpen) return undefined;
+    const term = debouncedCustomerQuery.trim();
+    if (term.length < 1) {
+      lookupCustomer('');
+      return undefined;
+    }
+    lookupCustomer(term);
+    return undefined;
+  }, [customerOpen, addCustomerOpen, debouncedCustomerQuery, lookupCustomer]);
+
+  const loadCatalog = useCallback(async ({ silent = false } = {}) => {
+    // Nhịp tải nền (focus/đổi tab) có thể về sau nhịp mới hơn — chỉ nhận kết quả
+    // của lần gọi cuối cùng để danh sách không bị nhảy về dữ liệu cũ.
+    const requestId = catalogRequestRef.current + 1;
+    catalogRequestRef.current = requestId;
+    if (!silent) setCatalogLoading(true);
     try {
       const rows = await fetchProducts();
+      if (requestId !== catalogRequestRef.current) return false;
       setCatalog(rows.map(toPosProduct));
-      if (!rows.length) setScanMessage('Chi nhánh chưa có sản phẩm nào.');
+      setCatalogError('');
+      return true;
     } catch (error) {
-      setCatalog([]);
-      setScanMessage(
-        `Không tải được sản phẩm từ server: ${error.message || 'lỗi kết nối'}. Kiểm tra backend (cổng 4313) rồi tải lại trang.`,
-      );
+      if (requestId !== catalogRequestRef.current) return false;
+      // Giữ nguyên catalog đang hiển thị: một nhịp tải nền hỏng không được làm
+      // trắng quầy hàng khi thu ngân đang bán dở.
+      const message =
+        error.code === 'ECONNABORTED' || /timeout/i.test(String(error.message || ''))
+          ? 'Product catalog took too long to load. Tap Retry.'
+          : error.message || 'connection error';
+      setCatalogError(message);
+      return false;
+    } finally {
+      if (requestId === catalogRequestRef.current) setCatalogLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let active = true;
-    const refresh = () => {
-      if (active) loadCatalog();
+    let cancelled = false;
+    let retryTimer;
+
+    const softRefresh = () => {
+      if (!cancelled) loadCatalog({ silent: true });
     };
     const onVisible = () => {
-      if (!document.hidden) refresh();
+      if (!document.hidden) softRefresh();
     };
-    refresh();
-    // Sản phẩm vừa tạo ở tab khác sẽ không có trong catalog đã nạp — nạp lại khi
-    // quay lại tab/cửa sổ, để thu ngân không phải F5 thủ công.
-    window.addEventListener('focus', refresh);
+
+    (async () => {
+      const ok = await loadCatalog({ silent: false });
+      if (cancelled || ok) return;
+      // BE vừa restart / mạng chập chờn: tự thử lại tối đa 3 lần.
+      for (let attempt = 1; attempt <= 3 && !cancelled; attempt += 1) {
+        await new Promise((resolve) => {
+          retryTimer = window.setTimeout(resolve, 1500 * attempt);
+        });
+        if (cancelled) return;
+        const recovered = await loadCatalog({ silent: false });
+        if (recovered) return;
+      }
+    })();
+
+    window.addEventListener('focus', softRefresh);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      active = false;
-      window.removeEventListener('focus', refresh);
+      cancelled = true;
+      window.clearTimeout(retryTimer);
+      window.removeEventListener('focus', softRefresh);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [loadCatalog]);
@@ -115,11 +275,16 @@ export default function PosNewOrderPage() {
         for (const event of feed.events ?? []) {
           try {
             const product = toPosProduct(await scanBarcode(event.barcode));
-            addProduct(product, 1);
-            setScanMessage(`Từ điện thoại: đã thêm "${product.name}" vào giỏ.`);
+            const result = addProduct(product, 1);
+            setScanMessage(
+              result.message ||
+                (result.ok
+                  ? `Added "${product.name}" from the phone scanner.`
+                  : `Phone barcode ${event.barcode}: could not add to cart.`),
+            );
           } catch (error) {
             setScanMessage(
-              `Mã ${event.barcode} từ điện thoại: ${error.message || 'không xử lý được.'}`,
+              `Phone barcode ${event.barcode}: ${error.message || 'could not be processed.'}`,
             );
           }
         }
@@ -138,90 +303,68 @@ export default function PosNewOrderPage() {
     };
   }, [relayMode, addProduct]);
 
-  const searchTerm = pendingProduct ? '' : query.trim().toLowerCase();
+  const categories = useMemo(() => {
+    const counts = new Map();
+    for (const product of catalog) {
+      const name = product.category || 'Uncategorized';
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ id: name, name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [catalog]);
 
-  const results = useMemo(() => {
-    if (!searchTerm || pendingProduct) return [];
-    return catalog
-      .filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchTerm) ||
-          product.code.toLowerCase().includes(searchTerm) ||
-          (product.barcode ?? '').includes(searchTerm) ||
-          (product.category ?? '').toLowerCase().includes(searchTerm),
-      )
-      .slice(0, 8);
-  }, [searchTerm, pendingProduct, catalog]);
+  const visibleProducts = useMemo(() => {
+    const searchTerm = query.trim().toLowerCase();
+    return catalog.filter((product) => {
+      const categoryMatches =
+        activeCategory === ALL_PRODUCTS_ID || product.category === activeCategory;
+      const searchMatches =
+        !searchTerm ||
+        product.name.toLowerCase().includes(searchTerm) ||
+        product.code.toLowerCase().includes(searchTerm) ||
+        (product.barcode ?? '').includes(searchTerm) ||
+        (product.category ?? '').toLowerCase().includes(searchTerm);
+      return categoryMatches && searchMatches;
+    });
+  }, [activeCategory, catalog, query]);
 
-  function openProductPopup(product) {
-    setPopupProduct(product);
-    setShowResults(false);
-  }
+  const activeAccent = categoryAccent(activeCategory);
 
-  function confirmPendingProduct(product, qty) {
-    setPendingProduct(product);
-    setPendingQty(qty);
-    setQuery(`${product.name} × ${qty}`);
-    setPopupProduct(null);
-    setShowResults(false);
-  }
-
-  function clearPending() {
-    setPendingProduct(null);
-    setPendingQty(1);
-    setQuery('');
-  }
-
-  /** Enter = CHỈ tìm sản phẩm, chưa thêm vào giỏ. Thêm vào giỏ là việc của nút "Add item". */
   async function lookupProduct() {
-    if (pendingProduct) return; // đã tìm ra rồi, bấm "Add item" để thêm
-
     const term = query.trim();
     if (!term) return;
 
-    // Chuỗi toàn số = barcode → tra DB qua API, đưa vào trạng thái chờ thêm.
     if (/^\d{6,}$/.test(term)) {
-      setScanMessage(`Đang tra mã ${term}…`);
+      setScanMessage(`Looking up barcode ${term}…`);
       try {
         if (relayMode) {
           const sent = await pushScanEvent(term);
-          setScanMessage(`Đã gửi "${sent.name}" sang máy bán hàng.`);
+          setScanMessage(`Sent "${sent.name}" to the checkout terminal.`);
           setQuery('');
-          setShowResults(false);
           return;
         }
         const product = toPosProduct(await scanBarcode(term));
-        confirmPendingProduct(product, 1);
-        setScanMessage(`Đã tìm thấy "${product.name}". Bấm "Add item" để thêm vào giỏ.`);
+        const result = addProduct(product, 1);
+        setQuery('');
+        setScanMessage(
+          result.message ||
+            (result.ok
+              ? `Added "${product.name}" to the cart.`
+              : 'Could not add product to the cart.'),
+        );
       } catch (error) {
         setScanMessage(error.message || 'Product not found.');
-        setShowResults(true);
       }
       return;
     }
 
-    // Gõ đúng mã sản phẩm (SKU) → mở popup chọn số lượng.
     const exact = catalog.find(
       (product) => product.code.toLowerCase() === term.toLowerCase(),
     );
     if (exact) {
-      openProductPopup(exact);
-      return;
+      setPopupProduct(exact);
     }
-
-    setShowResults(true);
-  }
-
-  /** Nút "Add item" — chỉ thêm sản phẩm đã tìm ra trước đó. */
-  function commitPendingToCart() {
-    if (!pendingProduct) {
-      setScanMessage('Chưa chọn sản phẩm. Gõ mã hoặc tên rồi nhấn Enter để tìm trước.');
-      setShowResults(true);
-      return;
-    }
-    addProduct(pendingProduct, pendingQty);
-    setScanMessage(`Đã thêm "${pendingProduct.name}" vào giỏ.`);
-    clearPending();
   }
 
   function handleProductSearch(event) {
@@ -229,23 +372,23 @@ export default function PosNewOrderPage() {
     lookupProduct();
   }
 
-  /**
-   * Camera đọc được mã → tra DB và THÊM THẲNG vào giỏ (không cần bấm "Add item").
-   * Khác với gõ tay + Enter: gõ tay chỉ tìm, phải bấm "Add item" mới thêm.
-   */
   async function handleCameraDetected(barcode) {
     try {
       if (relayMode) {
         const sent = await pushScanEvent(barcode);
-        setScanMessage(`Đã đọc mã ${barcode} → đã gửi "${sent.name}" sang máy bán hàng.`);
+        setScanMessage(`Scanned ${barcode} and sent "${sent.name}" to the checkout terminal.`);
         return;
       }
       const product = toPosProduct(await scanBarcode(barcode));
-      addProduct(product, 1);
-      setScanMessage(`Đã đọc mã ${barcode} → đã thêm "${product.name}" vào giỏ.`);
+      const result = addProduct(product, 1);
+      setScanMessage(
+        result.message ||
+          (result.ok
+            ? `Scanned ${barcode} and added "${product.name}" to the cart.`
+            : `Barcode ${barcode}: could not add to cart.`),
+      );
     } catch (error) {
-      // Luôn kèm mã đọc được để biết camera đọc ra cái gì khi tra không thấy.
-      setScanMessage(`Mã ${barcode}: ${error.message || 'không xử lý được.'}`);
+      setScanMessage(`Barcode ${barcode}: ${error.message || 'could not be processed.'}`);
     } finally {
       setScannerOpen(false);
     }
@@ -253,422 +396,594 @@ export default function PosNewOrderPage() {
 
   return (
     <>
-      <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
-        <PosPageTitle title="Product Cart" />
-
-        <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,1fr)_330px]">
-          <div className="min-w-0 space-y-4">
-            <section className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)]">
-              <div className="border-b border-[var(--admin-border)] px-4 py-4">
-                <form onSubmit={handleProductSearch} className="relative">
-                  {/* Bọc riêng icon + input: trên mobile hàng nút nằm trong luồng làm
-                      form cao lên, nếu căn icon theo form thì icon bị tụt khỏi ô nhập. */}
-                  <div className="relative">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-subtle)]"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.7"
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 lg:p-4">
+        <div className="grid items-start gap-3 xl:grid-cols-[240px_minmax(0,1fr)_360px] 2xl:grid-cols-[260px_minmax(0,1fr)_390px]">
+          <aside className="overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)] xl:sticky xl:top-3">
+            <div className="border-b border-[var(--admin-border)] px-4 py-3">
+              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--admin-muted)]">Categories</h2>
+              <p className="mt-0.5 text-xs text-[var(--admin-subtle)]">{catalog.length} products</p>
+            </div>
+            {/* Dưới xl xếp thành chip tự xuống dòng để không phải kéo ngang. */}
+            <nav className="flex flex-wrap gap-1.5 p-2 xl:max-h-[calc(100vh-152px)] xl:flex-nowrap xl:flex-col xl:overflow-y-auto">
+              {[
+                { id: ALL_PRODUCTS_ID, name: 'All products', count: catalog.length },
+                ...categories,
+              ].map((category) => {
+                const accent = categoryAccent(category.id);
+                const selected = activeCategory === category.id;
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => setActiveCategory(category.id)}
+                    style={
+                      selected
+                        ? { backgroundColor: accent.bg, borderColor: accent.border, color: accent.text }
+                        : undefined
+                    }
+                    className={`flex shrink-0 items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left text-sm transition xl:w-full ${
+                      selected
+                        ? 'font-semibold shadow-sm'
+                        : 'border-transparent text-[var(--admin-muted)] hover:bg-[#f0f4f8] hover:text-[var(--admin-text)]'
+                    }`}
                   >
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-extrabold"
+                      style={{ backgroundColor: accent.bg, color: accent.text }}
+                    >
+                      {category.id === ALL_PRODUCTS_ID ? (
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M4 5h6v6H4zM14 5h6v6h-6zM4 13h6v6H4zM14 13h6v6h-6z" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        categoryInitials(category.name)
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate xl:whitespace-normal xl:break-words">
+                      {category.name}
+                    </span>
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+                      style={{ backgroundColor: accent.bg, color: accent.text }}
+                    >
+                      {category.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-3 rounded-2xl border border-[var(--admin-border)] bg-white p-3 shadow-[var(--shadow-card)]">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <form onSubmit={handleProductSearch} className="relative min-w-0 flex-1">
+                  <svg viewBox="0 0 24 24" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--admin-subtle)]" fill="none" stroke="currentColor" strokeWidth="1.7">
                     <circle cx="11" cy="11" r="7" />
                     <path d="m16.5 16.5 4 4" strokeLinecap="round" />
                   </svg>
                   <input
+                    ref={searchInputRef}
                     autoFocus
                     value={query}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (pendingProduct) {
-                        clearPending();
-                      }
-                      setQuery(value);
-                      setShowResults(true);
-                    }}
-                    onFocus={() => {
-                      if (!pendingProduct) setShowResults(true);
-                    }}
-                    placeholder="Scan barcode or search products to add to cart..."
-                    className="w-full rounded-lg border border-[var(--admin-border)] bg-white py-3 pl-10 pr-3 text-base outline-none transition placeholder:text-[var(--admin-subtle)] focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15 sm:py-2.5 sm:pr-24 sm:text-sm"
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search by product, barcode, or category (F3)"
+                    className="w-full rounded-xl border border-[var(--admin-border)] bg-[#fbfcfe] py-3 pl-10 pr-3 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:bg-white focus:ring-2 focus:ring-[#0058be]/15"
                   />
-                  </div>
-                  {/* Mobile: 2 nút xuống dòng, to đủ để bấm bằng ngón tay.
-                      Từ sm trở lên: nhét lại vào trong ô input như thiết kế gốc. */}
-                  <div className="mt-2 flex gap-2 sm:absolute sm:right-1.5 sm:top-1/2 sm:mt-0 sm:-translate-y-1/2 sm:gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setScannerOpen(true)}
-                      title="Scan with camera"
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--admin-brand)] py-3 text-sm font-semibold text-[var(--admin-brand)] hover:bg-[#0058be]/5 sm:flex-none sm:rounded-md sm:px-2 sm:py-1.5 sm:text-xs"
-                    >
-                      <svg viewBox="0 0 24 24" className="h-4 w-4 sm:hidden" fill="none" stroke="currentColor" strokeWidth="1.7">
-                        <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
-                      </svg>
-                      Scan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={commitPendingToCart}
-                      className="flex-1 rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white hover:bg-[var(--admin-brand-hover)] sm:flex-none sm:rounded-md sm:px-3 sm:py-1.5 sm:text-xs"
-                    >
-                      Add item
-                    </button>
-                  </div>
-                  {showResults && !pendingProduct && query && (
-                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-20 overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]">
-                      {results.length ? (
-                        results.map((product) => (
-                          <button
-                            key={product.id}
-                            type="button"
-                            onClick={() => openProductPopup(product)}
-                            className="flex w-full items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3 text-left last:border-0 hover:bg-[#f7f9fb]"
-                          >
-                            <span className="min-w-0">
-                              <span className="block truncate text-sm font-medium">{product.name}</span>
-                              <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-[var(--admin-subtle)]">
-                                <span className="rounded border border-[var(--admin-border)] bg-[#f7f9fb] px-1.5 py-0.5 font-semibold text-[var(--admin-muted)]">
-                                  {product.category}
-                                </span>
-                                <span className="font-mono">{product.code}</span>
-                                {product.barcode ? (
-                                  <span className="font-mono text-[var(--admin-muted)]">{product.barcode}</span>
-                                ) : null}
-                                <span>· Stock {product.stock}</span>
-                              </span>
-                            </span>
-                            <span className="shrink-0 text-right">
-                              {product.promoPrice != null && (
-                                <span className="block text-[11px] text-[var(--admin-subtle)] line-through">
-                                  {formatVnd(product.price)}
-                                </span>
-                              )}
-                              <span className="text-sm font-semibold text-[var(--admin-brand)]">
-                                {formatVnd(product.promoPrice ?? product.price)}
-                              </span>
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="px-4 py-3 text-sm text-[var(--admin-subtle)]">No product found.</p>
-                      )}
-                    </div>
-                  )}
                 </form>
-                {pendingProduct && (
-                  <p className="mt-2 text-xs text-[var(--admin-muted)]">
-                    Đã tìm thấy: <span className="font-semibold text-[var(--admin-text)]">{pendingProduct.name}</span>
-                    {' · '}Số lượng {pendingQty}. Bấm <strong>Add item</strong> để thêm vào giỏ.
-                  </p>
-                )}
-                <label
-                  className={[
-                    'mt-3 flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition',
-                    relayMode
-                      ? 'border-[var(--admin-brand)]/40 bg-[#0058be]/5'
-                      : 'border-[var(--admin-border)] bg-white',
-                  ].join(' ')}
-                >
-                  <input
-                    type="checkbox"
-                    checked={relayMode}
-                    onChange={(event) => setRelayMode(event.target.checked)}
-                    className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--admin-brand)]"
-                  />
-                  <span className="text-xs leading-relaxed text-[var(--admin-muted)]">
-                    <strong className="block text-sm text-[var(--admin-text)]">Scanner mode</strong>
-                    Enable on your <strong>phone</strong>: After scanning, send the code to the vending machine instead of
-                    adding it to the cart on this machine. The vending machine is turned <strong>off</strong>.
-                  </span>
-                </label>
-
-                {relayMode && (
-                  <button
-                    type="button"
-                    onClick={() => setScannerOpen(true)}
-                    className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] py-4 text-base font-bold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)]"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
-                    </svg>
-                    Quét mã gửi sang máy bán hàng
-                  </button>
-                )}
-
-                {scanMessage && <p className="mt-2 text-xs text-[var(--admin-muted)]">{scanMessage}</p>}
-              </div>
-
-              <PosOrderTable
-                lines={lines}
-                editable
-                updateQty={updateQty}
-                removeLine={removeLine}
-              />
-
-              <div className="flex items-center justify-between border-t border-[var(--admin-border)] px-4 py-3">
                 <button
                   type="button"
-                  onClick={() => setConfirmClear(true)}
-                  disabled={!lines.length}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--admin-muted)] transition hover:bg-[#f7f9fb] disabled:opacity-40"
+                  onClick={() => setScannerOpen(true)}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)]"
                 >
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.7">
-                    <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" />
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
                   </svg>
-                  Clear Entire Cart
-                </button>
-                <span className="text-xs text-[var(--admin-subtle)]">
-                  {totals.itemCount} items in cart
-                </span>
-              </div>
-            </section>
-
-            <OrderSummary totals={totals} appliedCode={appliedVoucher?.code} />
-          </div>
-
-          <aside className="space-y-4 2xl:sticky 2xl:top-0">
-            <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 shadow-[var(--shadow-card)]">
-              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--admin-muted)]">
-                Campaign discount code
-              </h2>
-              <input
-                value={discountCodeInput}
-                onChange={(event) => setDiscountCodeInput(event.target.value.toUpperCase())}
-                placeholder="Enter a discount code"
-                className="mt-3 w-full rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm uppercase outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
-              />
-              {appliedVoucher ? (
-                <div className="mt-2 rounded-lg border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 p-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold text-[var(--admin-success)]">Code applied</p>
-                      <p className="text-xs text-[var(--admin-muted)]">
-                        {appliedVoucher.name}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={clearDiscountCode}
-                      className="text-xs font-semibold text-[var(--admin-brand)] hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={applyDiscountCode}
-                  className="mt-2 w-full rounded-lg bg-[var(--admin-brand)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
-                >
-                  Apply Discount Code
-                </button>
-              )}
-              {discountCodeError && (
-                <p className="mt-2 text-xs text-[var(--admin-danger)]">{discountCodeError}</p>
-              )}
-            </section>
-
-            <section className="rounded-xl border border-[var(--admin-border)] bg-white p-4 shadow-[var(--shadow-card)]">
-              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--admin-muted)]">
-                Customer
-              </h2>
-              <div className="mt-3 flex gap-2">
-                <input
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') lookupCustomer(phone);
-                  }}
-                  placeholder="Phone, name or email"
-                  className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] px-3 py-2.5 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
-                />
-                <button
-                  type="button"
-                  disabled={customerBusy}
-                  onClick={() => lookupCustomer(phone)}
-                  className="rounded-lg border border-[var(--admin-brand)] px-3 py-2.5 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5 disabled:opacity-45"
-                >
-                  {customerBusy ? 'Searching…' : 'Look Up'}
-                </button>
-                <button
-                  type="button"
-                  title="Scan customer QR"
-                  className="flex w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--admin-border)] text-[var(--admin-muted)] transition hover:bg-[#f7f9fb]"
-                >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v6h-6v-2M14 18h2" />
-                  </svg>
+                  Scan
+                  <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F2</kbd>
                 </button>
               </div>
-              {customerLookupError && (
-                <p className="mt-2 text-xs text-[var(--admin-danger)]">{customerLookupError}</p>
-              )}
-
-              {customerResults.length > 0 && (
-                <div className="mt-3 overflow-hidden rounded-lg border border-[var(--admin-border)]">
-                  <p className="border-b border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                    {customerResults.length} matches · pick one
-                  </p>
-                  <ul className="max-h-52 overflow-y-auto">
-                    {customerResults.map((match) => (
-                      <li key={match.id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            selectCustomer(match);
-                            setPhone(match.phone || '');
-                          }}
-                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition hover:bg-[#0058be]/5"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                              {match.fullName}
-                            </span>
-                            <span className="block truncate text-xs text-[var(--admin-muted)]">
-                              {match.phone}
-                            </span>
-                          </span>
-                          <span className="shrink-0 text-xs font-bold text-[var(--admin-brand)]">
-                            {match.points} pts
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {customerNotFound && !customer && (
-                <div className="mt-3 rounded-lg border border-dashed border-[var(--admin-border)] bg-[#f7f9fb] p-3">
-                  <p className="text-xs font-semibold text-[var(--admin-text)]">
-                    No customer matches &ldquo;{phone}&rdquo;
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--admin-muted)]">
-                    Add their name to this order. They are saved to the system once payment
-                    completes.
-                  </p>
-                  <input
-                    value={newCustomerName}
-                    onChange={(event) => setNewCustomerName(event.target.value)}
-                    placeholder="Customer name"
-                    className="mt-2 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="h-8 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: activeAccent.text }}
                   />
-                  <input
-                    value={newCustomerPhone || phone}
-                    onChange={(event) => setNewCustomerPhone(event.target.value)}
-                    placeholder="Phone number"
-                    inputMode="tel"
-                    className="mt-2 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
-                  />
-                  <button
-                    type="button"
-                    disabled={!newCustomerName.trim() || !(newCustomerPhone || phone).trim()}
-                    onClick={() => {
-                      const result = stageNewCustomer({
-                        fullName: newCustomerName,
-                        phone: newCustomerPhone || phone,
-                      });
-                      if (result.ok) {
-                        setNewCustomerName('');
-                        setNewCustomerPhone('');
-                      }
-                    }}
-                    className="mt-2 w-full rounded-lg bg-[var(--admin-brand)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
-                  >
-                    Add customer to order
-                  </button>
-                </div>
-              )}
-
-              {customer ? (
-                <div className="mt-3 rounded-lg border border-[#0058be]/15 bg-[#0058be]/5 p-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">{customer.fullName}</p>
-                      <p className="text-xs text-[var(--admin-muted)]">
-                        {customer.phone}
-                        {customer.email ? ` · ${customer.email}` : ''}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-[var(--admin-brand)]">
-                      {customer.pending ? 'New' : `${customer.points} pts`}
-                    </span>
-                  </div>
-                  {/* Khách mới chưa có điểm nào để đổi. */}
-                  {customer.points > 0 && (
-                    <>
-                      <label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
-                        Redeem points · 1 point = {formatVnd(loyalty.pointValueVnd)}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max={customer.points}
-                        value={pointsToRedeem}
-                        onChange={(event) =>
-                          setPointsToRedeem(
-                            Math.max(0, Math.min(customer.points, Number(event.target.value) || 0)),
-                          )
-                        }
-                        className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)]"
-                      />
-                      {/* Đổi nhiều hơn giá trị đơn thì phần thừa không bị trừ. */}
-                      {totals.pointsUsed < pointsToRedeem && (
-                        <p className="mt-1 text-[11px] text-amber-700">
-                          Only {totals.pointsUsed} points fit this order · the rest stays on the
-                          account.
-                        </p>
-                      )}
-                    </>
-                  )}
-                  {totals.pointsEarned > 0 && (
-                    <p className="mt-2 text-xs font-medium text-[var(--admin-success)]">
-                      Customer will earn +{totals.pointsEarned} points.
+                  <div>
+                    <h1 className="text-lg font-bold text-[var(--admin-text)]">
+                      {activeCategory === ALL_PRODUCTS_ID ? 'All products' : activeCategory}
+                    </h1>
+                    <p className="text-xs text-[var(--admin-subtle)]">
+                      {catalogLoading && !catalog.length
+                        ? 'Loading products…'
+                        : `${visibleProducts.length} products found`}
                     </p>
-                  )}
-                  <p className="mt-2 text-[11px] text-[var(--admin-subtle)]">
-                    {customer.pending
-                      ? 'This customer and their points are saved once payment completes.'
-                      : 'Points are settled once payment completes.'}
-                  </p>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-2 text-xs text-[var(--admin-subtle)]">Retail customer · no points</p>
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-[var(--admin-muted)]">
+                    <input type="checkbox" checked={relayMode} onChange={(event) => setRelayMode(event.target.checked)} className="h-4 w-4 accent-[var(--admin-brand)]" />
+                    Phone scanner relay
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => loadCatalog()}
+                    disabled={catalogLoading}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--admin-border)] px-3 text-xs font-semibold text-[var(--admin-muted)] transition hover:bg-[#f0f4f8] hover:text-[var(--admin-text)] disabled:opacity-40"
+                  >
+                    <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 ${catalogLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              {catalogError && catalog.length > 0 && (
+                <p className="mt-2 rounded-lg bg-[var(--admin-danger-bg)] px-3 py-2 text-xs font-medium text-[var(--admin-danger)]">
+                  Showing the last loaded list — could not refresh products: {catalogError}
+                </p>
               )}
-            </section>
+              {scanMessage && <p className="mt-2 rounded-lg bg-[#f0f4f8] px-3 py-2 text-xs text-[var(--admin-muted)]">{scanMessage}</p>}
+            </div>
 
-            <button
-              type="button"
-              disabled={!lines.length}
-              onClick={() => setPaymentOpen(true)}
-              className="flex w-full items-center justify-between rounded-lg bg-[var(--admin-brand)] px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <span>Proceed to Payment</span>
-              <span>{formatVnd(totals.total)}</span>
-            </button>
-          </aside>
+            {catalogLoading && !catalog.length ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div
+                    key={index}
+                    className="animate-pulse overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white p-2.5 shadow-[var(--shadow-card)]"
+                  >
+                    <div className="h-24 w-full rounded-xl bg-[#eef2f6] sm:h-28" />
+                    <div className="space-y-2 px-1 pb-1 pt-3">
+                      <div className="h-3.5 w-4/5 rounded bg-[#eef2f6]" />
+                      <div className="h-3 w-2/5 rounded bg-[#f2f5f8]" />
+                      <div className="h-5 w-1/2 rounded-full bg-[#eef2f6]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : catalogError && !catalog.length ? (
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--admin-danger)]/35 bg-white p-8 text-center">
+                <p className="font-semibold text-[var(--admin-danger)]">Could not load products</p>
+                <p className="mt-1 max-w-sm text-sm text-[var(--admin-muted)]">{catalogError}</p>
+                <button
+                  type="button"
+                  onClick={() => loadCatalog()}
+                  className="mt-4 rounded-xl bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)]"
+                >
+                  Retry
+                </button>
+              </div>
+            ) : !catalog.length ? (
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--admin-border)] bg-white p-8 text-center">
+                <p className="font-semibold text-[var(--admin-text)]">No products at this branch</p>
+                <button type="button" onClick={() => loadCatalog()} className="mt-4 rounded-xl bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)]">
+                  Refresh
+                </button>
+              </div>
+            ) : visibleProducts.length ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4">
+                {visibleProducts.map((product) => {
+                  const soldOut = product.stock <= 0;
+                  const lowStock = !soldOut && product.stock <= LOW_STOCK_THRESHOLD;
+                  const accent = categoryAccent(product.category);
+                  return (
+                    <article
+                      key={product.id}
+                      className={`group relative overflow-hidden rounded-2xl border bg-white p-2.5 shadow-[var(--shadow-card)] transition ${
+                        soldOut ? 'border-[var(--admin-border)] opacity-60' : 'border-[var(--admin-border)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-elevated)]'
+                      }`}
+                      style={soldOut ? undefined : { borderTopColor: accent.text, borderTopWidth: '3px' }}
+                    >
+                      <button type="button" disabled={soldOut} onClick={() => setPopupProduct(product)} className="block w-full text-left">
+                        <div className="relative">
+                          <PosProductImage
+                            src={product.imageUrl}
+                            name={product.name}
+                            accent={accent}
+                            className="h-24 w-full rounded-xl sm:h-28"
+                          />
+                          <span
+                            className="absolute left-1.5 top-1.5 max-w-[80%] truncate rounded-full px-2 py-0.5 text-[10px] font-bold"
+                            style={{ backgroundColor: accent.bg, color: accent.text }}
+                          >
+                            {product.category}
+                          </span>
+                          {soldOut && (
+                            <span className="absolute right-1.5 top-1.5 rounded-full bg-[var(--admin-danger-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--admin-danger)]">
+                              Sold out
+                            </span>
+                          )}
+                          {lowStock && (
+                            <span className="absolute right-1.5 top-1.5 rounded-full bg-[#fdf0dc] px-2 py-0.5 text-[10px] font-bold text-[var(--admin-warning)]">
+                              Low stock
+                            </span>
+                          )}
+                        </div>
+                        <div className="px-1 pb-1 pt-2">
+                          <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-[var(--admin-text)]">{product.name}</p>
+                          <p className="mt-0.5 truncate text-[11px] text-[var(--admin-subtle)]">
+                            {product.barcode || 'No barcode'} · Stock {product.stock}
+                          </p>
+                          <span
+                            className="mt-2 inline-flex rounded-full px-2.5 py-1 text-sm font-extrabold"
+                            style={{ backgroundColor: accent.bg, color: accent.text }}
+                          >
+                            {formatVnd(product.price)}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={soldOut}
+                        onClick={() => {
+                          const result = addProduct(product, 1);
+                          setScanMessage(
+                            result.message ||
+                              (result.ok
+                                ? `Added "${product.name}" to the cart.`
+                                : `Could not add "${product.name}".`),
+                          );
+                        }}
+                        className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--admin-brand)] text-xl font-bold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)] disabled:bg-[var(--admin-subtle)]"
+                        aria-label={`Add ${product.name} to cart`}
+                      >
+                        +
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--admin-border)] bg-white p-8 text-center">
+                <p className="font-semibold text-[var(--admin-text)]">No matching products</p>
+                <button type="button" onClick={() => { setQuery(''); setActiveCategory(ALL_PRODUCTS_ID); }} className="mt-4 text-sm font-semibold text-[var(--admin-brand)] hover:underline">
+                  Show all products
+                </button>
+              </div>
+            )}
+          </section>
+
+          <PosCartPanel
+            lines={lines}
+            totals={totals}
+            customer={customer}
+            appliedVoucher={appliedVoucher}
+            discountCodeInput={discountCodeInput}
+            discountCodeError={discountCodeError}
+            discountCodeBusy={discountCodeBusy}
+            setDiscountCodeInput={setDiscountCodeInput}
+            applyDiscountCode={applyDiscountCode}
+            clearDiscountCode={clearDiscountCode}
+            updateQty={updateQty}
+            removeLine={removeLine}
+            onOpenCustomer={() => setCustomerOpen(true)}
+            onClearCart={() => setConfirmClear(true)}
+            onCheckout={() => navigate('/pos/payment')}
+            selectedKey={selectedLineKey}
+            onSelectLine={setSelectedLineKey}
+          />
         </div>
-      </main>
+      </div>
 
-      <ProductQtyPopup
+      <ProductInfoPopup
         open={Boolean(popupProduct)}
         product={popupProduct}
         onClose={() => setPopupProduct(null)}
-        onConfirm={confirmPendingProduct}
       />
 
       <ConfirmDialog
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
-        title="Clear entire cart"
-        message="Remove all products from the cart? This cannot be undone."
-        confirmLabel="Clear cart"
+        title="Cancel order"
+        message="Clear the entire cart and cancel this order? Customer, discount code, and redeemed points will also be reset."
+        confirmLabel="Cancel order"
         danger
         onConfirm={clearCart}
       />
 
-      <CheckoutDialog open={paymentOpen} onClose={() => setPaymentOpen(false)} />
+      <ConfirmDialog
+        open={Boolean(confirmRemoveKey)}
+        onClose={() => setConfirmRemoveKey(null)}
+        title="Remove product"
+        message={
+          confirmRemoveKey
+            ? `Remove "${lines.find((line) => line.key === confirmRemoveKey)?.name || 'this item'}" from the cart?`
+            : ''
+        }
+        confirmLabel="Remove"
+        danger
+        onConfirm={() => {
+          if (confirmRemoveKey) removeLine(confirmRemoveKey);
+          setConfirmRemoveKey(null);
+        }}
+      />
+
+      <Modal
+        open={customerOpen}
+        onClose={() => {
+          setCustomerOpen(false);
+          setAddCustomerOpen(false);
+        }}
+        title="Customer"
+        size="md"
+      >
+        <div className="space-y-4">
+          {!addCustomerOpen && (
+            <>
+              <div className="relative">
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      lookupCustomer(phone);
+                    }
+                  }}
+                  placeholder="Name or phone number"
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-[var(--admin-border)] px-3 py-2.5 text-sm outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                />
+                {customerBusy && (
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-[var(--admin-subtle)]">
+                    Searching…
+                  </span>
+                )}
+              </div>
+
+              {customerResults.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-[var(--admin-border)] shadow-[var(--shadow-card)]">
+                  <div className="grid grid-cols-[1fr_1.2fr_auto] gap-2 border-b border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+                    <span>Phone</span>
+                    <span>Name</span>
+                    <span>Points</span>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto">
+                    {customerResults.map((match) => (
+                      <button
+                        key={match.id}
+                        type="button"
+                        onClick={() => {
+                          selectCustomer(match);
+                          setPhone('');
+                        }}
+                        className="grid w-full grid-cols-[1fr_1.2fr_auto] gap-2 border-b border-[var(--admin-border)] px-3 py-2.5 text-left last:border-0 hover:bg-[#0058be]/10"
+                      >
+                        <span className="truncate text-sm tabular-nums text-[var(--admin-muted)]">{match.phone || '—'}</span>
+                        <span className="truncate text-sm font-semibold">{match.fullName}</span>
+                        <span className="text-xs font-bold text-[var(--admin-brand)]">{match.points} pts</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {customerNotFound && !customer && phone.trim() && !customerBusy && (
+                <div className="rounded-xl border border-dashed border-[var(--admin-border)] bg-[#f7f9fb] p-4">
+                  <p className="text-sm font-semibold">No matching customer</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddCustomerOpen(true);
+                      setNewCustomerPhone(phone);
+                    }}
+                    className="mt-3 w-full rounded-xl bg-[var(--admin-brand)] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
+                  >
+                    Add new customer
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {(customerLookupError || customerFormError) && (
+            <p className="text-sm text-[var(--admin-danger)]">{customerLookupError || customerFormError}</p>
+          )}
+
+          {addCustomerOpen && (
+            <div className="rounded-xl border border-[var(--admin-border)] bg-white p-4">
+              <p className="text-sm font-semibold text-[var(--admin-text)]">New customer</p>
+              <div className="mt-3 grid gap-2">
+                <input
+                  value={newCustomerName}
+                  onChange={(event) => setNewCustomerName(event.target.value)}
+                  placeholder="Full name"
+                  maxLength={100}
+                  className="rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                />
+                <input
+                  value={newCustomerPhone}
+                  onChange={(event) => setNewCustomerPhone(event.target.value)}
+                  placeholder="Phone number"
+                  inputMode="tel"
+                  maxLength={20}
+                  className="rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                />
+                <input
+                  value={newCustomerEmail}
+                  onChange={(event) => setNewCustomerEmail(event.target.value)}
+                  placeholder="Email (optional)"
+                  type="email"
+                  maxLength={255}
+                  className="rounded-xl border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddCustomerOpen(false)}
+                  className="rounded-xl border border-[var(--admin-border)] py-2.5 text-sm font-semibold transition hover:bg-[#f7f9fb]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={createBusy || !newCustomerName.trim() || !newCustomerPhone.trim()}
+                  onClick={async () => {
+                    const nameError = validateRequiredName(newCustomerName, { label: 'Customer name' });
+                    if (nameError) {
+                      setCustomerFormError(nameError);
+                      return;
+                    }
+                    const phoneError = validateVnPhone(newCustomerPhone, { required: true });
+                    if (phoneError) {
+                      setCustomerFormError(phoneError);
+                      return;
+                    }
+                    if (newCustomerEmail.trim()) {
+                      const emailError = validateEmail(newCustomerEmail.trim());
+                      if (emailError) {
+                        setCustomerFormError(emailError);
+                        return;
+                      }
+                    }
+                    setCustomerFormError('');
+                    setCreateBusy(true);
+                    try {
+                      const created = await apiCreateCustomer({
+                        fullName: newCustomerName,
+                        phone: newCustomerPhone,
+                        email: newCustomerEmail.trim() || undefined,
+                      });
+                      selectCustomer({
+                        id: created.customerId,
+                        fullName: created.fullName,
+                        email: created.email,
+                        phone: created.phone,
+                        points: created.totalPoints ?? 0,
+                        pending: false,
+                      });
+                      setPhone(created.phone || '');
+                      setNewCustomerName('');
+                      setNewCustomerPhone('');
+                      setNewCustomerEmail('');
+                      setAddCustomerOpen(false);
+                    } catch (error) {
+                      const staged = stageNewCustomer({
+                        fullName: newCustomerName,
+                        phone: newCustomerPhone,
+                        email: newCustomerEmail,
+                      });
+                      if (!staged.ok) {
+                        setCustomerFormError(error.message || staged.message || 'Could not create customer.');
+                      } else {
+                        setAddCustomerOpen(false);
+                        setCustomerFormError('');
+                      }
+                    } finally {
+                      setCreateBusy(false);
+                    }
+                  }}
+                  className="rounded-xl bg-[var(--admin-brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:opacity-40"
+                >
+                  {createBusy ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!addCustomerOpen && (
+            <button
+              type="button"
+              onClick={() => {
+                setAddCustomerOpen(true);
+                if (!newCustomerPhone) setNewCustomerPhone(phone);
+              }}
+              className="w-full rounded-xl border border-dashed border-[var(--admin-brand)]/40 py-2.5 text-sm font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
+            >
+              + Add new customer
+            </button>
+          )}
+
+          {customer ? (
+            <div className="rounded-xl border border-[#0058be]/20 bg-[#0058be]/5 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold">{customer.fullName}</p>
+                  <p className="text-xs text-[var(--admin-muted)]">
+                    {customer.phone}
+                    {customer.email && !String(customer.email).endsWith('@guest.chainstore.com')
+                      ? ` · ${customer.email}`
+                      : ''}
+                  </p>
+                  {customer.id != null && (
+                    <p className="mt-1 text-[11px] font-medium text-[var(--admin-subtle)]">
+                      Customer ID · KH-{String(customer.id).padStart(5, '0')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-[var(--admin-brand)]">
+                    {customer.pending ? 'New customer' : `${customer.points} pts`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearCustomer();
+                      setPhone('');
+                    }}
+                    className="text-xs font-semibold text-[var(--admin-danger)] transition hover:underline"
+                  >
+                    Remove customer
+                  </button>
+                </div>
+              </div>
+              {customer.points > 0 && (
+                <label className="mt-4 block text-xs font-semibold text-[var(--admin-muted)]">
+                  Redeem points · 1 point = {formatVnd(loyalty.pointValueVnd)}
+                  <input
+                    type="number"
+                    min="0"
+                    max={Math.min(
+                      customer.points,
+                      loyalty.pointValueVnd > 0
+                        ? Math.floor(
+                            Math.max(0, totals.subtotalAfterPromo - totals.codeDiscount) /
+                              loyalty.pointValueVnd,
+                          )
+                        : 0,
+                    )}
+                    step="1"
+                    value={pointsToRedeem}
+                    onChange={(event) => {
+                      const afterDiscount = Math.max(
+                        0,
+                        totals.subtotalAfterPromo - totals.codeDiscount,
+                      );
+                      const byAmount =
+                        loyalty.pointValueVnd > 0
+                          ? Math.floor(afterDiscount / loyalty.pointValueVnd)
+                          : 0;
+                      const maxAffordable = Math.min(customer.points, byAmount);
+                      const raw = Math.floor(Number(event.target.value) || 0);
+                      setPointsToRedeem(Math.max(0, Math.min(maxAffordable, raw)));
+                    }}
+                    className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm outline-none"
+                  />
+                </label>
+              )}
+              {(totals.pointsUsed > 0 || totals.pointsEarned > 0) && (
+                <p className="mt-3 text-xs font-medium text-[var(--admin-success)]">
+                  {totals.pointsUsed > 0 ? `${totals.pointsUsed} points will be redeemed. ` : ''}
+                  {totals.pointsEarned > 0 ? `This order will earn ${totals.pointsEarned} points.` : ''}
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => {
+              setCustomerOpen(false);
+              setAddCustomerOpen(false);
+            }}
+            className="w-full rounded-xl bg-[var(--admin-brand)] py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
+          >
+            Done
+          </button>
+        </div>
+      </Modal>
       <BarcodeScannerModal
         open={scannerOpen}
         onClose={() => setScannerOpen(false)}

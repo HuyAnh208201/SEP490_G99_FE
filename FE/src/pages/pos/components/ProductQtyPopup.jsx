@@ -14,7 +14,9 @@ export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
 
   const price = unitPrice(product);
   const subtotal = price * qty;
-  const maxStock = product.stock ?? 9999;
+  const stock = Number(product.stock);
+  const maxStock = Number.isFinite(stock) && stock > 0 ? stock : 0;
+  const canConfirm = maxStock > 0 && qty >= 1 && qty <= maxStock;
 
   return (
     <Modal open={open} onClose={onClose} title={product.name} size="sm">
@@ -60,13 +62,17 @@ export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
           </span>
           <button
             type="button"
+            disabled={qty >= maxStock}
             onClick={() => setQty((value) => Math.min(maxStock, value + 1))}
-            className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
+            className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8] disabled:opacity-40"
             aria-label="Increase quantity"
           >
             +
           </button>
         </div>
+        {maxStock <= 0 && (
+          <p className="mt-2 text-xs text-[var(--admin-danger)]">This product is out of stock.</p>
+        )}
       </div>
 
       <div className="mt-4 flex items-center justify-between text-sm">
@@ -76,8 +82,9 @@ export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
 
       <button
         type="button"
+        disabled={!canConfirm}
         onClick={() => onConfirm?.(product, qty)}
-        className="mt-5 w-full rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
+        className="mt-5 w-full rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
       >
         Confirm
       </button>
