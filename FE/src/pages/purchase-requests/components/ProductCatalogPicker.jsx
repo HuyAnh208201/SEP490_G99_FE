@@ -156,9 +156,11 @@ export default function ProductCatalogPicker({
                 filtered.map((p) => {
                   const hasStock = p.currentStock != null && p.currentStock !== '';
                   const stock = hasStock ? Number(p.currentStock) : null;
-                  const low =
-                    hasStock &&
-                    stock <= (p.reorderPoint != null ? Number(p.reorderPoint) : 10);
+                  const reorder =
+                    p.reorderPoint != null && p.reorderPoint !== ''
+                      ? Number(p.reorderPoint)
+                      : null;
+                  const low = hasStock && reorder != null && reorder > 0 && stock <= reorder;
                   return (
                     <tr
                       key={p.id}

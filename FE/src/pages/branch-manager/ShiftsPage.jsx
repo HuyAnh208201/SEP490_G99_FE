@@ -474,16 +474,19 @@ export default function ShiftsPage() {
         s.cashiers.length + s.inventoryStaff.length <= MAX_EMPLOYEES_PER_SHIFT &&
         (!(s.first || s.last) || s.inventoryStaff.length >= 1),
     );
-    if (ready.length < editable.length || editable.length < 1) return;
+    if (ready.length < 1) return;
 
+    const skipped = editable.length - ready.length;
     const ok = window.confirm(
-      `Assign and publish ${editable.length} slot(s) for this week? This cannot partially succeed.`,
+      skipped > 0
+        ? `Publish ${ready.length} ready slot(s)? ${skipped} empty/incomplete slot(s) will be skipped (holidays / days off).`
+        : `Assign and publish ${ready.length} slot(s) for this week?`,
     );
     if (!ok) return;
     setBusy('setup-publish');
     setSetupError('');
     try {
-      const slotsPayload = editable.map((s) => ({
+      const slotsPayload = ready.map((s) => ({
         startTime: s.startTime.length === 16 ? `${s.startTime}:00` : s.startTime,
         endTime: s.endTime.length === 16 ? `${s.endTime}:00` : s.endTime,
         openingCash: s.first ? (s.openingCash ?? null) : null,

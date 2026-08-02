@@ -330,7 +330,10 @@ export default function PosNewOrderPage() {
                                 <span className="rounded border border-[var(--admin-border)] bg-[#f7f9fb] px-1.5 py-0.5 font-semibold text-[var(--admin-muted)]">
                                   {product.category}
                                 </span>
-                                <span>{product.code}</span>
+                                <span className="font-mono">{product.code}</span>
+                                {product.barcode ? (
+                                  <span className="font-mono text-[var(--admin-muted)]">{product.barcode}</span>
+                                ) : null}
                                 <span>· Stock {product.stock}</span>
                               </span>
                             </span>

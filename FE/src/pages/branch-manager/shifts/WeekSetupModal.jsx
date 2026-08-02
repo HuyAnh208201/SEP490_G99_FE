@@ -86,12 +86,15 @@ export default function WeekSetupModal({
         onClose();
       }}
       title="Set up week & publish"
-      description={`${weekStart || ''} · assign up to ${MAX_EMPLOYEES_PER_SHIFT} staff per slot, then publish the whole week`}
+      description={`${weekStart || ''} · assign up to ${MAX_EMPLOYEES_PER_SHIFT} staff per slot. Empty slots (holidays / days off) can be skipped.`}
       size="full"
       footer={
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm text-[var(--admin-muted)]">
             {setupProgress.ready}/{setupProgress.total} slots ready
+            {setupProgress.ready < setupProgress.total
+              ? ' — empty slots will be skipped'
+              : ''}
             {setupProgress.published > 0 ? ` · ${setupProgress.published} already published` : ''}
           </span>
           <div className="flex gap-2">
@@ -100,14 +103,10 @@ export default function WeekSetupModal({
             </Button>
             <Button
               loading={busy === 'setup-publish'}
-              disabled={
-                setupLoading ||
-                setupProgress.total < 1 ||
-                setupProgress.ready < setupProgress.total
-              }
+              disabled={setupLoading || setupProgress.ready < 1}
               onClick={onPublish}
             >
-              Publish week
+              Publish ready slots
             </Button>
           </div>
         </div>

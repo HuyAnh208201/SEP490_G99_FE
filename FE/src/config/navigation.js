@@ -162,12 +162,6 @@ export const NAV_GROUPS = [
     label: 'Branch operations',
     items: [
       {
-        path: '/branch-manager',
-        label: 'Branch (BM)',
-        icon: 'branch',
-        permissions: ['BRANCH_DASHBOARD'],
-      },
-      {
         path: '/purchase-requests',
         label: 'Import requests',
         icon: 'request',
@@ -200,36 +194,14 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Executive',
-    items: [
-      {
-        path: '/director',
-        label: 'Director',
-        icon: 'chart',
-        permissions: ['DIRECTOR_DASHBOARD'],
-      },
-      {
-        path: '/director/reports',
-        label: 'Performance reports',
-        icon: 'report',
-        permissions: ['BUSINESS_PERFORMANCE_REPORTS'],
-      },
-      {
-        path: '/director/planning',
-        label: 'Strategic planning',
-        icon: 'plan',
-        permissions: ['STRATEGIC_PLANNING_OVERVIEW'],
-      },
-    ],
-  },
-  {
     label: 'Reports',
     items: [
       {
         path: '/reports',
-        label: 'Reports',
+        label: 'Revenue & reports',
         icon: 'report',
-        permissions: ['REPORTS_VIEW'],
+        anyPermission: true,
+        permissions: ['REPORTS_VIEW', 'BUSINESS_PERFORMANCE_REPORTS'],
       },
     ],
   },
@@ -256,5 +228,5 @@ export const SETUP_WORKFLOW = [
   { step: 7, label: 'Import requests', path: '/purchase-requests' },
   { step: 8, label: 'Products', path: '/catalog/products' },
   { step: 9, label: 'Shifts', path: '/branch-manager/shifts' },
-  { step: 10, label: 'Reports', path: '/director/reports' },
+  { step: 10, label: 'Reports', path: '/reports' },
 ];
