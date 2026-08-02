@@ -37,7 +37,7 @@ export default function InventoryPage() {
         if (!active) return;
         setAllProducts([]);
         setLoadError(
-          `Không tải được sản phẩm từ server: ${error.message || 'lỗi kết nối'}. Kiểm tra backend (cổng 4313) rồi tải lại trang.`,
+          `Could not load products from the server: ${error.message || 'connection error'}. Check the backend (port 4313) then reload the page.`,
         );
       })
       .finally(() => {
@@ -56,7 +56,7 @@ export default function InventoryPage() {
   );
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
+    <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
       <PosPageTitle title="Inventory Products" />
 
       <section className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)]">
@@ -141,9 +141,9 @@ export default function InventoryPage() {
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-[var(--admin-subtle)]">
                     {loading
-                      ? 'Đang tải sản phẩm từ server...'
+                      ? 'Loading products from the server…'
                       : loadError
-                        ? 'Không có dữ liệu để hiển thị.'
+                        ? 'No data to display.'
                         : 'No matching products.'}
                   </td>
                 </tr>
@@ -162,6 +162,6 @@ export default function InventoryPage() {
         </div>
         <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </section>
-    </main>
+    </div>
   );
 }
