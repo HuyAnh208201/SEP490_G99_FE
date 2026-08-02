@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatMoneyInput, formatVnd, parseMoneyInput } from '../../lib/money.js';
 import { usePosCart } from '../../contexts/PosCartContext.jsx';
@@ -7,26 +7,8 @@ import { isTypingTarget } from './posHotkeys.js';
 
 const METHODS = [
   { id: 'cash', label: 'Cash', hint: 'Receive cash & return change · shortcut 1' },
-  { id: 'payos', label: 'PayOS', hint: 'Customer pays via PayOS gateway · shortcut 2' },
+  { id: 'payos', label: 'PayOS', hint: 'Customer pays via PayOS QR · shortcut 2' },
 ];
-
-/** Demo poll window until real PayOS session API is wired. */
-const PAYOS_TIMEOUT_MS = 5 * 60 * 1000;
-
-function StatusBadge({ tone, children }) {
-  const tones = {
-    idle: 'bg-[#f0f4f8] text-[var(--admin-muted)]',
-    pending: 'bg-[#0058be]/10 text-[var(--admin-brand)]',
-    success: 'bg-[#e4f6ec] text-[var(--admin-success)]',
-    danger: 'bg-[var(--admin-danger-bg)] text-[var(--admin-danger)]',
-    warn: 'bg-[#fdf0dc] text-[var(--admin-warning)]',
-  };
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${tones[tone] || tones.idle}`}>
-      {children}
-    </span>
-  );
-}
 
 export default function PosPaymentPage() {
   const navigate = useNavigate();
@@ -43,7 +25,6 @@ export default function PosPaymentPage() {
   const initialMethod = searchParams.get('method') === 'payos' ? 'payos' : 'cash';
   const [method, setMethod] = useState(initialMethod);
 
-  // —— Cash ——
   const [receivedRaw, setReceivedRaw] = useState('');
   const [cashError, setCashError] = useState('');
   const received = parseMoneyInput(receivedRaw) ?? 0;
@@ -55,70 +36,19 @@ export default function PosPaymentPage() {
       .slice(0, 4);
   }, [totals.total]);
 
-  // —— PayOS (session + status; no custom QR UI) ——
-  const [payosStatus, setPayosStatus] = useState('idle'); // idle | pending | paid | failed | expired
-  const [payosError, setPayosError] = useState('');
-  const [payosStartedAt, setPayosStartedAt] = useState(null);
-  const [secondsLeft, setSecondsLeft] = useState(null);
-  const pollRef = useRef(null);
-
   useEffect(() => {
     const next = searchParams.get('method') === 'payos' ? 'payos' : 'cash';
     setMethod(next);
   }, [searchParams]);
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (payosStatus !== 'pending' || !payosStartedAt) {
-      setSecondsLeft(null);
-      return undefined;
-    }
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((PAYOS_TIMEOUT_MS - (Date.now() - payosStartedAt)) / 1000));
-      setSecondsLeft(left);
-      if (left <= 0) {
-        setPayosStatus('expired');
-        if (pollRef.current) {
-          window.clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
-      }
-    };
-    tick();
-    const timer = window.setInterval(tick, 1000);
-    return () => window.clearInterval(timer);
-  }, [payosStatus, payosStartedAt]);
-
   function selectMethod(next) {
     setMethod(next);
     setSearchParams(next === 'cash' ? {} : { method: next }, { replace: true });
     setCashError('');
-    setPayosError('');
   }
 
-  function startPayosSession() {
-    setPayosError('');
-    setPayosStatus('pending');
-    setPayosStartedAt(Date.now());
-    if (pollRef.current) window.clearInterval(pollRef.current);
-    pollRef.current = window.setInterval(() => {
-      // Reserved for GET /pos/orders/{id}/payment-status when PayOS is integrated.
-    }, 2000);
-  }
-
-  function cancelPayosSession() {
-    if (pollRef.current) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    setPayosStatus('idle');
-    setPayosStartedAt(null);
-    setPayosError('');
+  function openPayOsCheckout() {
+    navigate('/pos/payment/payos');
   }
 
   async function completeCash() {
@@ -145,32 +75,6 @@ export default function PosPaymentPage() {
     });
   }
 
-  async function completePayos() {
-    setPayosError('');
-    if (payosStatus !== 'pending' && payosStatus !== 'paid') {
-      setPayosError('Start a PayOS session before confirming payment.');
-      return;
-    }
-    const result = await completeCashPayment({
-      receivedAmount: totals.total,
-      paymentMethod: 'PAYOS',
-    });
-    if (!result.ok) {
-      setPayosStatus('failed');
-      setPayosError(result.message || 'Could not complete the payment');
-      return;
-    }
-    if (pollRef.current) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    setPayosStatus('paid');
-    navigate('/pos/history', {
-      replace: true,
-      state: { completedInvoice: result.order.invoiceCode },
-    });
-  }
-
   useEffect(() => {
     function onKeyDown(event) {
       if (event.key === 'Escape') {
@@ -190,36 +94,14 @@ export default function PosPaymentPage() {
       }
       if (event.key !== 'F4') return;
       event.preventDefault();
-      if (method === 'cash') {
-        completeCash();
-      } else if (payosStatus === 'idle' || payosStatus === 'expired' || payosStatus === 'failed') {
-        startPayosSession();
-      } else if (payosStatus === 'pending') {
-        completePayos();
-      }
+      if (method === 'cash') completeCash();
+      else openPayOsCheckout();
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
 
   if (!lines.length) return <Navigate to="/pos" replace />;
-
-  const payosTone =
-    payosStatus === 'pending'
-      ? 'pending'
-      : payosStatus === 'paid'
-        ? 'success'
-        : payosStatus === 'failed' || payosStatus === 'expired'
-          ? 'danger'
-          : 'idle';
-
-  const payosLabel = {
-    idle: 'Not started',
-    pending: 'Awaiting PayOS confirmation',
-    paid: 'Paid',
-    failed: 'Failed',
-    expired: 'Timed out',
-  }[payosStatus];
 
   function setReceivedAmount(amount) {
     setReceivedRaw(formatMoneyInput(amount));
@@ -385,83 +267,44 @@ export default function PosPaymentPage() {
             </div>
           ) : (
             <div className="mx-auto flex h-full max-w-3xl flex-col gap-3">
-              <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] p-3">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
-                    PayOS session
-                  </p>
-                  <p className="mt-1 text-2xl font-extrabold text-[var(--admin-brand)]">{formatVnd(totals.total)}</p>
-                  <p className="mt-1 text-xs text-[var(--admin-muted)]">Gateway checkout · no custom QR on this screen</p>
-                </div>
-                <StatusBadge tone={payosTone}>
-                  {payosStatus === 'pending' && (
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--admin-brand)]" />
-                  )}
-                  {payosLabel}
-                </StatusBadge>
+              <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+                  PayOS checkout
+                </p>
+                <p className="mt-1 text-3xl font-extrabold text-[var(--admin-brand)]">{formatVnd(totals.total)}</p>
+                <p className="mt-2 text-sm text-[var(--admin-muted)]">
+                  Opens the PayOS screen: creates the pending order, shows the real QR, and polls until the customer pays.
+                </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-[var(--admin-border)] px-3 py-3">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Gateway</p>
-                  <p className="mt-1 text-sm font-semibold">PayOS</p>
+                  <p className="mt-1 text-sm font-semibold">PayOS · VietQR</p>
                 </div>
                 <div className="rounded-xl border border-[var(--admin-border)] px-3 py-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Timeout</p>
-                  <p className="mt-1 text-sm font-semibold tabular-nums">
-                    {payosStatus === 'pending' && secondsLeft != null
-                      ? `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
-                      : '5:00'}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-[var(--admin-border)] px-3 py-3 sm:col-span-1 col-span-2">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">Items</p>
                   <p className="mt-1 text-sm font-semibold">{totals.itemCount}</p>
                 </div>
               </div>
 
-              {payosStatus === 'pending' && (
-                <p className="rounded-xl border border-[#0058be]/15 bg-[#0058be]/5 px-3 py-2 text-sm text-[var(--admin-brand)]">
-                  Waiting for PayOS confirmation… polling every 2 seconds.
-                </p>
-              )}
-              {payosStatus === 'expired' && (
-                <p className="rounded-xl bg-[var(--admin-danger-bg)] px-3 py-2 text-sm text-[var(--admin-danger)]">
-                  Session timed out. Start again or switch to cash.
-                </p>
-              )}
-              {payosError && <p className="text-sm text-[var(--admin-danger)]">{payosError}</p>}
-
-              <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-[1fr_1.4fr]">
-                {payosStatus === 'idle' || payosStatus === 'expired' || payosStatus === 'failed' ? (
-                  <button
-                    type="button"
-                    onClick={startPayosSession}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)] sm:col-span-2"
-                  >
-                    Start PayOS payment
-                    <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={cancelPayosSession}
-                      className="min-h-12 rounded-xl border border-[var(--admin-border)] bg-white text-sm font-semibold text-[var(--admin-muted)] transition hover:bg-[#f7f9fb]"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={checkoutBusy || payosStatus === 'expired'}
-                      onClick={completePayos}
-                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      Confirm paid
-                      <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
-                    </button>
-                  </>
-                )}
+              <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-[1fr_1.6fr]">
+                <button
+                  type="button"
+                  onClick={() => selectMethod('cash')}
+                  className="min-h-12 rounded-xl border border-[var(--admin-border)] bg-white text-sm font-semibold text-[var(--admin-muted)] transition hover:bg-[#f7f9fb]"
+                >
+                  Use cash instead
+                </button>
+                <button
+                  type="button"
+                  disabled={checkoutBusy || !lines.length}
+                  onClick={openPayOsCheckout}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  Continue to PayOS QR
+                  <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
+                </button>
               </div>
             </div>
           )}
