@@ -99,8 +99,14 @@ export default function PurchaseRequestsPage() {
   return (
     <>
       {showCreate && (
-        <div className="mb-4 flex justify-end">
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+          {!userBranchId && (
+            <p className="mr-auto text-sm text-amber-700">
+              No branch assigned — create request is disabled until your account is linked to a store.
+            </p>
+          )}
           <Button
+            disabled={!userBranchId}
             onClick={() => {
               setEditing(null);
               setFormOpen(true);
