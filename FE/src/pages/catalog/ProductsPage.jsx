@@ -268,6 +268,14 @@ export default function ProductsPage() {
     'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
   const showForm = canManage;
+  const filterSelectClass =
+    'rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+  const colSpan =
+    7 +
+    (showBranchStock ? 1 : 0) +
+    (showWarehouseStock ? 2 : 0) +
+    (canManage || isWm ? 1 : 0) +
+    (canManage ? 1 : 0);
 
   return (
     <div className="w-full">
@@ -527,51 +535,49 @@ export default function ProductsPage() {
         )}
 
         <Card className={`${showForm ? 'xl:col-span-8' : ''} !p-0 overflow-hidden`}>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
-            <p className="text-sm text-[var(--admin-muted)]">
+          <div className="flex flex-wrap items-center gap-2 border-b border-[var(--admin-border)] px-4 py-3">
+            <p className="mr-auto shrink-0 text-sm text-[var(--admin-muted)]">
               <strong>{pageData.totalRecords}</strong> products
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-              >
-                <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              {showWarehouseStock && (
-                <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
-                  <input
-                    type="checkbox"
-                    checked={lowStockOnly}
-                    onChange={(e) => setLowStockOnly(e.target.checked)}
-                    className="rounded border-[var(--admin-border)]"
-                  />
-                  Low stock only
-                </label>
-              )}
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search SKU, barcode, name…"
-                className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-              />
-            </div>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">All categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={filterSelectClass}
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            {showWarehouseStock && (
+              <label className="flex shrink-0 items-center gap-2 text-sm text-[var(--admin-muted)]">
+                <input
+                  type="checkbox"
+                  checked={lowStockOnly}
+                  onChange={(e) => setLowStockOnly(e.target.checked)}
+                  className="rounded border-[var(--admin-border)]"
+                />
+                Low stock only
+              </label>
+            )}
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search SKU, barcode, name…"
+              className="min-w-[220px] flex-1 max-w-sm rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-full text-left text-sm">
@@ -584,7 +590,7 @@ export default function ProductsPage() {
                   {showBranchStock && <th className="px-4 py-3 text-right">Branch stock</th>}
                   {showWarehouseStock && <th className="px-4 py-3 text-right">In stock</th>}
                   {showWarehouseStock && <th className="px-4 py-3 text-right">Reorder</th>}
-                  <th className="px-4 py-3">Retail</th>
+                  <th className="whitespace-nowrap px-4 py-3">Retail</th>
                   <th className="px-4 py-3">Unit</th>
                   {(canManage || isWm) && <th className="px-4 py-3">Import unit</th>}
                   <th className="px-4 py-3">Status</th>
@@ -595,15 +601,14 @@ export default function ProductsPage() {
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td
-                          colSpan={8 + (showBranchStock ? 1 : 0) + (showWarehouseStock ? 2 : 0) + (canManage ? 1 : 0)}
-                          className="px-4 py-4"
-                        >
+                        <td colSpan={colSpan} className="px-4 py-4">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
                     ))
-                  : filtered.map((p) => (
+                  : filtered.map((p) => {
+                      const branchLow = Boolean(showBranchStock && p.lowStock);
+                      return (
                       <tr
                         key={p.id}
                         className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
@@ -622,7 +627,7 @@ export default function ProductsPage() {
                           )}
                         </td>
                         {showBranchStock && (
-                          <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                          <td className={`px-4 py-3 text-right tabular-nums font-semibold ${branchLow ? 'text-amber-600' : ''}`}>
                             {p.branchStock ?? 0}
                           </td>
                         )}
@@ -638,7 +643,9 @@ export default function ProductsPage() {
                             {p.warehouseReorderPoint ?? '—'}
                           </td>
                         )}
-                        <td className="px-4 py-3 tabular-nums">{formatVnd(p.defaultSalePrice)}</td>
+                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                          {formatVnd(p.defaultSalePrice)}
+                        </td>
                         <td className="px-4 py-3">{unitLabel(p.unit)}</td>
                         {(canManage || isWm) && (
                           <td className="px-4 py-3 text-[var(--admin-muted)]">
@@ -651,11 +658,11 @@ export default function ProductsPage() {
                           <Badge tone={p.status === 'active' ? 'success' : 'danger'}>
                             {p.status || '—'}
                           </Badge>
-                          {showWarehouseStock && p.lowStock && (
+                          {(showWarehouseStock && p.lowStock) || branchLow ? (
                             <Badge tone="warning" className="ml-1">
                               Low
                             </Badge>
-                          )}
+                          ) : null}
                         </td>
                         {canManage && (
                           <td className="px-4 py-3 text-right">
@@ -678,12 +685,14 @@ export default function ProductsPage() {
                           </td>
                         )}
                       </tr>
-                    ))}
+                    );
+                    })}
               </tbody>
             </table>
             {!loading && filtered.length === 0 && (
               <p className="px-4 py-10 text-center text-sm text-[var(--admin-muted)]">
                 No products match your search.
+                {statusFilter === 'active' ? ' Try All statuses if the SKU is inactive.' : null}
               </p>
             )}
           </div>

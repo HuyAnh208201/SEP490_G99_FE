@@ -38,6 +38,11 @@ export function showBranchStockColumn(role) {
   return isBranchStoreRole(role);
 }
 
+/** BM can edit branch_inventory.reorder_point for their store. */
+export function canEditBranchReorderPoint(role) {
+  return normalizeWebRole(role) === 'BRANCH_MANAGER';
+}
+
 export function showWarehouseStockColumn(role) {
   return isWarehouseViewRole(role);
 }

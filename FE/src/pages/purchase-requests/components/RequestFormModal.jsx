@@ -1,105 +1,86 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import { fetchBranchById } from '../../../api/branches.js';
-import { fetchBranchInventory } from '../../../api/inventory.js';
+import { fetchCategories } from '../../../api/categories.js';
 import {
   fetchRequestBranches,
-  fetchRequestProducts,
   getRecommendedProducts,
   saveDraft,
+  searchRequestProducts,
   submitRequest,
 } from '../../../api/purchaseRequests.js';
 import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
+import useDebouncedValue from '../../../hooks/useDebouncedValue.js';
 import ProductCatalogPicker from './ProductCatalogPicker.jsx';
-import AddQtyModal from './AddQtyModal.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
+const PAGE_SIZE = 20;
+
+function normId(id) {
+  const n = Number(id);
+  return Number.isFinite(n) ? n : id;
+}
+
 /**
  * Create / edit purchase request (mainly Branch Manager).
- * BM can only create for their assigned branch.
+ * Catalog | Request lines side-by-side; Add suggested from low-stock API.
  */
 export default function RequestFormModal({ open, onClose, editing, branchId, createdBy, onSaved }) {
   const lockedBranchId = branchId ? String(branchId) : '';
   const [branchName, setBranchName] = useState('');
   const [products, setProducts] = useState([]);
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogTotalPages, setCatalogTotalPages] = useState(0);
+  const [catalogTotalRecords, setCatalogTotalRecords] = useState(0);
+  const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebouncedValue(keyword, 350);
+  const [categoryId, setCategoryId] = useState('');
+  const [stockSort, setStockSort] = useState('');
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [categories, setCategories] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
   const [recommended, setRecommended] = useState([]);
+  const [recommendedError, setRecommendedError] = useState('');
+  const [recommendedLoading, setRecommendedLoading] = useState(false);
   const [reason, setReason] = useState('');
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [pendingRecommended, setPendingRecommended] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  const reloadCatalog = useCallback(() => setReloadToken((k) => k + 1), []);
 
   useEffect(() => {
-    if (!open || !lockedBranchId) return undefined;
-    let cancelled = false;
-    setProductsLoading(true);
-
-    Promise.all([
-      fetchBranchInventory(lockedBranchId).catch(() => null),
-      fetchRequestProducts().catch(() => []),
-      getRecommendedProducts(lockedBranchId).catch(() => []),
-    ])
-      .then(([inventory, catalog, rec]) => {
-        if (cancelled) return;
-        const recommendedRows = Array.isArray(rec) ? rec : [];
-        setRecommended(recommendedRows);
-
-        if (Array.isArray(inventory) && inventory.length > 0) {
-          setProducts(
-            inventory.map((row) => ({
-              id: row.productId,
-              code: row.productCode,
-              name: row.productName,
-              unit: row.unit,
-              categoryName: row.categoryName,
-              currentStock: Number(row.quantity ?? 0),
-              reorderPoint: row.reorderPoint != null ? Number(row.reorderPoint) : null,
-              topPackagingLabel: row.topPackagingLabel,
-              unitsPerImportUnit: row.topPackagingConversionQty,
-            })),
-          );
-          return;
-        }
-
-        // Fallback: catalog only if inventory API unavailable
-        const stockByProduct = new Map();
-        recommendedRows.forEach((r) => {
-          if (r.productId == null) return;
-          stockByProduct.set(Number(r.productId), {
-            currentStock: Number(r.currentStock ?? 0),
-            reorderPoint: Number(r.reorderPoint ?? 0),
-          });
-        });
-        setProducts(
-          (Array.isArray(catalog) ? catalog : []).map((p) => {
-            const stock = stockByProduct.get(Number(p.id));
-            return {
-              ...p,
-              currentStock: stock ? stock.currentStock : p.currentStock ?? null,
-              reorderPoint: stock ? stock.reorderPoint : p.reorderPoint ?? null,
-            };
-          }),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setProducts([]);
-          setRecommended([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setProductsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, lockedBranchId]);
+    if (!open) return;
+    if (editing) {
+      setReason(editing.reason || '');
+      setLines(
+        editing.items.map((it) => ({
+          productId: normId(it.productId),
+          itemId: it.id,
+          productName: it.productName,
+          productCode: it.productCode,
+          unit: it.unit,
+          requestedQuantity: it.requestedQuantity,
+        })),
+      );
+      if (editing.branchName) setBranchName(editing.branchName);
+    } else {
+      setReason('');
+      setLines([]);
+    }
+    setError('');
+    setKeyword('');
+    setCategoryId('');
+    setStockSort('');
+    setLowStockOnly(false);
+    setCatalogPage(1);
+  }, [open, editing]);
 
   useEffect(() => {
     if (!open || !lockedBranchId) return;
@@ -116,41 +97,152 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   }, [open, lockedBranchId]);
 
   useEffect(() => {
-    if (!open) return;
-    if (editing) {
-      setReason(editing.reason || '');
-      setLines(
-        editing.items.map((it) => ({
-          productId: it.productId,
-          itemId: it.id,
-          productName: it.productName,
-          productCode: it.productCode,
-          unit: it.unit,
-          requestedQuantity: it.requestedQuantity,
-        })),
-      );
-      if (editing.branchName) setBranchName(editing.branchName);
-    } else {
-      setReason('');
-      setLines([]);
+    if (!open) return undefined;
+    let cancelled = false;
+    fetchCategories()
+      .then((rows) => {
+        if (cancelled) return;
+        const list = Array.isArray(rows) ? rows : [];
+        setCategories(
+          list
+            .map((c) => ({ id: c.id, name: c.name }))
+            .filter((c) => c.id != null && c.name)
+            .sort((a, b) => String(a.name).localeCompare(String(b.name))),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    if (!lockedBranchId) {
+      setRecommended([]);
+      setRecommendedError('');
+      setRecommendedLoading(false);
+      return undefined;
     }
-    setError('');
-  }, [open, editing]);
+    let cancelled = false;
+    setRecommendedLoading(true);
+    setRecommendedError('');
+    getRecommendedProducts(lockedBranchId)
+      .then((rec) => {
+        if (!cancelled) setRecommended(Array.isArray(rec) ? rec : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setRecommended([]);
+          setRecommendedError(err?.message || 'Failed to load suggested products.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecommendedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, lockedBranchId, reloadToken]);
 
-  const addedIds = useMemo(() => new Set(lines.map((l) => l.productId)), [lines]);
+  useEffect(() => {
+    if (!open) return undefined;
+    if (!lockedBranchId) {
+      setProducts([]);
+      setCatalogTotalPages(0);
+      setCatalogTotalRecords(0);
+      setCatalogError('Your account is not linked to a branch. Contact an administrator.');
+      setProductsLoading(false);
+      return undefined;
+    }
 
-  const addableRecommended = useMemo(
-    () => recommended.filter((r) => !addedIds.has(r.productId)),
+    let cancelled = false;
+    setProductsLoading(true);
+    setCatalogError('');
+
+    searchRequestProducts(debouncedKeyword, {
+      page: catalogPage,
+      size: PAGE_SIZE,
+      categoryId: categoryId || undefined,
+      stockSort: stockSort || undefined,
+      lowStockOnly: lowStockOnly || undefined,
+    })
+      .then((page) => {
+        if (cancelled) return;
+        setProducts(page.items || []);
+        setCatalogTotalPages(page.totalPages || 0);
+        setCatalogTotalRecords(page.totalRecords || 0);
+        if (!(page.items || []).length && !debouncedKeyword.trim() && !categoryId && !lowStockOnly) {
+          setCatalogError('No catalog products available.');
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setProducts([]);
+        setCatalogTotalPages(0);
+        setCatalogTotalRecords(0);
+        setCatalogError(err?.message || 'Failed to load product catalog.');
+      })
+      .finally(() => {
+        if (!cancelled) setProductsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    lockedBranchId,
+    debouncedKeyword,
+    catalogPage,
+    categoryId,
+    stockSort,
+    lowStockOnly,
+    reloadToken,
+  ]);
+
+  const addedIds = useMemo(() => new Set(lines.map((l) => normId(l.productId))), [lines]);
+
+  const suggestedByProductId = useMemo(() => {
+    const map = new Map();
+    for (const r of recommended) {
+      map.set(normId(r.productId), r);
+    }
+    return map;
+  }, [recommended]);
+
+  const catalogProducts = useMemo(
+    () =>
+      products.map((p) => {
+        const rec = suggestedByProductId.get(normId(p.id));
+        if (!rec) return p;
+        return {
+          ...p,
+          suggestedQty: rec.suggestedQty ?? p.suggestedQty,
+          reorderPoint: rec.reorderPoint ?? p.reorderPoint,
+          currentStock: rec.currentStock ?? p.currentStock,
+          lowStock: true,
+          topPackagingLabel: p.topPackagingLabel || rec.topPackagingLabel,
+          unitsPerImportUnit: p.unitsPerImportUnit || rec.topPackagingConversionQty,
+        };
+      }),
+    [products, suggestedByProductId],
+  );
+
+  const addableSuggested = useMemo(
+    () => recommended.filter((r) => !addedIds.has(normId(r.productId))),
     [recommended, addedIds],
   );
 
   function addProducts(list, qtyResolver) {
     setLines((prev) => {
-      const existing = new Set(prev.map((l) => l.productId));
+      const existing = new Set(prev.map((l) => normId(l.productId)));
       const additions = list
-        .filter((p) => !existing.has(p.id ?? p.productId))
+        .filter((p) => !existing.has(normId(p.id ?? p.productId)))
         .map((p) => {
-          const id = p.id ?? p.productId;
+          const id = normId(p.id ?? p.productId);
           return {
             productId: id,
             productName: p.name ?? p.productName,
@@ -166,26 +258,15 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     });
   }
 
-  function openAddRecommended(r) {
-    setPendingRecommended(r);
-  }
-
-  function confirmAddRecommended(qty) {
-    if (!pendingRecommended) return;
-    const r = pendingRecommended;
+  function addSuggested() {
     addProducts(
-      [{ id: r.productId, name: r.name, code: r.code, unit: r.unit, topPackagingLabel: r.topPackagingLabel, requestedQty: qty }],
-    );
-    setPendingRecommended(null);
-  }
-
-  function addAllRecommended() {
-    addProducts(
-      recommended.map((r) => ({
+      addableSuggested.map((r) => ({
         id: r.productId,
         name: r.name,
         code: r.code,
         unit: r.unit,
+        topPackagingLabel: r.topPackagingLabel,
+        unitsPerImportUnit: r.topPackagingConversionQty,
         suggestedQty: r.suggestedQty,
       })),
       (p) => p.suggestedQty || 1,
@@ -193,13 +274,15 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   }
 
   function updateQty(productId, value) {
+    const id = normId(productId);
     setLines((prev) =>
-      prev.map((l) => (l.productId === productId ? { ...l, requestedQuantity: value } : l)),
+      prev.map((l) => (normId(l.productId) === id ? { ...l, requestedQuantity: value } : l)),
     );
   }
 
   function removeLine(productId) {
-    setLines((prev) => prev.filter((l) => l.productId !== productId));
+    const id = normId(productId);
+    setLines((prev) => prev.filter((l) => normId(l.productId) !== id));
   }
 
   function buildPayload() {
@@ -248,16 +331,55 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     }
   }
 
+  function resetPageAndSet(setter) {
+    return (value) => {
+      setter(value);
+      setCatalogPage(1);
+    };
+  }
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={editing ? `Edit ${editing.code}` : 'Create purchase request'}
-      description="Browse the full catalog with branch stock, select products, save as draft, or submit for approval."
-      size="full"
+      description="Browse branch stock, filter the catalog, add suggested low-stock items, then submit for approval."
+      size="viewport"
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Badge tone="default">{lines.length} products</Badge>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <Button
+              variant="ghost"
+              className="border border-[var(--admin-border)]"
+              loading={busy === 'draft'}
+              disabled={!lockedBranchId}
+              onClick={() => handle('draft', saveDraft)}
+            >
+              Save draft
+            </Button>
+            <Button
+              loading={busy === 'submit'}
+              disabled={!lockedBranchId}
+              onClick={() => handle('submit', submitRequest)}
+            >
+              Submit for approval
+            </Button>
+          </div>
+        </div>
+      }
     >
-      <div className="max-h-[78vh] space-y-5 overflow-y-auto pr-1">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex min-h-0 flex-col gap-4">
+        {!lockedBranchId && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            No branch assigned to your account — catalog and suggested products cannot load.
+          </div>
+        )}
+
+        <div className="grid shrink-0 gap-3 sm:grid-cols-2">
           <label className="block space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
               Branch
@@ -267,9 +389,6 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
               value={branchName || (lockedBranchId ? `Branch #${lockedBranchId}` : '—')}
               className={`${inputClass} bg-[#f7f9fb] text-[var(--admin-text)]`}
             />
-            <p className="text-xs text-[var(--admin-subtle)]">
-              Requests are created for your assigned branch only.
-            </p>
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
@@ -284,25 +403,56 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
           </label>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-5">
-          <div className="space-y-4 lg:col-span-3">
-            <ProductCatalogPicker
-              products={products}
-              excludedIds={addedIds}
-              loading={productsLoading}
-              onAddMany={(picks) => addProducts(picks)}
-            />
+        {error && (
+          <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
-            <div>
-              <p className="mb-2 text-sm font-semibold text-[var(--admin-text)]">
-                Request lines
-                <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
-                  Set quantities after adding from the catalog
-                </span>
-              </p>
-              <div className="overflow-hidden rounded-xl border border-[var(--admin-border)]">
+        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2" style={{ minHeight: '28rem' }}>
+          <div className="min-h-0 min-w-0">
+            <p className="mb-2 text-sm font-semibold text-[var(--admin-text)]">Product catalog</p>
+            <div className="h-[min(58vh,520px)]">
+              <ProductCatalogPicker
+                products={catalogProducts}
+                excludedIds={addedIds}
+                loading={productsLoading}
+                loadError={catalogError}
+                onRetry={reloadCatalog}
+                keyword={keyword}
+                onKeywordChange={resetPageAndSet(setKeyword)}
+                categories={categories}
+                categoryId={categoryId}
+                onCategoryChange={resetPageAndSet(setCategoryId)}
+                stockSort={stockSort}
+                onStockSortChange={resetPageAndSet(setStockSort)}
+                lowStockOnly={lowStockOnly}
+                onLowStockOnlyChange={resetPageAndSet(setLowStockOnly)}
+                addSuggestedCount={addableSuggested.length}
+                addSuggestedBusy={recommendedLoading}
+                addSuggestedError={recommendedError}
+                onAddSuggested={addSuggested}
+                onRetrySuggested={reloadCatalog}
+                page={catalogPage}
+                totalPages={catalogTotalPages}
+                totalRecords={catalogTotalRecords}
+                onPageChange={setCatalogPage}
+                onAddMany={(picks) => addProducts(picks)}
+              />
+            </div>
+          </div>
+
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <p className="mb-2 text-sm font-semibold text-[var(--admin-text)]">
+              Request lines
+              <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
+                Adjust quantities before submit
+              </span>
+            </p>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--admin-border)]">
+              <div className="min-h-0 flex-1 overflow-auto">
                 <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
+                  <thead className="sticky top-0 bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                     <tr>
                       <th className="px-3 py-2.5">Product</th>
                       <th className="px-3 py-2.5">Import unit</th>
@@ -359,107 +509,15 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                   </tbody>
                 </table>
                 {lines.length === 0 && (
-                  <p className="px-3 py-8 text-center text-sm text-[var(--admin-muted)]">
-                    No products yet. Select from the catalog above or add from recommendations.
+                  <p className="px-3 py-10 text-center text-sm text-[var(--admin-muted)]">
+                    No products yet. Add from the catalog or use Add suggested.
                   </p>
                 )}
               </div>
             </div>
-          </div>
-
-          <div className="lg:col-span-2">
-            <div className="rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60">
-              <div className="flex items-start justify-between gap-2 border-b border-[var(--admin-border)] px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-[var(--admin-text)]">Recommended products</p>
-                  <p className="text-xs text-[var(--admin-subtle)]">Low stock — click to add.</p>
-                </div>
-                {addableRecommended.length > 0 && (
-                  <Button
-                    variant="secondary"
-                    className="!px-2 !py-1 !text-xs shrink-0"
-                    onClick={addAllRecommended}
-                  >
-                    Add all below
-                  </Button>
-                )}
-              </div>
-              <div className="max-h-80 space-y-2 overflow-y-auto p-3">
-                {recommended.length === 0 && (
-                  <p className="py-6 text-center text-xs text-[var(--admin-muted)]">
-                    No products below reorder point.
-                  </p>
-                )}
-                {recommended.map((r) => (
-                  <div
-                    key={r.productId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-[var(--admin-text)]">{r.name}</p>
-                      <p className="text-[11px] text-[var(--admin-subtle)]">
-                        Stock:{' '}
-                        <span className="font-semibold text-red-600">{r.currentStock}</span> / Reorder{' '}
-                        {r.reorderPoint} · Suggested{' '}
-                        <span className="font-semibold text-[#0058be]">{r.suggestedQty}</span>
-                      </p>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      className="!px-2 !py-1 !text-xs"
-                      disabled={addedIds.has(r.productId)}
-                      onClick={() => openAddRecommended(r)}
-                    >
-                      {addedIds.has(r.productId) ? 'Added' : '+ Add'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] pt-4">
-          <Badge tone="default">{lines.length} products</Badge>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>
-              Close
-            </Button>
-            <Button
-              variant="ghost"
-              className="border border-[var(--admin-border)]"
-              loading={busy === 'draft'}
-              onClick={() => handle('draft', saveDraft)}
-            >
-              Save draft
-            </Button>
-            <Button loading={busy === 'submit'} onClick={() => handle('submit', submitRequest)}>
-              Submit for approval
-            </Button>
           </div>
         </div>
       </div>
-
-      <AddQtyModal
-        open={Boolean(pendingRecommended)}
-        product={
-          pendingRecommended && {
-            name: pendingRecommended.name,
-            code: pendingRecommended.code,
-            unit: pendingRecommended.unit,
-            topPackagingLabel: pendingRecommended.topPackagingLabel,
-          }
-        }
-        defaultQty={pendingRecommended?.suggestedQty || 1}
-        onConfirm={confirmAddRecommended}
-        onCancel={() => setPendingRecommended(null)}
-      />
     </Modal>
   );
 }

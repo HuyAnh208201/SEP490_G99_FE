@@ -7,7 +7,13 @@ export default function Modal({ open, onClose, title, description, children, siz
     lg: 'max-w-2xl',
     xl: 'max-w-5xl',
     full: 'max-w-[min(1200px,calc(100vw-2rem))]',
+    viewport: 'max-w-[min(1440px,calc(100vw-1.5rem))]',
   };
+
+  const heightClass =
+    size === 'viewport'
+      ? 'max-h-[min(94vh,960px)]'
+      : 'max-h-[min(92vh,900px)]';
 
   return (
     <div
@@ -23,7 +29,7 @@ export default function Modal({ open, onClose, title, description, children, siz
         onClick={onClose}
       />
       <div
-        className={`relative flex max-h-[min(92vh,900px)] w-full flex-col ${widths[size] || widths.md} rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]`}
+        className={`relative flex ${heightClass} w-full flex-col ${widths[size] || widths.md} rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-elevated)]`}
       >
         <div className="shrink-0 border-b border-[var(--admin-border)] px-6 py-4">
           <div className="flex items-start justify-between gap-4">

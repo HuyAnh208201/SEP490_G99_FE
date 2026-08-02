@@ -38,3 +38,11 @@ export async function fetchBranchInventoryPage(branchId, params = {}) {
   const { data } = await http.get(`/inventory/branches/${branchId}/page`, { params: compactPageParams(params) });
   return unwrapPage(data);
 }
+
+export async function updateBranchReorderPoint(branchId, productId, reorderPoint) {
+  const { data } = await http.patch(
+    `/inventory/branches/${branchId}/products/${productId}/reorder-point`,
+    { reorderPoint: Number(reorderPoint) },
+  );
+  return unwrap(data);
+}

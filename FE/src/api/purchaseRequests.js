@@ -78,16 +78,24 @@ export async function getRecommendedProducts(branchId) {
 
 export async function searchRequestProducts(keyword, params = {}) {
   const { data } = await http.get(`${BASE}/search-products`, {
-    params: { keyword, ...params },
+    params: compactPageParams({
+      keyword: keyword || undefined,
+      page: 1,
+      size: 20,
+      ...params,
+    }),
   });
-  const rows = unwrapList(data);
-  return rows.map((p) => ({
+  return unwrapPage(data, (p) => ({
     id: p.productId ?? p.id,
     code: p.productCode ?? p.code,
     name: p.productName ?? p.name,
+    barcode: p.barcode,
     unit: p.unit,
     categoryId: p.categoryId,
     categoryName: p.categoryName,
+    currentStock: p.currentStock ?? 0,
+    reorderPoint: p.reorderPoint ?? null,
+    lowStock: Boolean(p.lowStock),
     topPackagingLabel: p.topPackagingLabel,
     unitsPerImportUnit: p.topPackagingConversionQty,
   }));
@@ -165,10 +173,12 @@ export async function fetchRequestProducts() {
     id: p.id,
     code: p.code,
     name: p.name,
+    barcode: p.barcode,
     unit: p.unit,
     categoryId: p.categoryId,
     categoryName: p.categoryName,
     currentStock: p.currentStock ?? null,
+    reorderPoint: p.branchReorderPoint ?? p.reorderPoint ?? null,
     supplierId: p.supplierId ?? null,
     topPackagingLabel: p.topPackagingLabel,
     unitsPerImportUnit: p.topPackagingConversionQty ?? p.unitsPerImportUnit,
