@@ -144,7 +144,14 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
               ].join(' ');
             }}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#f7f9fb]">
+            <span
+              className={[
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-[#f7f9fb] transition',
+                location.pathname.startsWith('/pos/shift')
+                  ? 'border-[#0058be]/20 bg-white text-[var(--admin-brand)]'
+                  : 'border-transparent text-[var(--admin-subtle)]',
+              ].join(' ')}
+            >
               <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
                 {item.icon}
               </svg>

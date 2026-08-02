@@ -98,6 +98,8 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState([]);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
@@ -108,16 +110,18 @@ export default function ProductsPage() {
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(fetchProductsPage, {
     search: debouncedQuery,
+    categoryId: categoryId || undefined,
+    status: statusFilter || undefined,
     lowStockOnly: lowStockOnly || undefined,
   });
   const { items, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
 
   useEffect(() => {
-    if (canManage || isWm) {
-      getCategories().then((cats) => setCategories(Array.isArray(cats) ? cats : [])).catch(() => setCategories([]));
-    }
-  }, [canManage, getCategories, isWm]);
+    getCategories()
+      .then((cats) => setCategories(Array.isArray(cats) ? cats : []))
+      .catch(() => setCategories([]));
+  }, [getCategories]);
 
   useEffect(() => {
     if (searchParams.get('count') === '1') {
@@ -527,7 +531,28 @@ export default function ProductsPage() {
             <p className="text-sm text-[var(--admin-muted)]">
               <strong>{pageData.totalRecords}</strong> products
             </p>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+              >
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
+              >
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
               {showWarehouseStock && (
                 <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
                   <input
@@ -558,6 +583,7 @@ export default function ProductsPage() {
                   <th className="px-4 py-3">Category</th>
                   {showBranchStock && <th className="px-4 py-3 text-right">Branch stock</th>}
                   {showWarehouseStock && <th className="px-4 py-3 text-right">In stock</th>}
+                  {showWarehouseStock && <th className="px-4 py-3 text-right">Reorder</th>}
                   <th className="px-4 py-3">Retail</th>
                   <th className="px-4 py-3">Unit</th>
                   {(canManage || isWm) && <th className="px-4 py-3">Import unit</th>}
@@ -570,7 +596,7 @@ export default function ProductsPage() {
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
                         <td
-                          colSpan={8 + (showBranchStock ? 1 : 0) + (showWarehouseStock ? 1 : 0) + (canManage ? 1 : 0)}
+                          colSpan={8 + (showBranchStock ? 1 : 0) + (showWarehouseStock ? 2 : 0) + (canManage ? 1 : 0)}
                           className="px-4 py-4"
                         >
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
@@ -605,6 +631,11 @@ export default function ProductsPage() {
                             <span className={p.lowStock ? 'font-semibold text-amber-600' : ''}>
                               {p.warehouseStock ?? 0}
                             </span>
+                          </td>
+                        )}
+                        {showWarehouseStock && (
+                          <td className="px-4 py-3 text-right tabular-nums text-[var(--admin-muted)]">
+                            {p.warehouseReorderPoint ?? '—'}
                           </td>
                         )}
                         <td className="px-4 py-3 tabular-nums">{formatVnd(p.defaultSalePrice)}</td>

@@ -96,7 +96,11 @@ export default function UsersPage() {
       setCriticalAction({ user: targetUser, type: 'DEACTIVATE', label: 'Deactivate' });
       return;
     }
-    if (!window.confirm(`Deactivate account for ${targetUser.name}?`)) return;
+    if (!window.confirm(
+      `Deactivate account for ${targetUser.name}?\n\n` +
+        'This will immediately block their access, force-close any open shift session, ' +
+        'and remove them from current/future published shifts.',
+    )) return;
     setActionLoading(`deactivate-${targetUser.id}`);
     setActionError('');
     try {
@@ -114,7 +118,10 @@ export default function UsersPage() {
       setCriticalAction({ user: targetUser, type: 'DELETE', label: 'Delete' });
       return;
     }
-    if (!window.confirm(`Delete account for ${targetUser.name}? This cannot be undone.`)) return;
+    if (!window.confirm(
+      `Delete account for ${targetUser.name}? This cannot be undone.\n\n` +
+        'If they have an open shift or published assignments, delete will be blocked — deactivate first.',
+    )) return;
     setActionLoading(`delete-${targetUser.id}`);
     setActionError('');
     try {

@@ -47,7 +47,11 @@ export default function UserDetailDrawer({
   const canManage = canManageTeamMember(actorRole, actorBranchId, user, currentUserId);
 
   async function handleDeactivate() {
-    if (!user || !window.confirm(`Deactivate account for ${user.name}?`)) return;
+    if (!user || !window.confirm(
+      `Deactivate account for ${user.name}?\n\n` +
+        'This will immediately block their access, force-close any open shift session, ' +
+        'and remove them from current/future published shifts.',
+    )) return;
     setActionLoading('deactivate');
     setError('');
     try {
@@ -78,7 +82,10 @@ export default function UserDetailDrawer({
   }
 
   async function handleDelete() {
-    if (!user || !window.confirm(`Delete account for ${user.name}? This cannot be undone.`)) return;
+    if (!user || !window.confirm(
+      `Delete account for ${user.name}? This cannot be undone.\n\n` +
+        'If they have an open shift or published assignments, delete will be blocked — deactivate first.',
+    )) return;
     setActionLoading('delete');
     setError('');
     try {

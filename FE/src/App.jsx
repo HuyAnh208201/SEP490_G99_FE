@@ -25,18 +25,12 @@ import CountHistoryPage from './pages/inventory-staff/CountHistoryPage.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
-import BranchManagerDashboardPage, {
-  RefundApprovalPage,
-} from './pages/branch-manager/BranchManagerPages.jsx';
 import CashReconciliationListPage from './pages/branch-manager/CashReconciliationListPage.jsx';
 import CashReconciliationReviewPage from './pages/branch-manager/CashReconciliationReviewPage.jsx';
 import SupplyReceiptApprovalPage from './pages/branch-manager/SupplyReceiptApprovalPage.jsx';
 import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
-import DirectorDashboardPage, {
-  DirectorPlanningPage,
-  DirectorReportsPage,
-} from './pages/director/DirectorPages.jsx';
+import { RefundApprovalPage } from './pages/branch-manager/BranchManagerPages.jsx';
 import ReportsPage from './pages/reports/ReportsPage.jsx';
 import PosLayout from './pages/pos/PosLayout.jsx';
 import PosNewOrderPage from './pages/pos/PosNewOrderPage.jsx';
@@ -280,14 +274,7 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/branch-manager"
-          element={
-            <PermissionRoute permission="BRANCH_DASHBOARD">
-              <BranchManagerDashboardPage />
-            </PermissionRoute>
-          }
-        />
+        <Route path="/branch-manager" element={<Navigate to="/reports" replace />} />
         <Route path="/branch-manager/staff" element={<Navigate to="/users" replace />} />
         <Route
           path="/branch-manager/shifts"
@@ -346,35 +333,14 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/director"
-          element={
-            <PermissionRoute permission="DIRECTOR_DASHBOARD">
-              <DirectorDashboardPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/director/reports"
-          element={
-            <PermissionRoute permission="BUSINESS_PERFORMANCE_REPORTS">
-              <DirectorReportsPage />
-            </PermissionRoute>
-          }
-        />
-        <Route
-          path="/director/planning"
-          element={
-            <PermissionRoute permission="STRATEGIC_PLANNING_OVERVIEW">
-              <DirectorPlanningPage />
-            </PermissionRoute>
-          }
-        />
+        <Route path="/director" element={<Navigate to="/reports" replace />} />
+        <Route path="/director/reports" element={<Navigate to="/reports" replace />} />
+        <Route path="/director/planning" element={<Navigate to="/reports" replace />} />
 
         <Route
           path="/reports"
           element={
-            <PermissionRoute permission="REPORTS_VIEW">
+            <PermissionRoute anyOf={['REPORTS_VIEW', 'BUSINESS_PERFORMANCE_REPORTS']}>
               <ReportsPage />
             </PermissionRoute>
           }

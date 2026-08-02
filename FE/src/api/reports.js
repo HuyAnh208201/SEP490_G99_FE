@@ -83,3 +83,25 @@ export async function fetchPointTransactionsPage(params = {}) {
   const { data } = await http.get('/reports/point-transactions/page', { params: compactPageParams(params) });
   return unwrapPage(data);
 }
+
+/** Dashboard KPIs — BM is forced to own branch; Director/Admin may pass branchId. */
+export async function fetchReportSummary({ from, to, branchId, shiftId } = {}) {
+  const { data } = await http.get('/reports/summary', {
+    params: buildParams({ from, to, branchId, shiftId }),
+  });
+  return unwrap(data);
+}
+
+export async function fetchReportTrend({ from, to, branchId, shiftId } = {}) {
+  const { data } = await http.get('/reports/trend', {
+    params: buildParams({ from, to, branchId, shiftId }),
+  });
+  return unwrap(data) ?? [];
+}
+
+export async function fetchTopProducts({ from, to, branchId, shiftId, limit = 5 } = {}) {
+  const { data } = await http.get('/reports/top-products', {
+    params: buildParams({ from, to, branchId, shiftId, limit }),
+  });
+  return unwrap(data) ?? [];
+}

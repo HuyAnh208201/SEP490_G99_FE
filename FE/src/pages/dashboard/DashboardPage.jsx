@@ -76,12 +76,13 @@ const QUICK_LINKS = {
     { to: '/promotions', label: 'Promotions' },
   ],
   DIRECTOR: [
-    { to: '/director/reports', label: 'Performance reports' },
+    { to: '/reports', label: 'Revenue Dashboard' },
     { to: '/promotions', label: 'Promotions' },
     { to: '/branches', label: 'Branch list' },
     { to: '/catalog/suppliers', label: 'Suppliers' },
   ],
   BRANCH_MANAGER: [
+    { to: '/reports', label: 'Branch' },
     { to: '/branch-manager/shifts', label: 'Shifts' },
     { to: '/users', label: 'Team & accounts' },
     { to: '/purchase-requests', label: 'Import requests' },

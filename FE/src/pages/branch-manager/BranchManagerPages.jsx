@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchMe } from '../../api/users.js';
 import { listRequests } from '../../api/purchaseRequests.js';
 import { fetchShifts } from '../../api/shifts.js';
@@ -87,8 +88,19 @@ export default function BranchManagerDashboardPage() {
         <StatCard label="Staff assigned" value={loading ? '…' : stats.staffOnShift} icon="staff" />
         <StatCard label="Low stock SKUs" value={loading ? '…' : stats.lowStockSkus} icon="boxes" />
       </div>
-      <Card className="p-4 text-sm text-[var(--admin-muted)]">
-        Revenue metrics will be available after the POS module ships (next sprint).
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+        <div>
+          <p className="font-semibold text-[var(--admin-text)]">Branch Performance</p>
+          <p className="text-[var(--admin-muted)]">
+            Revenue KPIs, trends, and best-selling products for your branch.
+          </p>
+        </div>
+        <Link
+          to="/reports"
+          className="rounded-lg bg-[var(--admin-brand)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+        >
+          Open reports
+        </Link>
       </Card>
     </div>
   );
