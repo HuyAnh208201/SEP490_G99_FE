@@ -66,7 +66,7 @@ export default function PosPaymentPage() {
       setCashError(result.message);
       return;
     }
-    navigate('/pos/history', {
+    navigate('/pos', {
       replace: true,
       state: {
         completedInvoice: result.order.invoiceCode,

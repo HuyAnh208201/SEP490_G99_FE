@@ -144,12 +144,16 @@ export default function PayOSPaymentPage() {
     };
   }, [status, link]);
 
-  // 4. Đã nhận tiền → đẩy đơn vào lịch sử và dọn giỏ.
+  // 4. Đã nhận tiền → dọn giỏ rồi về màn bán hàng kèm popup thành công.
   useEffect(() => {
     if (status !== 'PAID' || settledRef.current) return;
     settledRef.current = true;
     finishPayOSOrder(order);
-  }, [status, order, finishPayOSOrder]);
+    navigate('/pos', {
+      replace: true,
+      state: { completedInvoice: order?.invoiceCode },
+    });
+  }, [status, order, finishPayOSOrder, navigate]);
 
   async function checkNow() {
     if (!link) return;

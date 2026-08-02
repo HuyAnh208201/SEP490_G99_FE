@@ -13,9 +13,15 @@ function unwrap(body) {
 }
 
 export async function fetchProducts() {
-  // POS tải full catalog — timeout dài hơn default 15s để tránh “Could not load products”
-  // khi BE còn chậm (N+1 packaging cũ) hoặc mạng chập chờn.
-  const { data } = await http.get('/products', { timeout: 60000 });
+  const { data } = await http.get('/products');
+  const rows = unwrap(data);
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** Lightweight POS counter catalog — prefer this over fetchProducts(). */
+export async function fetchPosCatalog() {
+  // Mounted on PosOrderController (/api/pos/orders/catalog) so cashiers hit a proven route tree.
+  const { data } = await http.get('/pos/orders/catalog', { timeout: 10000 });
   const rows = unwrap(data);
   return Array.isArray(rows) ? rows : [];
 }
