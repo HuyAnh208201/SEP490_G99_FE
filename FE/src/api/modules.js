@@ -1,4 +1,10 @@
 import { http } from './http.js';
+import {
+  fetchAdminDashboard,
+  fetchBranchManagerDashboard,
+  fetchDirectorDashboard,
+  fetchWarehouseDashboard,
+} from './dashboards.js';
 
 function unwrap(body) {
   if (!body?.success) {
@@ -16,11 +22,11 @@ export async function fetchModule(path) {
 }
 
 export const adminApi = {
-  dashboard: () => fetchModule('/admin/dashboard'),
+  dashboard: () => fetchAdminDashboard(),
 };
 
 export const directorApi = {
-  dashboard: () => fetchModule('/director/dashboard'),
+  dashboard: (params) => fetchDirectorDashboard(params),
   branches: () => fetchModule('/director/branches'),
   performance: () => fetchModule('/director/reports/performance'),
   planning: () => fetchModule('/director/planning'),
@@ -32,7 +38,7 @@ export const branchApi = {
 };
 
 export const branchManagerApi = {
-  dashboard: () => fetchModule('/branch-manager/dashboard'),
+  dashboard: (params) => fetchBranchManagerDashboard(params),
   staff: () => fetchModule('/branch-manager/staff'),
   shifts: () => fetchModule('/branch-manager/shifts'),
   importRequests: () => fetchModule('/branch-manager/import-requests'),
@@ -44,7 +50,7 @@ export const branchManagerApi = {
 };
 
 export const warehouseApi = {
-  dashboard: () => fetchModule('/warehouse/dashboard'),
+  dashboard: () => fetchWarehouseDashboard(),
   inventory: () => fetchModule('/warehouse/inventory'),
   importRequests: () => fetchModule('/warehouse/import-requests'),
   dispatchOrders: () => fetchModule('/warehouse/dispatch-orders'),

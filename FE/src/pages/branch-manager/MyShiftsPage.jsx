@@ -57,7 +57,7 @@ export default function MyShiftsPage() {
     <div className="space-y-6">
       <PageHeader
         title="My shifts"
-        description="Cashier / inventory staff — view assigned shifts and check in."
+        description="Your assigned shifts — view the schedule and check in."
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}

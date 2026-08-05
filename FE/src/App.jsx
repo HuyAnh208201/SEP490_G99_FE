@@ -11,7 +11,6 @@ import SystemSettingsPage from './pages/system/SystemSettingsPage.jsx';
 import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
 import ProductsPage from './pages/catalog/ProductsPage.jsx';
 import SuppliersPage from './pages/catalog/SuppliersPage.jsx';
-import WarehouseDashboardPage from './pages/warehouse/WarehousePages.jsx';
 import WarehouseInventoryPage from './pages/warehouse/WarehouseInventoryPage.jsx';
 import IncomingRequestsPage from './pages/warehouse/IncomingRequestsPage.jsx';
 import DispatchPlanningPage from './pages/warehouse/DispatchPlanningPage.jsx';
@@ -192,11 +191,7 @@ export default function App() {
 
         <Route
           path="/warehouse"
-          element={
-            <PermissionRoute permission="WAREHOUSE_DASHBOARD">
-              <WarehouseDashboardPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/dashboard" replace />}
         />
         <Route
           path="/warehouse/inventory"

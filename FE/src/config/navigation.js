@@ -92,12 +92,6 @@ export const NAV_GROUPS = [
     label: 'Warehouse & imports',
     items: [
       {
-        path: '/warehouse',
-        label: 'Central warehouse',
-        icon: 'warehouse',
-        permissions: ['WAREHOUSE_DASHBOARD'],
-      },
-      {
         path: '/warehouse/incoming-requests',
         label: 'Incoming requests',
         icon: 'inbox',
