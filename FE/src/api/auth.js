@@ -3,15 +3,18 @@ import { http } from './http.js';
 function resolveAuthError(err, fallback) {
   // http.js may wrap API errors as Error(message) with .status (no Axios response).
   const status = err?.response?.status ?? err?.status ?? err?.code;
-  const serverMessage = err?.response?.data?.message || err?.message;
+  const body = err?.response?.data;
+  const serverMessage = typeof body === 'object' && body?.message ? body.message : null;
+  const axiosGeneric = /^Request failed with status code \d+$/i.test(err?.message || '');
 
-  if (!err?.response && status == null) {
+  if (!err?.response && (status == null || status === 'NETWORK_ERROR' || status === 'ECONNABORTED')) {
     return 'Cannot reach the backend. Start BE first on port 4313 (cd BE && mvnw.cmd spring-boot:run).';
   }
-  if ((status === 500 || status === 502 || status === 503 || status === 504) && !serverMessage) {
-    return 'Backend is not running or returned an error. Check http://localhost:4313 is up.';
+  // Vite proxy returns bare 500 when BE on :4313 is down — axios message is useless.
+  if ((status === 500 || status === 502 || status === 503 || status === 504) && (!serverMessage || axiosGeneric)) {
+    return 'Backend is not running on port 4313. Start BE: cd SEB490_G99_BE/BE && mvnw.cmd spring-boot:run';
   }
-  return serverMessage || fallback;
+  return serverMessage || (!axiosGeneric && err?.message) || fallback;
 }
 
 /**
