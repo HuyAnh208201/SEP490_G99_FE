@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 
-const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+const PRODUCT_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+const CUSTOMER_QR_FORMATS = ['qr_code'];
 
-export default function BarcodeScannerModal({ open, onClose, onDetected }) {
+export default function BarcodeScannerModal({
+  open,
+  onClose,
+  onDetected,
+  formats = PRODUCT_FORMATS,
+  title = 'Scan product barcode',
+  hint = 'Point the camera at a product barcode.',
+}) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const frameRef = useRef(0);
@@ -50,8 +58,8 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
         const video = videoRef.current;
         video.srcObject = stream;
         await video.play();
-        const detector = new BarcodeDetector({ formats: FORMATS });
-        setStatus('Point the camera at a product barcode.');
+        const detector = new BarcodeDetector({ formats });
+        setStatus(hint);
 
         let failures = 0;
         const detect = async () => {
@@ -67,7 +75,7 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
                 stopCamera();
                 // Tắt camera là khung hình đen ngay. Phải báo đang gọi API,
                 // không thì người dùng tưởng máy treo.
-                setStatus(`Read barcode ${value} — looking up product…`);
+                setStatus(`Read ${value} — looking up…`);
                 await onDetected(value);
               }
             } catch (error) {
@@ -95,10 +103,11 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
       cancelled = true;
       stopCamera();
     };
-  }, [open, onDetected]);
+  }, [open, onDetected]); // formats/hint are read when opening; avoid restarting camera mid-scan
+
 
   return (
-    <Modal open={open} onClose={onClose} title="Scan product barcode" size="sm">
+    <Modal open={open} onClose={onClose} title={title} size="sm">
       <div className="overflow-hidden rounded-xl bg-black">
         <video ref={videoRef} muted playsInline className="aspect-[3/4] w-full object-cover" />
       </div>
@@ -113,3 +122,5 @@ export default function BarcodeScannerModal({ open, onClose, onDetected }) {
     </Modal>
   );
 }
+
+export { PRODUCT_FORMATS, CUSTOMER_QR_FORMATS };

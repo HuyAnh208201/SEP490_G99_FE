@@ -3,7 +3,7 @@ import Modal from '../../../components/ui/Modal.jsx';
 const STEPS = [
   'Open your assigned shift before selling.',
   'Search, scan, or tap + to add products to the cart.',
-  'Optional: attach a customer to redeem or earn loyalty points.',
+  'Optional: type or scan the customer phone QR to redeem or earn loyalty points.',
   'Press Checkout to open the Payment screen (Cash or PayOS).',
   'End shift from the header when you finish.',
 ];
@@ -13,7 +13,7 @@ const SHORTCUTS = [
   { keys: 'F2', action: 'Open barcode scanner' },
   { keys: 'F3', action: 'Focus product search' },
   { keys: 'F4', action: 'Checkout / confirm payment' },
-  { keys: 'F9', action: 'Open customer lookup' },
+  { keys: 'F9', action: 'Focus customer phone / loyalty attach' },
   { keys: 'Esc', action: 'Close dialogs or go back' },
   { keys: '↑ / ↓', action: 'Select cart line' },
   { keys: '+ / −', action: 'Change quantity of selected line' },
