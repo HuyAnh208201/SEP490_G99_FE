@@ -15,7 +15,7 @@ export async function fetchLoyaltyConfig() {
   return unwrap(data);
 }
 
-/** Tra cứu khách hàng khớp chính xác SĐT hoặc email → { customerId, fullName, email, phone, totalPoints }. */
+/** Tra cứu khách hàng khớp chính xác SĐT hoặc email → { customerId, fullName, email, phone, totalPoints, tierCode, tierName }. */
 export async function lookupCustomer(phoneOrEmail) {
   const { data } = await http.get('/cashier/customer', {
     params: { phoneOrEmail },
@@ -29,16 +29,6 @@ export async function searchCustomers(keyword) {
     params: { keyword },
   });
   return unwrap(data) ?? [];
-}
-
-/** Tạo nhanh khách mới tại quầy → cùng shape với lookupCustomer. */
-export async function createCustomer({ fullName, phone, email }) {
-  const payload = { fullName, phone };
-  if (email != null && String(email).trim() !== '') {
-    payload.email = String(email).trim();
-  }
-  const { data } = await http.post('/cashier/customer', payload);
-  return unwrap(data);
 }
 
 /**

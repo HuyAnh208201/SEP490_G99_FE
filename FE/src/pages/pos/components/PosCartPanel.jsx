@@ -21,6 +21,14 @@ function PersonIcon() {
   );
 }
 
+function ScanIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2M7 12h10" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function PosCartPanel({
   lines,
   totals,
@@ -34,7 +42,17 @@ export default function PosCartPanel({
   clearDiscountCode,
   updateQty,
   removeLine,
-  onOpenCustomer,
+  customerPhone = '',
+  onCustomerPhoneChange,
+  onLookupCustomer,
+  onScanCustomer,
+  onClearCustomer,
+  customerBusy = false,
+  customerLookupError = '',
+  customerPhoneInputRef,
+  pointsToRedeem = 0,
+  setPointsToRedeem,
+  loyalty,
   onClearCart,
   onCheckout,
   selectedKey: selectedKeyProp,
@@ -79,34 +97,148 @@ export default function PosCartPanel({
     changeQuantity(line, capped);
   }
 
+  const maxRedeemable =
+    customer && loyalty?.pointValueVnd > 0
+      ? Math.min(
+          customer.points,
+          Math.floor(
+            Math.max(0, totals.subtotalAfterPromo - totals.codeDiscount) / loyalty.pointValueVnd,
+          ),
+        )
+      : 0;
+
   return (
     <aside
       className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)] ${
         readOnly ? 'h-full' : 'xl:sticky xl:top-3 xl:h-[calc(100vh-80px)]'
       } ${className}`}
     >
-      <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-4 py-3">
-        <div>
-          <h2 className="text-base font-bold text-[var(--admin-text)]">Current order</h2>
-          <p className="text-xs text-[var(--admin-subtle)]">
-            {readOnly ? 'Ready for payment' : 'Draft'} · {totals.itemCount} items
-          </p>
+      <div className="border-b border-[var(--admin-border)] px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-bold text-[var(--admin-text)]">Current order</h2>
+            <p className="text-xs text-[var(--admin-subtle)]">
+              {readOnly ? 'Ready for payment' : 'Draft'} · {totals.itemCount} items
+            </p>
+          </div>
         </div>
+
         {readOnly ? (
-          <div className="inline-flex min-h-10 max-w-[46%] items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 text-xs font-semibold text-[var(--admin-text)]">
-            <PersonIcon />
-            <span className="truncate">{customer ? customer.fullName : 'Walk-in'}</span>
+          <div className="mt-3 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2.5">
+            {customer ? (
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[var(--admin-text)]">{customer.fullName}</p>
+                <p className="mt-0.5 text-xs tabular-nums text-[var(--admin-muted)]">{customer.phone}</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {customer.tierName || customer.tierCode ? (
+                    <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--admin-brand)]">
+                      {customer.tierName || customer.tierCode}
+                    </span>
+                  ) : null}
+                  <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--admin-text)]">
+                    {customer.points} pts
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 text-xs font-semibold text-[var(--admin-muted)]">
+                <PersonIcon />
+                Walk-in
+              </div>
+            )}
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onOpenCustomer}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 text-xs font-semibold text-[var(--admin-text)] transition hover:border-[var(--admin-brand)] hover:text-[var(--admin-brand)]"
-          >
-            <PersonIcon />
-            {customer ? customer.fullName : 'Customer'}
-            <kbd className="rounded bg-[#f0f4f8] px-1 py-0.5 text-[10px] font-bold text-[var(--admin-subtle)]">F9</kbd>
-          </button>
+          <div className="mt-3 space-y-2">
+            <label className="block text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+              Customer phone number
+            </label>
+            <div className="flex gap-2">
+              <input
+                ref={customerPhoneInputRef}
+                value={customerPhone}
+                onChange={(event) => onCustomerPhoneChange?.(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    onLookupCustomer?.(customerPhone);
+                  }
+                }}
+                onBlur={() => {
+                  if (customerPhone.trim() && !customer) {
+                    onLookupCustomer?.(customerPhone);
+                  }
+                }}
+                placeholder="0912345678"
+                inputMode="tel"
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm tabular-nums outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+              />
+              <button
+                type="button"
+                onClick={onScanCustomer}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-brand)] text-white transition hover:bg-[var(--admin-brand-hover)]"
+                aria-label="Scan customer QR"
+                title="Scan customer QR"
+              >
+                <ScanIcon />
+              </button>
+            </div>
+            {customerBusy && (
+              <p className="text-[11px] font-medium text-[var(--admin-subtle)]">Looking up…</p>
+            )}
+            {customerLookupError && !customerBusy && (
+              <p className="text-xs text-[var(--admin-danger)]">{customerLookupError}</p>
+            )}
+            {customer ? (
+              <div className="rounded-xl border border-[#0058be]/20 bg-[#0058be]/5 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--admin-text)]">{customer.fullName}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {customer.tierName || customer.tierCode ? (
+                        <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--admin-brand)]">
+                          {customer.tierName || customer.tierCode}
+                        </span>
+                      ) : null}
+                      <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-semibold text-[var(--admin-text)]">
+                        {customer.points} pts
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onClearCustomer}
+                    className="shrink-0 text-xs font-semibold text-[var(--admin-danger)] hover:underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+                {customer.points > 0 && setPointsToRedeem && loyalty && (
+                  <label className="mt-3 block text-[11px] font-semibold text-[var(--admin-muted)]">
+                    Redeem points · 1 pt = {formatVnd(loyalty.pointValueVnd)}
+                    <input
+                      type="number"
+                      min="0"
+                      max={maxRedeemable}
+                      step="1"
+                      value={pointsToRedeem}
+                      onChange={(event) => {
+                        const raw = Math.floor(Number(event.target.value) || 0);
+                        setPointsToRedeem(Math.max(0, Math.min(maxRedeemable, raw)));
+                      }}
+                      className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none"
+                    />
+                  </label>
+                )}
+                {(totals.pointsUsed > 0 || totals.pointsEarned > 0) && (
+                  <p className="mt-2 text-[11px] font-medium text-[var(--admin-success)]">
+                    {totals.pointsUsed > 0 ? `${totals.pointsUsed} pts redeemed. ` : ''}
+                    {totals.pointsEarned > 0 ? `Earn ~${totals.pointsEarned} pts.` : ''}
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
 

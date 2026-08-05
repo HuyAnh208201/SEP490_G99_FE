@@ -10,7 +10,7 @@ import {
 import { hasPromo, toPosProduct, unitPrice } from '../pages/pos/posProduct.js';
 import {
   fetchLoyaltyConfig as apiFetchLoyaltyConfig,
-  searchCustomers as apiSearchCustomers,
+  lookupCustomer as apiLookupCustomer,
 } from '../api/cashier.js';
 import {
   checkout as apiCheckout,
@@ -18,13 +18,7 @@ import {
   lookupVoucher as apiLookupVoucher,
 } from '../api/posOrders.js';
 import { scanBarcode as apiScanBarcode } from '../api/barcode.js';
-import {
-  normalizePhone,
-  validateEmail,
-  validateRequiredName,
-  validateVnPhone,
-  NAME_MAX_LENGTH,
-} from '../lib/validation.js';
+import { normalizePhone, validateVnPhone } from '../lib/validation.js';
 
 /** Fallback khi chưa tải được cấu hình từ server; server vẫn là nguồn sự thật khi chốt đơn. */
 const DEFAULT_LOYALTY = { vndPerPoint: 10000, pointValueVnd: 1000 };
@@ -40,6 +34,8 @@ function toCustomer(data) {
     email: data.email,
     phone: data.phone,
     points: data.totalPoints ?? 0,
+    tierCode: data.tierCode ?? null,
+    tierName: data.tierName ?? null,
   };
 }
 
@@ -100,10 +96,6 @@ export function PosCartProvider({ children }) {
   const [customer, setCustomer] = useState(null);
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerLookupError, setCustomerLookupError] = useState('');
-  /** Nhiều khách cùng khớp một phần SĐT → cashier chọn tay. */
-  const [customerResults, setCustomerResults] = useState([]);
-  /** Tra không ra ai → mở form tạo nhanh. */
-  const [customerNotFound, setCustomerNotFound] = useState(false);
   const [customerBusy, setCustomerBusy] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   /** Chốt đơn là thao tác ghi DB — ref chặn double-click chắc hơn state. */
@@ -261,102 +253,82 @@ export function PosCartProvider({ children }) {
     setCustomer(null);
     setCustomerPhone('');
     setCustomerLookupError('');
-    setCustomerResults([]);
-    setCustomerNotFound(false);
     setDiscountCodeInput('');
     setAppliedVoucher(null);
     setDiscountCodeError('');
     setPointsToRedeem(0);
   }, []);
 
-  /**
-   * Gắn khách mới vào đơn nhưng CHƯA ghi DB — chỉ giữ tên + SĐT trong giỏ.
-   * Khách chỉ được tạo thật khi thanh toán thành công, xem completeCashPayment.
-   */
-  const stageNewCustomer = useCallback(({ fullName, phone, email = null }) => {
-    const nameError = validateRequiredName(fullName, {
-      label: 'Customer name',
-      max: NAME_MAX_LENGTH,
-    });
-    if (nameError) {
-      setCustomerLookupError(nameError);
-      return { ok: false, message: nameError };
-    }
-    const phoneError = validateVnPhone(phone, { required: true, label: 'Phone number' });
-    if (phoneError) {
-      setCustomerLookupError(phoneError);
-      return { ok: false, message: phoneError };
-    }
-    const number = normalizePhone(phone);
-    const name = String(fullName ?? '').trim();
-    const mail = email == null || String(email).trim() === '' ? null : String(email).trim();
-    if (mail) {
-      const emailError = validateEmail(mail);
-      if (emailError) {
-        setCustomerLookupError(emailError);
-        return { ok: false, message: emailError };
-      }
-    }
-    setCustomer({
-      id: null,
-      fullName: name,
-      email: mail,
-      phone: number,
-      points: 0,
-      pending: true,
-    });
-    setCustomerPhone(number);
-    setCustomerResults([]);
-    setCustomerNotFound(false);
-    setCustomerLookupError('');
-    setPointsToRedeem(0);
-    return { ok: true };
-  }, []);
-
   /** Gỡ khách khỏi đơn hiện tại (không xóa tài khoản trong DB). */
   const clearCustomer = useCallback(() => {
     setCustomer(null);
     setCustomerPhone('');
-    setCustomerResults([]);
-    setCustomerNotFound(false);
     setCustomerLookupError('');
     setPointsToRedeem(0);
   }, []);
+
+  /** Update phone draft; detach loyalty customer if the number no longer matches. */
+  const setCustomerPhoneDraft = useCallback((value) => {
+    const next = String(value ?? '');
+    setCustomerPhone(next);
+    setCustomerLookupError('');
+    setCustomer((prev) => {
+      if (!prev) return null;
+      if (normalizePhone(next) === normalizePhone(prev.phone || '')) return prev;
+      return null;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!customer) setPointsToRedeem(0);
+  }, [customer]);
 
   const selectCustomer = useCallback((found) => {
     setCustomer(found);
-    setCustomerResults([]);
-    setCustomerNotFound(false);
+    setCustomerPhone(found?.phone ?? '');
     setCustomerLookupError('');
     setPointsToRedeem(0);
   }, []);
 
-  /** Tra theo một phần SĐT / tên. Luôn hiện danh sách để cashier chọn, tránh chọn nhầm khi trùng tên. */
-  const lookupCustomer = useCallback(async (keyword) => {
-    const value = String(keyword ?? '').trim();
+  /**
+   * Exact phone (or email) lookup for loyalty attach — used by typed phone + customer QR.
+   * No create-at-counter: unknown phone stays walk-in until a registered account is found.
+   */
+  const lookupCustomerByPhone = useCallback(async (phoneOrEmail) => {
+    const value = normalizePhone(phoneOrEmail);
     setCustomerPhone(value);
-    setCustomerResults([]);
-    setCustomerNotFound(false);
+    setCustomerLookupError('');
     if (!value) {
-      setCustomerResults([]);
-      setCustomerNotFound(false);
-      setCustomerLookupError('');
-      return { ok: true, retail: true };
+      setCustomer(null);
+      setPointsToRedeem(0);
+      return { ok: true, cleared: true };
     }
+
+    const phoneError = validateVnPhone(value, { required: true, label: 'Phone number' });
+    // Allow email-shaped lookups without VN phone validation.
+    const looksLikeEmail = value.includes('@');
+    if (!looksLikeEmail && phoneError) {
+      setCustomer(null);
+      setPointsToRedeem(0);
+      setCustomerLookupError(phoneError);
+      return { ok: false, message: phoneError };
+    }
+
     setCustomerBusy(true);
     try {
-      const matches = await apiSearchCustomers(value);
-      if (matches.length === 0) {
-        setCustomerNotFound(true);
-        setCustomerLookupError('');
-        return { ok: false, notFound: true };
-      }
-      setCustomerResults(matches.map(toCustomer));
+      const found = await apiLookupCustomer(value);
+      const mapped = toCustomer(found);
+      setCustomer(mapped);
+      setCustomerPhone(mapped.phone || value);
       setCustomerLookupError('');
-      return { ok: true, multiple: matches.length > 1, count: matches.length };
+      setPointsToRedeem(0);
+      return { ok: true, customer: mapped };
     } catch (error) {
-      setCustomerLookupError(error.message || 'Customer lookup failed');
-      return { ok: false };
+      setCustomer(null);
+      setPointsToRedeem(0);
+      const message = error.message || 'Customer not found';
+      setCustomerLookupError(message);
+      return { ok: false, notFound: true, message };
     } finally {
       setCustomerBusy(false);
     }
@@ -432,7 +404,7 @@ export function PosCartProvider({ children }) {
           paymentMethod,
           cashReceived: paymentMethod === 'CASH' ? receivedAmount : null,
           customerPhone: customer?.phone ? normalizePhone(customer.phone) : null,
-          customerName: customer?.pending ? customer.fullName : null,
+          customerName: null,
           voucherCode: appliedVoucher?.code ?? null,
           // pointsUsed đã bị chặn trên theo tổng đơn, không phải số thô cashier gõ.
           pointsToRedeem: totals.pointsUsed,
@@ -477,7 +449,7 @@ export function PosCartProvider({ children }) {
         paymentMethod: 'PAYOS',
         cashReceived: null,
         customerPhone: customer?.phone ?? null,
-        customerName: customer?.pending ? customer.fullName : null,
+        customerName: null,
         voucherCode: appliedVoucher?.code ?? null,
         pointsToRedeem: totals.pointsUsed,
       });
@@ -505,9 +477,9 @@ export function PosCartProvider({ children }) {
       lines,
       customer,
       customerPhone,
+      setCustomerPhone,
+      setCustomerPhoneDraft,
       customerLookupError,
-      customerResults,
-      customerNotFound,
       customerBusy,
       checkoutBusy,
       discountCodeInput,
@@ -529,10 +501,9 @@ export function PosCartProvider({ children }) {
       updateQty,
       removeLine,
       clearCart,
-      lookupCustomer,
+      lookupCustomerByPhone,
       selectCustomer,
       clearCustomer,
-      stageNewCustomer,
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,
@@ -544,8 +515,6 @@ export function PosCartProvider({ children }) {
       customer,
       customerPhone,
       customerLookupError,
-      customerResults,
-      customerNotFound,
       customerBusy,
       checkoutBusy,
       discountCodeInput,
@@ -564,10 +533,10 @@ export function PosCartProvider({ children }) {
       updateQty,
       removeLine,
       clearCart,
-      lookupCustomer,
+      lookupCustomerByPhone,
       selectCustomer,
       clearCustomer,
-      stageNewCustomer,
+      setCustomerPhoneDraft,
       applyDiscountCode,
       clearDiscountCode,
       completeCashPayment,

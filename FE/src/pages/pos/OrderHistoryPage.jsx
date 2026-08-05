@@ -202,7 +202,7 @@ export default function OrderHistoryPage() {
                     {order.invoiceCode}
                   </td>
                   <td className="px-4 py-3 text-[var(--admin-muted)]">{formatWhen(order.createdAt)}</td>
-                  <td className="px-4 py-3">{order.customerName}</td>
+                  <td className="px-4 py-3">{order.customerName || 'Walk-in'}</td>
                   <td className="px-4 py-3">{order.itemCount}</td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-[#0058be]/10 px-2 py-0.5 text-xs font-semibold text-[var(--admin-brand)]">
@@ -272,8 +272,24 @@ export default function OrderHistoryPage() {
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Invoice ID</dt><dd className="font-semibold">{selected.invoiceCode}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Date & Time</dt><dd className="text-right">{formatWhen(selected.createdAt)}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Cashier</dt><dd>Current Cashier</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Customer</dt><dd>{selected.customerName}</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Customer</dt><dd>{selected.customerName || 'Walk-in'}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Payment Method</dt><dd>{selected.paymentMethod}</dd></div>
+                {(selected.pointsRedeemed > 0 || selected.pointsEarned > 0) && (
+                  <>
+                    {selected.pointsRedeemed > 0 ? (
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--admin-subtle)]">Points redeemed</dt>
+                        <dd>{selected.pointsRedeemed}</dd>
+                      </div>
+                    ) : null}
+                    {selected.pointsEarned > 0 ? (
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-[var(--admin-subtle)]">Points earned</dt>
+                        <dd>{selected.pointsEarned}</dd>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </dl>
             ) : (
               <p className="mt-4 text-sm text-[var(--admin-subtle)]">Select an invoice.</p>
@@ -307,9 +323,27 @@ export default function OrderHistoryPage() {
                 <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--admin-muted)]">
                   Order Summary
                 </h2>
-                <div className="mt-4 flex items-center justify-between border-t border-[var(--admin-border)] pt-3">
-                  <span className="font-semibold">Total Amount Due</span>
-                  <span className="text-lg font-bold text-[var(--admin-brand)]">{formatVnd(selected.total)}</span>
+                <div className="mt-4 space-y-1.5 border-t border-[var(--admin-border)] pt-3 text-sm">
+                  {(selected.pointsRedeemed > 0 || selected.pointsEarned > 0) && (
+                    <>
+                      {selected.pointsRedeemed > 0 ? (
+                        <div className="flex justify-between text-[var(--admin-muted)]">
+                          <span>Points redeemed</span>
+                          <span>−{selected.pointsRedeemed}</span>
+                        </div>
+                      ) : null}
+                      {selected.pointsEarned > 0 ? (
+                        <div className="flex justify-between text-[var(--admin-muted)]">
+                          <span>Points earned</span>
+                          <span>+{selected.pointsEarned}</span>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="font-semibold">Total Amount Due</span>
+                    <span className="text-lg font-bold text-[var(--admin-brand)]">{formatVnd(selected.total)}</span>
+                  </div>
                 </div>
               </section>
 
