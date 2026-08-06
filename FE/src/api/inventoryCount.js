@@ -25,9 +25,9 @@ function asList(data) {
   return [];
 }
 
-/** Phiếu kiểm kê: sản phẩm + số hệ thống của chi nhánh. */
-export async function getCountSheet() {
-  const { data } = await http.get(`${BASE}/sheet`);
+/** Phiếu kiểm kê: sản phẩm + số hệ thống của chi nhánh (paged). */
+export async function getCountSheet(params = {}) {
+  const { data } = await http.get(`${BASE}/sheet`, { params: compactPageParams(params) });
   return unwrap(data);
 }
 
