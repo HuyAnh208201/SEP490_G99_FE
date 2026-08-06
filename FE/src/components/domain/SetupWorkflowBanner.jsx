@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchBranches } from '../../api/branches.js';
 import { fetchCampaigns } from '../../api/campaigns.js';
-import { fetchProducts } from '../../api/products.js';
 import { fetchSuppliers } from '../../api/suppliers.js';
 import { fetchUsers } from '../../api/users.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
@@ -26,7 +25,7 @@ const STEP_CHECKS = {
  */
 export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
   const { has } = usePermissions();
-  const { getCategories, getProducts, getSuppliers } = useReferenceData();
+  const { getCategories, getProductCount, getSuppliers } = useReferenceData();
   const [counts, setCounts] = useState({
     categories: 0,
     products: 0,
@@ -54,7 +53,7 @@ export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
     async function loadProgress() {
       const tasks = [
         ['categories', getCategories()],
-        ['products', getProducts()],
+        ['products', getProductCount()],
         ['suppliers', has('SUPPLIER_MANAGEMENT') ? getSuppliers() : Promise.resolve([])],
         ['branches', has('BRANCH_LIST_ADMIN') ? fetchBranches() : Promise.resolve([])],
         ['users', has('USER_MANAGEMENT_LIST') ? fetchUsers() : Promise.resolve([])],
@@ -72,8 +71,16 @@ export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
       };
       tasks.forEach(([key], idx) => {
         const result = results[idx];
-        next[key] =
-          result.status === 'fulfilled' && Array.isArray(result.value) ? result.value.length : 0;
+        if (result.status !== 'fulfilled') {
+          next[key] = 0;
+          return;
+        }
+        const value = result.value;
+        if (key === 'products') {
+          next[key] = Number(value) || 0;
+        } else {
+          next[key] = Array.isArray(value) ? value.length : 0;
+        }
       });
       if (!cancelled) setCounts(next);
     }
@@ -82,7 +89,7 @@ export default function SetupWorkflowBanner({ counts: countsProp } = {}) {
     return () => {
       cancelled = true;
     };
-  }, [has, countsProp, getCategories, getProducts, getSuppliers]);
+  }, [has, countsProp, getCategories, getProductCount, getSuppliers]);
 
   const completedSetupSteps = SETUP_WORKFLOW.filter((step) =>
     STEP_CHECKS[step.step]?.(counts),

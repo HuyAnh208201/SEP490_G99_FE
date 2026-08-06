@@ -12,16 +12,35 @@ function unwrap(body) {
   return body.data;
 }
 
+/** @deprecated Prefer fetchProductsPage — soft-capped on BE (max 100). */
 export async function fetchProducts() {
   const { data } = await http.get('/products');
   const rows = unwrap(data);
   return Array.isArray(rows) ? rows : [];
 }
 
-/** Lightweight POS counter catalog — prefer this over fetchProducts(). */
-export async function fetchPosCatalog() {
-  // Mounted on PosOrderController (/api/pos/orders/catalog) so cashiers hit a proven route tree.
-  const { data } = await http.get('/pos/orders/catalog', { timeout: 10000 });
+export async function fetchProductCount() {
+  const { data } = await http.get('/products/count');
+  return Number(unwrap(data)) || 0;
+}
+
+/**
+ * Lightweight POS counter catalog (paged).
+ * @param {{ search?: string, page?: number, size?: number, categoryId?: number }} [params]
+ */
+export async function fetchPosCatalog(params = {}) {
+  const { data } = await http.get('/pos/orders/catalog', {
+    timeout: 10000,
+    params: {
+      ...compactPageParams(params),
+      paged: true,
+      categoryId: params.categoryId,
+    },
+  });
+  // Paged response shape from successPage
+  if (data?.data?.listObjects || data?.data?.content) {
+    return unwrapPage(data).items;
+  }
   const rows = unwrap(data);
   return Array.isArray(rows) ? rows : [];
 }

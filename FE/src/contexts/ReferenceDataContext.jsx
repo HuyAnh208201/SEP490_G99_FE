@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { fetchCategories } from '../api/categories.js';
-import { fetchProducts } from '../api/products.js';
+import { fetchProductCount } from '../api/products.js';
 import { fetchSuppliers } from '../api/suppliers.js';
 
 const ReferenceDataContext = createContext(null);
@@ -8,7 +8,7 @@ const CACHE_MS = 60_000;
 
 export function ReferenceDataProvider({ children }) {
   const cacheRef = useRef({
-    products: { at: 0, data: null, promise: null },
+    productCount: { at: 0, data: null, promise: null },
     categories: { at: 0, data: null, promise: null },
     suppliers: { at: 0, data: null, promise: null },
   });
@@ -18,7 +18,7 @@ export function ReferenceDataProvider({ children }) {
   const loadCached = useCallback(async (key, loader) => {
     const now = Date.now();
     const entry = cacheRef.current[key];
-    if (entry.data && now - entry.at < CACHE_MS) {
+    if (entry.data != null && now - entry.at < CACHE_MS) {
       return entry.data;
     }
     if (entry.promise) {
@@ -38,10 +38,16 @@ export function ReferenceDataProvider({ children }) {
     return entry.promise;
   }, []);
 
-  const getProducts = useCallback(
-    () => loadCached('products', fetchProducts),
+  /** Returns a number (product count) — not a full product list. */
+  const getProductCount = useCallback(
+    () => loadCached('productCount', fetchProductCount),
     [loadCached],
   );
+  /** @deprecated Use getProductCount — kept for callers that only need length > 0. */
+  const getProducts = useCallback(async () => {
+    const count = await getProductCount();
+    return { length: count };
+  }, [getProductCount]);
   const getCategories = useCallback(
     () => loadCached('categories', fetchCategories),
     [loadCached],
@@ -52,7 +58,9 @@ export function ReferenceDataProvider({ children }) {
   );
 
   const invalidate = useCallback((key) => {
-    if (key) {
+    if (key === 'products') {
+      cacheRef.current.productCount = { at: 0, data: null, promise: null };
+    } else if (key) {
       cacheRef.current[key] = { at: 0, data: null, promise: null };
     } else {
       Object.keys(cacheRef.current).forEach((k) => {
@@ -63,8 +71,8 @@ export function ReferenceDataProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ getProducts, getCategories, getSuppliers, invalidate, version }),
-    [getProducts, getCategories, getSuppliers, invalidate, version],
+    () => ({ getProducts, getProductCount, getCategories, getSuppliers, invalidate, version }),
+    [getProducts, getProductCount, getCategories, getSuppliers, invalidate, version],
   );
 
   return <ReferenceDataContext.Provider value={value}>{children}</ReferenceDataContext.Provider>;

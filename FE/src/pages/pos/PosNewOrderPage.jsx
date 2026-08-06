@@ -210,14 +210,18 @@ export default function PosNewOrderPage() {
     updateQty,
   ]);
 
-  const loadCatalog = useCallback(async ({ silent = false } = {}) => {
+  const loadCatalog = useCallback(async ({ silent = false, search = '' } = {}) => {
     // Nhịp tải nền (focus/đổi tab) có thể về sau nhịp mới hơn — chỉ nhận kết quả
     // của lần gọi cuối cùng để danh sách không bị nhảy về dữ liệu cũ.
     const requestId = catalogRequestRef.current + 1;
     catalogRequestRef.current = requestId;
     if (!silent) setCatalogLoading(true);
     try {
-      const rows = await fetchPosCatalog();
+      const rows = await fetchPosCatalog({
+        page: 1,
+        size: 100,
+        search: search || undefined,
+      });
       if (requestId !== catalogRequestRef.current) return false;
       setCatalog(rows.map(toPosProduct));
       setCatalogError('');
@@ -240,22 +244,22 @@ export default function PosNewOrderPage() {
   useEffect(() => {
     let cancelled = false;
     let retryTimer;
+    let searchTimer;
 
     const softRefresh = () => {
-      if (!cancelled) loadCatalog({ silent: true });
+      if (!cancelled) loadCatalog({ silent: true, search: query });
     };
     const onVisible = () => {
       if (!document.hidden) softRefresh();
     };
 
     (async () => {
-      const ok = await loadCatalog({ silent: false });
+      const ok = await loadCatalog({ silent: false, search: query });
       if (cancelled || ok) return;
-      // One quick retry only — avoid multi-minute skeleton loops.
       await new Promise((resolve) => {
         retryTimer = window.setTimeout(resolve, 800);
       });
-      if (!cancelled) await loadCatalog({ silent: false });
+      if (!cancelled) await loadCatalog({ silent: false, search: query });
     })();
 
     window.addEventListener('focus', softRefresh);
@@ -263,10 +267,21 @@ export default function PosNewOrderPage() {
     return () => {
       cancelled = true;
       window.clearTimeout(retryTimer);
+      window.clearTimeout(searchTimer);
       window.removeEventListener('focus', softRefresh);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [loadCatalog]);
+
+  // Debounced server search when cashier types a longer query
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) return undefined;
+    const timer = window.setTimeout(() => {
+      loadCatalog({ silent: true, search: term });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [query, loadCatalog]);
 
   // Máy bán hàng (không bật chế độ máy quét) hỏi mã mới từ điện thoại mỗi 2 giây
   // rồi tự thêm vào giỏ. Dùng chuỗi setTimeout thay vì setInterval để 2 nhịp
