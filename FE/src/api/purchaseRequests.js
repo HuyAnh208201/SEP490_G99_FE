@@ -1,4 +1,6 @@
 import { http } from './http.js';
+import { compactPageParams, unwrapPage } from './pagination.js';
+import { fetchProductsPage } from './products.js';
 import {
   flattenConsolidated,
   normalizeRequestDetail,
@@ -6,7 +8,6 @@ import {
   toApprovePayload,
   toDraftPayload,
 } from '../lib/purchaseRequestMappers.js';
-import { compactPageParams, unwrapPage } from './pagination.js';
 
 /**
  * Purchase Requests API — real backend only.
@@ -166,10 +167,9 @@ export async function fetchRequestBranches() {
   }));
 }
 
-export async function fetchRequestProducts() {
-  const { data } = await http.get('/products');
-  const rows = unwrap(data);
-  return (Array.isArray(rows) ? rows : []).map((p) => ({
+export async function fetchRequestProducts(params = {}) {
+  const page = await fetchProductsPage({ page: 1, size: 50, ...params });
+  return (page.items || []).map((p) => ({
     id: p.id,
     code: p.code,
     name: p.name,
