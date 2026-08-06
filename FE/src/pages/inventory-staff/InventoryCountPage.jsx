@@ -6,6 +6,8 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import NavIcon from '../../components/layout/NavIcon.jsx';
 import { unitLabel } from '../../constants/productUnits.js';
 import { getCountSheet, submitCount } from '../../api/inventoryCount.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
+import { isDemoIsEmail } from '../../lib/demoAccounts.js';
 
 const inputClass =
   'w-24 rounded-lg border border-[var(--admin-border)] bg-white px-2 py-1.5 text-right text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -26,6 +28,7 @@ function pad2(n) {
 
 export default function InventoryCountPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [now, setNow] = useState(() => new Date());
   const [sheet, setSheet] = useState(null);
   const [form, setForm] = useState({});
@@ -42,13 +45,13 @@ export default function InventoryCountPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const locked = isStoreOpen(now);
+  const locked = isStoreOpen(now) && !isDemoIsEmail(user?.email);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await getCountSheet();
+      const data = await getCountSheet({ page: 1, size: 100 });
       setSheet(data);
       const initial = {};
       (data.products || []).forEach((p) => {
@@ -110,11 +113,17 @@ export default function InventoryCountPage() {
 
   async function submit() {
     setError('');
-    const items = products.map((p) => ({
-      productId: p.productId,
-      countedQty: Number(form[p.productId]?.counted) || 0,
-      note: form[p.productId]?.note?.trim() || undefined,
-    }));
+    const items = products
+      .filter((p) => form[p.productId]?.counted !== '')
+      .map((p) => ({
+        productId: p.productId,
+        countedQty: Number(form[p.productId]?.counted) || 0,
+        note: form[p.productId]?.note?.trim() || undefined,
+      }));
+    if (!items.length) {
+      setError('Enter at least one counted quantity before submitting.');
+      return;
+    }
     setSubmitting(true);
     try {
       await submitCount({ items });
