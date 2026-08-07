@@ -11,6 +11,7 @@ import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
@@ -28,6 +29,7 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
 
   useEffect(() => {
     fetchCategories().then((data) => setAllCategories(Array.isArray(data) ? data : [])).catch(() => setAllCategories([]));
@@ -79,7 +81,12 @@ export default function CategoriesPage() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Delete this category?')) return;
+    setDeleteTargetId(id);
+  }
+
+  async function confirmDelete() {
+    const id = deleteTargetId;
+    if (!id) return;
     try {
       await deleteCategory(id);
       if (editingId === id) cancelEdit();
@@ -230,6 +237,16 @@ export default function CategoriesPage() {
           <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        title="Delete category"
+        message="Delete this category?"
+        confirmLabel="Confirm"
+        danger
+      />
     </div>
   );
 }

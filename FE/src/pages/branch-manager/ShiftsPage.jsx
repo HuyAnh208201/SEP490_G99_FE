@@ -11,6 +11,7 @@ import {
   setupAndPublishWeek,
 } from '../../api/shifts.js';
 import Button from '../../components/ui/Button.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import { deriveShiftSlots, MAX_SHIFT_HOURS, parseOperatingHours } from '../../lib/operatingHours.js';
 import AssignModal from './shifts/AssignModal.jsx';
 import ScheduleGrid from './shifts/ScheduleGrid.jsx';
@@ -41,6 +42,7 @@ export default function ShiftsPage() {
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const [assignCtx, setAssignCtx] = useState(null);
   const [cashierIds, setCashierIds] = useState([]);
@@ -315,10 +317,16 @@ export default function ShiftsPage() {
 
   async function handleCopyWeek() {
     if (!branchId) return;
-    const ok = window.confirm(
-      'Copy Mon–Sun assignments from last week into empty slots? Existing assignments are kept.',
-    );
-    if (!ok) return;
+    setConfirmAction({
+      type: 'copy',
+      title: 'Copy previous week',
+      message:
+        'Copy Mon–Sun assignments from last week into empty slots? Existing assignments are kept.',
+    });
+  }
+
+  async function runCopyWeek() {
+    if (!branchId) return;
     setBusy('copy');
     setError('');
     setInfo('');
@@ -342,10 +350,15 @@ export default function ShiftsPage() {
 
   async function handlePublishWeek() {
     if (!branchId || weekStats.ready < 1) return;
-    const ok = window.confirm(
-      `Publish ${weekStats.ready} ready draft slot(s)? ${weekStats.incomplete} incomplete and ${weekStats.empty} empty will be skipped.`,
-    );
-    if (!ok) return;
+    setConfirmAction({
+      type: 'publish-week',
+      title: 'Publish week',
+      message: `Publish ${weekStats.ready} ready draft slot(s)? ${weekStats.incomplete} incomplete and ${weekStats.empty} empty will be skipped.`,
+    });
+  }
+
+  async function runPublishWeek() {
+    if (!branchId || weekStats.ready < 1) return;
     setBusy('publish-week');
     setError('');
     setInfo('');
@@ -477,12 +490,21 @@ export default function ShiftsPage() {
     if (ready.length < 1) return;
 
     const skipped = editable.length - ready.length;
-    const ok = window.confirm(
-      skipped > 0
-        ? `Publish ${ready.length} ready slot(s)? ${skipped} empty/incomplete slot(s) will be skipped (holidays / days off).`
-        : `Assign and publish ${ready.length} slot(s) for this week?`,
-    );
-    if (!ok) return;
+    setConfirmAction({
+      type: 'setup-publish',
+      title: 'Assign and publish',
+      message:
+        skipped > 0
+          ? `Publish ${ready.length} ready slot(s)? ${skipped} empty/incomplete slot(s) will be skipped (holidays / days off).`
+          : `Assign and publish ${ready.length} slot(s) for this week?`,
+      ready,
+    });
+  }
+
+  async function runSetupPublish(readySlots) {
+    if (!branchId || !setupWeekStart) return;
+    const ready = readySlots || [];
+    if (ready.length < 1) return;
     setBusy('setup-publish');
     setSetupError('');
     try {
@@ -507,6 +529,14 @@ export default function ShiftsPage() {
     } finally {
       setBusy('');
     }
+  }
+
+  function runConfirmAction() {
+    const action = confirmAction;
+    if (!action) return;
+    if (action.type === 'copy') runCopyWeek();
+    else if (action.type === 'publish-week') runPublishWeek();
+    else if (action.type === 'setup-publish') runSetupPublish(action.ready);
   }
 
   const hours = parseOperatingHours(operatingHours);
@@ -670,6 +700,15 @@ export default function ShiftsPage() {
         onSelectSlot={setActiveSetupKey}
         onToggleSelection={toggleSetupSelection}
         onOpeningCashChange={setSetupOpeningCash}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
+        title={confirmAction?.title || 'Confirm'}
+        message={confirmAction?.message || ''}
+        confirmLabel="Confirm"
       />
     </div>
   );

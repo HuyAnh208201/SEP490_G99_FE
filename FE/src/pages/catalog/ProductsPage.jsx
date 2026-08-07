@@ -38,6 +38,7 @@ import PrintableBarcode from '../../components/ui/PrintableBarcode.jsx';
 import MoneyInput from '../../components/ui/MoneyInput.jsx';
 import InventoryCountPanel from '../../components/domain/InventoryCountPanel.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
@@ -107,6 +108,7 @@ export default function ProductsPage() {
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [formError, setFormError] = useState('');
   const [countOpen, setCountOpen] = useState(searchParams.get('count') === '1');
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(fetchProductsPage, {
     search: debouncedQuery,
@@ -253,7 +255,12 @@ export default function ProductsPage() {
 
   async function handleDelete(id) {
     if (!canManage) return;
-    if (!window.confirm('Delete this product?')) return;
+    setDeleteTargetId(id);
+  }
+
+  async function confirmDelete() {
+    const id = deleteTargetId;
+    if (!id) return;
     try {
       await deleteProduct(id);
       if (editingId === id) cancelEdit();
@@ -699,6 +706,16 @@ export default function ProductsPage() {
           <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
+        title="Delete product"
+        message="Delete this product?"
+        confirmLabel="Confirm"
+        danger
+      />
     </div>
   );
 }
