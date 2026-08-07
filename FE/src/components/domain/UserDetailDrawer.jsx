@@ -4,6 +4,7 @@ import { canManageTeamMember } from '../../lib/teamPermissions.js';
 import { ROLE_LABELS } from '../../config/navigation.js';
 import Badge from '../ui/Badge.jsx';
 import Button from '../ui/Button.jsx';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 
 export default function UserDetailDrawer({
   userId,
@@ -18,6 +19,7 @@ export default function UserDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState('');
   const [error, setError] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
 
   useEffect(() => {
     if (!userId) return undefined;
@@ -46,54 +48,65 @@ export default function UserDetailDrawer({
 
   const canManage = canManageTeamMember(actorRole, actorBranchId, user, currentUserId);
 
-  async function handleDeactivate() {
-    if (!user || !window.confirm(
-      `Deactivate account for ${user.name}?\n\n` +
+  function requestDeactivate() {
+    if (!user) return;
+    setConfirmAction({
+      type: 'deactivate',
+      title: 'Deactivate account',
+      message:
+        `Deactivate account for ${user.name}?\n\n` +
         'This will immediately block their access, force-close any open shift session, ' +
         'and remove them from current/future published shifts.',
-    )) return;
-    setActionLoading('deactivate');
-    setError('');
-    try {
-      await updateUserStatus(user.id, false);
-      onChanged?.();
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to deactivate user');
-    } finally {
-      setActionLoading('');
-    }
+      confirmLabel: 'Confirm',
+      danger: false,
+    });
   }
 
-  async function handleActivate() {
+  function requestActivate() {
     if (!user) return;
-    setActionLoading('activate');
-    setError('');
-    try {
-      await updateUserStatus(user.id, true);
-      const refreshed = await fetchUserById(user.id);
-      setUser(refreshed);
-      onChanged?.();
-    } catch (err) {
-      setError(err.message || 'Failed to activate user');
-    } finally {
-      setActionLoading('');
-    }
+    setConfirmAction({
+      type: 'activate',
+      title: 'Activate account',
+      message: `Activate account for ${user.name}? They will regain access immediately.`,
+      confirmLabel: 'Confirm',
+      danger: false,
+    });
   }
 
-  async function handleDelete() {
-    if (!user || !window.confirm(
-      `Delete account for ${user.name}? This cannot be undone.\n\n` +
+  function requestDelete() {
+    if (!user) return;
+    setConfirmAction({
+      type: 'delete',
+      title: 'Delete account',
+      message:
+        `Delete account for ${user.name}? This cannot be undone.\n\n` +
         'If they have an open shift or published assignments, delete will be blocked — deactivate first.',
-    )) return;
-    setActionLoading('delete');
+      confirmLabel: 'Confirm',
+      danger: true,
+    });
+  }
+
+  async function runConfirmAction() {
+    if (!user || !confirmAction) return;
+    setActionLoading(confirmAction.type);
     setError('');
     try {
-      await deleteUser(user.id);
-      onChanged?.();
-      onClose();
+      if (confirmAction.type === 'deactivate') {
+        await updateUserStatus(user.id, false);
+        onChanged?.();
+        onClose();
+      } else if (confirmAction.type === 'activate') {
+        await updateUserStatus(user.id, true);
+        const refreshed = await fetchUserById(user.id);
+        setUser(refreshed);
+        onChanged?.();
+      } else if (confirmAction.type === 'delete') {
+        await deleteUser(user.id);
+        onChanged?.();
+        onClose();
+      }
     } catch (err) {
-      setError(err.message || 'Failed to delete user');
+      setError(err.message || `Failed to ${confirmAction.type} user`);
     } finally {
       setActionLoading('');
     }
@@ -188,7 +201,7 @@ export default function UserDetailDrawer({
               <Button
                 variant="secondary"
                 loading={actionLoading === 'deactivate'}
-                onClick={handleDeactivate}
+                onClick={requestDeactivate}
               >
                 Deactivate
               </Button>
@@ -197,7 +210,7 @@ export default function UserDetailDrawer({
               <Button
                 variant="secondary"
                 loading={actionLoading === 'activate'}
-                onClick={handleActivate}
+                onClick={requestActivate}
               >
                 Activate
               </Button>
@@ -207,7 +220,7 @@ export default function UserDetailDrawer({
                 variant="ghost"
                 className="!text-red-600"
                 loading={actionLoading === 'delete'}
-                onClick={handleDelete}
+                onClick={requestDelete}
               >
                 Delete
               </Button>
@@ -218,6 +231,16 @@ export default function UserDetailDrawer({
           </div>
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
+        title={confirmAction?.title || 'Confirm'}
+        message={confirmAction?.message || ''}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        danger={Boolean(confirmAction?.danger)}
+      />
     </div>
   );
 }
