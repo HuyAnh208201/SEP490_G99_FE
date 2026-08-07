@@ -14,6 +14,17 @@ function unwrap(body) {
 function normalizeUser(u) {
   if (!u) return null;
   const fullName = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+  const status = typeof u.status === 'string' ? u.status.trim().toLowerCase() : null;
+  let isActive;
+  if (status) {
+    isActive = status === 'active';
+  } else if (typeof u.isActive === 'boolean') {
+    isActive = u.isActive;
+  } else if (typeof u.active === 'boolean') {
+    isActive = u.active;
+  } else {
+    isActive = true;
+  }
   return {
     ...u,
     id: u.id,
@@ -21,7 +32,7 @@ function normalizeUser(u) {
     username: u.userName || u.email,
     role: u.role,
     status: u.status,
-    isActive: u.isActive ?? u.active ?? u.status === 'active',
+    isActive,
     branchId: u.branchId,
   };
 }

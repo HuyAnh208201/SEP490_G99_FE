@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { deleteUser, fetchUsersPage, updateUserStatus } from '../../api/users.js';
 import { fetchBranches } from '../../api/branches.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
@@ -8,6 +8,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import CreateUserModal from '../../components/domain/CreateUserModal.jsx';
 import CriticalUserActionModal from '../../components/domain/CriticalUserActionModal.jsx';
 import UserDetailDrawer from '../../components/domain/UserDetailDrawer.jsx';
@@ -44,6 +45,7 @@ export default function UsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [criticalAction, setCriticalAction] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(fetchUsersPage, {
     search: debouncedQuery,
@@ -91,44 +93,69 @@ export default function UsersPage() {
     return ['ADMIN', 'DIRECTOR', 'OWNER', 'PROMOTION_DIRECTOR'].includes(user.role);
   }
 
-  async function handleDeactivate(targetUser) {
+  function requestDeactivate(targetUser) {
     if (isCriticalUser(targetUser)) {
       setCriticalAction({ user: targetUser, type: 'DEACTIVATE', label: 'Deactivate' });
       return;
     }
-    if (!window.confirm(
-      `Deactivate account for ${targetUser.name}?\n\n` +
+    setConfirmAction({
+      type: 'deactivate',
+      user: targetUser,
+      title: 'Deactivate account',
+      message:
+        `Deactivate account for ${targetUser.name}?\n\n` +
         'This will immediately block their access, force-close any open shift session, ' +
         'and remove them from current/future published shifts.',
-    )) return;
-    setActionLoading(`deactivate-${targetUser.id}`);
-    setActionError('');
-    try {
-      await updateUserStatus(targetUser.id, false);
-      load();
-    } catch (err) {
-      setActionError(err.message || 'Failed to deactivate user');
-    } finally {
-      setActionLoading(null);
-    }
+      confirmLabel: 'Confirm',
+      danger: false,
+    });
   }
 
-  async function handleDelete(targetUser) {
+  function requestActivate(targetUser) {
+    setConfirmAction({
+      type: 'activate',
+      user: targetUser,
+      title: 'Activate account',
+      message: `Activate account for ${targetUser.name}? They will regain access immediately.`,
+      confirmLabel: 'Confirm',
+      danger: false,
+    });
+  }
+
+  function requestDelete(targetUser) {
     if (isCriticalUser(targetUser)) {
       setCriticalAction({ user: targetUser, type: 'DELETE', label: 'Delete' });
       return;
     }
-    if (!window.confirm(
-      `Delete account for ${targetUser.name}? This cannot be undone.\n\n` +
+    setConfirmAction({
+      type: 'delete',
+      user: targetUser,
+      title: 'Delete account',
+      message:
+        `Delete account for ${targetUser.name}? This cannot be undone.\n\n` +
         'If they have an open shift or published assignments, delete will be blocked — deactivate first.',
-    )) return;
-    setActionLoading(`delete-${targetUser.id}`);
+      confirmLabel: 'Confirm',
+      danger: true,
+    });
+  }
+
+  async function runConfirmAction() {
+    const action = confirmAction;
+    if (!action?.user) return;
+    const targetUser = action.user;
+    setActionLoading(`${action.type}-${targetUser.id}`);
     setActionError('');
     try {
-      await deleteUser(targetUser.id);
+      if (action.type === 'deactivate') {
+        await updateUserStatus(targetUser.id, false);
+      } else if (action.type === 'activate') {
+        await updateUserStatus(targetUser.id, true);
+      } else if (action.type === 'delete') {
+        await deleteUser(targetUser.id);
+      }
       load();
     } catch (err) {
-      setActionError(err.message || 'Failed to delete user');
+      setActionError(err.message || `Failed to ${action.type} user`);
     } finally {
       setActionLoading(null);
     }
@@ -260,9 +287,19 @@ export default function UsersPage() {
                               variant="ghost"
                               className="!px-2 !py-1"
                               loading={actionLoading === `deactivate-${u.id}`}
-                              onClick={() => handleDeactivate(u)}
+                              onClick={() => requestDeactivate(u)}
                             >
                               Deactivate
+                            </Button>
+                          )}
+                          {canManageTeamMember(role, actorBranchId, u, currentUserId) && u.isActive === false && (
+                            <Button
+                              variant="ghost"
+                              className="!px-2 !py-1"
+                              loading={actionLoading === `activate-${u.id}`}
+                              onClick={() => requestActivate(u)}
+                            >
+                              Activate
                             </Button>
                           )}
                           {canManageTeamMember(role, actorBranchId, u, currentUserId) && (
@@ -270,7 +307,7 @@ export default function UsersPage() {
                               variant="ghost"
                               className="!px-2 !py-1 !text-red-600"
                               loading={actionLoading === `delete-${u.id}`}
-                              onClick={() => handleDelete(u)}
+                              onClick={() => requestDelete(u)}
                             >
                               Delete
                             </Button>
@@ -305,6 +342,16 @@ export default function UsersPage() {
         currentUserId={currentUserId}
         onClose={() => setSelectedUserId(null)}
         onChanged={load}
+      />
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={runConfirmAction}
+        title={confirmAction?.title || 'Confirm'}
+        message={confirmAction?.message || ''}
+        confirmLabel={confirmAction?.confirmLabel || 'Confirm'}
+        danger={Boolean(confirmAction?.danger)}
       />
 
       <CriticalUserActionModal
