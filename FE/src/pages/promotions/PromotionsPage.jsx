@@ -55,6 +55,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import CampaignFormModal from '../../components/domain/CampaignFormModal.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
@@ -212,6 +213,8 @@ export default function PromotionsPage() {
 
   const [actionLoading, setActionLoading] = useState(null);
 
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+
   const [statusFilter, setStatusFilter] = useState('all');
 
   const [branchFilter, setBranchFilter] = useState('all');
@@ -314,6 +317,11 @@ export default function PromotionsPage() {
 
   async function runAction(id, action) {
 
+    if (action === 'delete') {
+      setDeleteTargetId(id);
+      return;
+    }
+
     setActionLoading(id);
 
     setActionError('');
@@ -348,14 +356,6 @@ export default function PromotionsPage() {
 
       else if (action === 'activate-branch') await activateCampaignForBranch(id);
 
-      else if (action === 'delete') {
-
-        if (!window.confirm('Delete this campaign permanently?')) return;
-
-        await deleteCampaign(id);
-
-      }
-
       await load();
 
     } catch (err) {
@@ -368,6 +368,21 @@ export default function PromotionsPage() {
 
     }
 
+  }
+
+  async function confirmDeleteCampaign() {
+    const id = deleteTargetId;
+    if (!id) return;
+    setActionLoading(id);
+    setActionError('');
+    try {
+      await deleteCampaign(id);
+      await load();
+    } catch (err) {
+      setActionError(err.message || 'Action failed');
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   async function confirmReactivate() {
@@ -993,6 +1008,16 @@ export default function PromotionsPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTargetId)}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDeleteCampaign}
+        title="Delete campaign"
+        message="Delete this campaign permanently?"
+        confirmLabel="Confirm"
+        danger
+      />
 
     </div>
 

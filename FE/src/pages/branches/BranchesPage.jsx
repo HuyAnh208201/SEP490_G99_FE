@@ -13,6 +13,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import BranchFormModal from '../../components/domain/BranchFormModal.jsx';
 import BranchAssignStaffModal from '../../components/domain/BranchAssignStaffModal.jsx';
 import BranchSuspendModal from '../../components/domain/BranchSuspendModal.jsx';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
@@ -41,10 +42,16 @@ export default function BranchesPage() {
   const [assignModal, setAssignModal] = useState(null);
   const [suspendModal, setSuspendModal] = useState(null);
   const [statusLoading, setStatusLoading] = useState(null);
+  const [activateTarget, setActivateTarget] = useState(null);
 
-  async function handleActivate(branch) {
+  function requestActivate(branch) {
     if (!canManage) return;
-    if (!window.confirm(`Reactivate branch "${branch.name}"?`)) return;
+    setActivateTarget(branch);
+  }
+
+  async function confirmActivate() {
+    const branch = activateTarget;
+    if (!branch) return;
     setStatusLoading(branch.id);
     setActionError('');
     try {
@@ -164,7 +171,7 @@ export default function BranchesPage() {
                                 className="!px-2 !py-1"
                                 loading={statusLoading === b.id}
                                 onClick={() =>
-                                  isActive ? setSuspendModal(b) : handleActivate(b)
+                                  isActive ? setSuspendModal(b) : requestActivate(b)
                                 }
                               >
                                 {isActive ? 'Deactivate' : 'Activate'}
@@ -233,6 +240,15 @@ export default function BranchesPage() {
         branch={suspendModal}
         onClose={() => setSuspendModal(null)}
         onDone={load}
+      />
+
+      <ConfirmDialog
+        open={Boolean(activateTarget)}
+        onClose={() => setActivateTarget(null)}
+        onConfirm={confirmActivate}
+        title="Reactivate branch"
+        message={activateTarget ? `Reactivate branch "${activateTarget.name}"?` : ''}
+        confirmLabel="Confirm"
       />
     </div>
   );
