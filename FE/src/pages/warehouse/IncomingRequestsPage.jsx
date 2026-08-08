@@ -76,9 +76,17 @@ export default function IncomingRequestsPage() {
     setActionError('');
     try {
       await approveRequest(request.id, []);
+      setActionError('');
       load();
     } catch (err) {
-      setActionError(err?.message || 'Failed to approve request');
+      // Approve often commits before Axios times out; refresh list and drop sticky timeout banners.
+      load();
+      const message = err?.message || 'Failed to approve request';
+      if (String(message).toLowerCase().includes('timeout')) {
+        setActionError('');
+      } else {
+        setActionError(message);
+      }
     } finally {
       setApprovingId(null);
     }

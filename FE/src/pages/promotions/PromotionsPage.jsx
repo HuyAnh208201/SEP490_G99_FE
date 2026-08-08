@@ -42,6 +42,10 @@ import {
 
   formatDiscount,
 
+  getEffectiveStatus,
+
+  toApiDateTime,
+
 } from '../../constants/campaigns.js';
 
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -333,15 +337,18 @@ export default function PromotionsPage() {
           await activateCampaign(id);
         } catch (err) {
           const msg = err.message || '';
-          if (/past|new startAt|dates are in the past/i.test(msg)) {
+            if (/past|new startAt|dates are in the past/i.test(msg)) {
             const campaign = items.find((c) => String(c.id) === String(id));
-            const today = new Date();
             const pad = (n) => String(n).padStart(2, '0');
-            const localDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+            const toLocal = (d) =>
+              `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+            const start = new Date();
+            const end = new Date();
+            end.setDate(end.getDate() + 7);
             setReactivateTarget({ id, name: campaign?.name });
             setReactivateDates({
-              startAt: `${localDate}T00:00`,
-              endAt: `${localDate}T23:59`,
+              startAt: `${toLocal(start)}T00:00`,
+              endAt: `${toLocal(end)}T23:59`,
             });
             setReactivateError(msg);
             return;
@@ -390,8 +397,8 @@ export default function PromotionsPage() {
     setReactivateError('');
     setActionLoading(reactivateTarget.id);
     try {
-      const startAt = reactivateDates.startAt ? new Date(reactivateDates.startAt).toISOString() : null;
-      const endAt = reactivateDates.endAt ? new Date(reactivateDates.endAt).toISOString() : null;
+      const startAt = toApiDateTime(reactivateDates.startAt);
+      const endAt = toApiDateTime(reactivateDates.endAt);
       if (!startAt || !endAt) {
         setReactivateError('Start and end dates are required.');
         return;
@@ -708,11 +715,14 @@ export default function PromotionsPage() {
 
                         <td className="px-4 py-3">
 
-                          <Badge tone={CAMPAIGN_STATUS_TONE[c.status] || 'default'}>
-
-                            {CAMPAIGN_STATUS_LABELS[c.status] || c.status}
-
-                          </Badge>
+                          {(() => {
+                            const effective = getEffectiveStatus(c);
+                            return (
+                              <Badge tone={CAMPAIGN_STATUS_TONE[effective] || 'default'}>
+                                {CAMPAIGN_STATUS_LABELS[effective] || effective}
+                              </Badge>
+                            );
+                          })()}
 
                         </td>
 
