@@ -142,9 +142,15 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
               </thead>
               <tbody>
                 {request.items?.map((it) => {
+                  const conversionQty = it.topPackagingConversionQty || 1;
                   const approved = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
-                  const approvedBaseUnits = approved * (it.topPackagingConversionQty || 1);
+                  const approvedBaseUnits = approved * conversionQty;
                   const isShort = it.warehouseStock != null && approvedBaseUnits > it.warehouseStock;
+                  // Display warehouse stock in TOP units to match Requested / Approved.
+                  const warehouseStockTop =
+                    it.warehouseStock == null
+                      ? null
+                      : Math.floor(Number(it.warehouseStock) / conversionQty);
                   return (
                     <tr key={it.id} className="border-t border-[var(--admin-border)]">
                       <td className="px-4 py-2.5">
@@ -159,11 +165,11 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{it.requestedQuantity}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {it.warehouseStock == null ? (
+                        {warehouseStockTop == null ? (
                           <span className="text-[var(--admin-subtle)]">—</span>
                         ) : (
                           <span className={isShort ? 'font-semibold text-amber-700' : ''}>
-                            {it.warehouseStock}
+                            {warehouseStockTop}
                           </span>
                         )}
                       </td>

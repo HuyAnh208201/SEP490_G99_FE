@@ -82,6 +82,26 @@ function pageDescription(role, canManage, isWm) {
   return 'Browse the product catalog.';
 }
 
+/** Display ledger BASE qty as base retail units or floor TOP purchase units. */
+function displayStockQty(baseQty, product, stockUnitMode) {
+  const qty = Number(baseQty) || 0;
+  if (stockUnitMode !== 'top') return qty;
+  const conversion =
+    Number(product?.topPackagingConversionQty) || Number(product?.unitsPerImportUnit) || 1;
+  return Math.floor(qty / Math.max(1, conversion));
+}
+
+function displayStockUnitLabel(product, stockUnitMode) {
+  if (stockUnitMode === 'top') {
+    return (
+      product?.topPackagingLabel ||
+      (product?.importUnit ? purchaseUnitLabel(product.importUnit) : null) ||
+      unitLabel(product?.unit)
+    );
+  }
+  return unitLabel(product?.unit);
+}
+
 export default function ProductsPage() {
   const { has, role } = usePermissions();
   const { getCategories, invalidate } = useReferenceData();
@@ -94,6 +114,7 @@ export default function ProductsPage() {
   const showBranchStock = showBranchStockColumn(role);
   const showWarehouseStock = showWarehouseStockColumn(role);
   const showCount = showInventoryCountAction(role, { has });
+  const showStockFilters = showWarehouseStock || showBranchStock;
 
   const barcodeRef = useRef(null);
   const [categories, setCategories] = useState([]);
@@ -102,6 +123,8 @@ export default function ProductsPage() {
   const [categoryId, setCategoryId] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [stockSort, setStockSort] = useState('');
+  const [stockUnitMode, setStockUnitMode] = useState('base');
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -115,6 +138,7 @@ export default function ProductsPage() {
     categoryId: categoryId || undefined,
     status: statusFilter || undefined,
     lowStockOnly: lowStockOnly || undefined,
+    stockSort: stockSort || undefined,
   });
   const { items, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
@@ -137,9 +161,12 @@ export default function ProductsPage() {
   const summary = useMemo(() => {
     if (!showWarehouseStock) return null;
     const low = items.filter((p) => p.lowStock).length;
-    const totalUnits = items.reduce((sum, p) => sum + (p.warehouseStock || 0), 0);
+    const totalUnits = items.reduce(
+      (sum, p) => sum + displayStockQty(p.warehouseStock, p, stockUnitMode),
+      0,
+    );
     return { skus: pageData.totalRecords, low, totalUnits };
-  }, [items, pageData.totalRecords, showWarehouseStock]);
+  }, [items, pageData.totalRecords, showWarehouseStock, stockUnitMode]);
 
   function patchForm(patch) {
     setForm((f) => {
@@ -567,6 +594,29 @@ export default function ProductsPage() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            {showStockFilters && (
+              <select
+                value={stockSort}
+                onChange={(e) => setStockSort(e.target.value)}
+                className={filterSelectClass}
+                aria-label="Stock sort"
+              >
+                <option value="">Default (name)</option>
+                <option value="desc">Stock: high to low</option>
+                <option value="asc">Stock: low to high</option>
+              </select>
+            )}
+            {showStockFilters && (
+              <select
+                value={stockUnitMode}
+                onChange={(e) => setStockUnitMode(e.target.value)}
+                className={filterSelectClass}
+                aria-label="Stock unit"
+              >
+                <option value="base">Stock unit: Base (retail)</option>
+                <option value="top">Stock unit: Purchase (largest)</option>
+              </select>
+            )}
             {showWarehouseStock && (
               <label className="flex shrink-0 items-center gap-2 text-sm text-[var(--admin-muted)]">
                 <input
@@ -615,6 +665,7 @@ export default function ProductsPage() {
                     ))
                   : filtered.map((p) => {
                       const branchLow = Boolean(showBranchStock && p.lowStock);
+                      const stockUnit = displayStockUnitLabel(p, stockUnitMode);
                       return (
                       <tr
                         key={p.id}
@@ -635,13 +686,13 @@ export default function ProductsPage() {
                         </td>
                         {showBranchStock && (
                           <td className={`px-4 py-3 text-right tabular-nums font-semibold ${branchLow ? 'text-amber-600' : ''}`}>
-                            {p.branchStock ?? 0}
+                            {displayStockQty(p.branchStock, p, stockUnitMode)}
                           </td>
                         )}
                         {showWarehouseStock && (
                           <td className="px-4 py-3 text-right tabular-nums">
                             <span className={p.lowStock ? 'font-semibold text-amber-600' : ''}>
-                              {p.warehouseStock ?? 0}
+                              {displayStockQty(p.warehouseStock, p, stockUnitMode)}
                             </span>
                           </td>
                         )}
@@ -653,12 +704,13 @@ export default function ProductsPage() {
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">
                           {formatVnd(p.defaultSalePrice)}
                         </td>
-                        <td className="px-4 py-3">{unitLabel(p.unit)}</td>
+                        <td className="px-4 py-3">{stockUnit}</td>
                         {(canManage || isWm) && (
                           <td className="px-4 py-3 text-[var(--admin-muted)]">
-                            {p.importUnit
-                              ? `${purchaseUnitLabel(p.importUnit)} (${p.unitsPerImportUnit || '—'}/${purchaseUnitLabel(p.importUnit)})`
-                              : '—'}
+                            {p.topPackagingLabel ||
+                              (p.importUnit
+                                ? `${purchaseUnitLabel(p.importUnit)} (${p.unitsPerImportUnit || '—'}/${purchaseUnitLabel(p.importUnit)})`
+                                : '—')}
                           </td>
                         )}
                         <td className="px-4 py-3">

@@ -20,6 +20,8 @@ export const CHAIN_SCOPE_MODES = [
 export const CAMPAIGN_STATUS_LABELS = {
   DRAFT: 'Draft',
   ACTIVE: 'Active',
+  SCHEDULED: 'Scheduled',
+  EXPIRED: 'Expired',
   SUSPENDED: 'Deactivated',
   DEACTIVATED: 'Deactivated',
 };
@@ -27,6 +29,8 @@ export const CAMPAIGN_STATUS_LABELS = {
 export const CAMPAIGN_STATUS_TONE = {
   DRAFT: 'warning',
   ACTIVE: 'success',
+  SCHEDULED: 'brand',
+  EXPIRED: 'warning',
   SUSPENDED: 'danger',
   DEACTIVATED: 'default',
 };
@@ -38,6 +42,34 @@ export const CAMPAIGN_STATUS_FILTERS = [
   { id: 'DRAFT', label: 'Draft' },
   { id: 'SUSPENDED', label: 'Deactivated' },
 ];
+
+/**
+ * Display status aligned with mobile visibility:
+ * ACTIVE + past end → Expired; ACTIVE + future start → Scheduled;
+ * DEACTIVATED/SUSPENDED with past end → Expired.
+ */
+export function getEffectiveStatus(campaign) {
+  if (!campaign?.status) return campaign?.status;
+  const status = campaign.status;
+  const now = Date.now();
+  const startMs = campaign.startAt ? new Date(campaign.startAt).getTime() : null;
+  const endMs = campaign.endAt ? new Date(campaign.endAt).getTime() : null;
+
+  if (status === 'ACTIVE') {
+    if (endMs != null && Number.isFinite(endMs) && endMs < now) return 'EXPIRED';
+    if (startMs != null && Number.isFinite(startMs) && startMs > now) return 'SCHEDULED';
+    return 'ACTIVE';
+  }
+  if (
+    (status === 'DEACTIVATED' || status === 'SUSPENDED') &&
+    endMs != null &&
+    Number.isFinite(endMs) &&
+    endMs < now
+  ) {
+    return 'EXPIRED';
+  }
+  return status;
+}
 
 export const CREATOR_FILTERS = [
   { id: 'all', label: 'All creators' },

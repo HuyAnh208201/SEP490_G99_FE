@@ -51,9 +51,13 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
-  const [reloadToken, setReloadToken] = useState(0);
+  const [catalogReloadToken, setCatalogReloadToken] = useState(0);
+  const [recommendedReloadToken, setRecommendedReloadToken] = useState(0);
+  /** True after the first catalog attempt for this open cycle (gates recommended load). */
+  const [initialCatalogSettled, setInitialCatalogSettled] = useState(false);
 
-  const reloadCatalog = useCallback(() => setReloadToken((k) => k + 1), []);
+  const reloadCatalog = useCallback(() => setCatalogReloadToken((k) => k + 1), []);
+  const reloadRecommended = useCallback(() => setRecommendedReloadToken((k) => k + 1), []);
 
   useEffect(() => {
     if (!open) return;
@@ -80,6 +84,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     setStockSort('');
     setLowStockOnly(false);
     setCatalogPage(1);
+    setInitialCatalogSettled(false);
   }, [open, editing]);
 
   useEffect(() => {
@@ -118,35 +123,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    if (!lockedBranchId) {
-      setRecommended([]);
-      setRecommendedError('');
-      setRecommendedLoading(false);
-      return undefined;
-    }
-    let cancelled = false;
-    setRecommendedLoading(true);
-    setRecommendedError('');
-    getRecommendedProducts(lockedBranchId)
-      .then((rec) => {
-        if (!cancelled) setRecommended(Array.isArray(rec) ? rec : []);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setRecommended([]);
-          setRecommendedError(err?.message || 'Failed to load suggested products.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setRecommendedLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, lockedBranchId, reloadToken]);
-
+  // Catalog loads first; recommended waits until catalog settles to avoid DB contention.
   useEffect(() => {
     if (!open) return undefined;
     if (!lockedBranchId) {
@@ -155,6 +132,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
       setCatalogTotalRecords(0);
       setCatalogError('Your account is not linked to a branch. Contact an administrator.');
       setProductsLoading(false);
+      setInitialCatalogSettled(true);
       return undefined;
     }
 
@@ -186,7 +164,10 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
         setCatalogError(err?.message || 'Failed to load product catalog.');
       })
       .finally(() => {
-        if (!cancelled) setProductsLoading(false);
+        if (!cancelled) {
+          setProductsLoading(false);
+          setInitialCatalogSettled(true);
+        }
       });
 
     return () => {
@@ -200,8 +181,40 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     categoryId,
     stockSort,
     lowStockOnly,
-    reloadToken,
+    catalogReloadToken,
   ]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    if (!lockedBranchId) {
+      setRecommended([]);
+      setRecommendedError('');
+      setRecommendedLoading(false);
+      return undefined;
+    }
+    // Wait for the first catalog attempt so suggested products do not compete on open.
+    if (!initialCatalogSettled) return undefined;
+
+    let cancelled = false;
+    setRecommendedLoading(true);
+    setRecommendedError('');
+    getRecommendedProducts(lockedBranchId)
+      .then((rec) => {
+        if (!cancelled) setRecommended(Array.isArray(rec) ? rec : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setRecommended([]);
+          setRecommendedError(err?.message || 'Suggested products unavailable. Catalog still works.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecommendedLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, lockedBranchId, initialCatalogSettled, recommendedReloadToken]);
 
   const addedIds = useMemo(() => new Set(lines.map((l) => normId(l.productId))), [lines]);
 
@@ -432,7 +445,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
                 addSuggestedBusy={recommendedLoading}
                 addSuggestedError={recommendedError}
                 onAddSuggested={addSuggested}
-                onRetrySuggested={reloadCatalog}
+                onRetrySuggested={reloadRecommended}
                 page={catalogPage}
                 totalPages={catalogTotalPages}
                 totalRecords={catalogTotalRecords}
