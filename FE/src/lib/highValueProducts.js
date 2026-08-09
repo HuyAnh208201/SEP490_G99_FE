@@ -6,6 +6,7 @@ const HIGH_RISK_CATEGORY_PATTERNS = [
   'cosmetic',
   'beauty',
   'thẻ cào',
+  'thẻ dịch vụ',
   'prepaid',
   'service card',
   'cồn giá trị cao',

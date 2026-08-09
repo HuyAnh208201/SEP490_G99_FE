@@ -14,6 +14,7 @@ import {
 } from '../../api/shiftSessions.js';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
 import { formatDateTime } from '../../lib/datetime.js';
+import { getAutoCloseStatus, SHIFT_AUTO_CLOSE_GRACE_MINUTES } from '../../lib/shiftAutoClose.js';
 
 function formatMoney(value) {
   const n = Number(value ?? 0);
@@ -22,6 +23,34 @@ function formatMoney(value) {
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[var(--admin-brand)]/15';
+
+function AutoCloseBanner({ session }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const status = useMemo(() => getAutoCloseStatus(session, now), [session, now]);
+  if (!status || status.state === 'ok') return null;
+  const tone =
+    status.state === 'overdue' || status.state === 'critical'
+      ? 'border-red-200 bg-red-50 text-red-900'
+      : 'border-amber-200 bg-amber-50 text-amber-900';
+  return (
+    <Card className={`p-4 text-sm ${tone}`}>
+      <p className="font-semibold">
+        {status.state === 'overdue'
+          ? 'Finish closing now — grace period ended'
+          : `Auto-close in about ${status.minutesLeft} min`}
+      </p>
+      <p className="mt-1">
+        Complete verification and cash count within {SHIFT_AUTO_CLOSE_GRACE_MINUTES} minutes after
+        shift end, or the system will auto-close and notify your branch manager. Deadline:{' '}
+        {formatDateTime(status.deadline.toISOString())}.
+      </p>
+    </Card>
+  );
+}
 
 export default function ShiftClosingPage() {
   const navigate = useNavigate();
@@ -162,6 +191,8 @@ export default function ShiftClosingPage() {
         description="Review your shift before ending and completing handover."
       />
 
+      <AutoCloseBanner session={data} />
+
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {isPendingApproval && (
@@ -262,10 +293,10 @@ export default function ShiftClosingPage() {
                   {hvRows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-3 py-6 text-center text-sm text-[var(--admin-muted)]">
-                        Chưa có mặt hàng giá trị cao trong tồn kho chi nhánh. Branch manager cần tạo
-                        sản phẩm thuộc danh mục rủi ro (High-value tobacco, Cosmetics &amp; beauty, Prepaid
-                        cards, Premium alcohol), đặt giá bán ≥ 300.000đ, và nhập tồn kho chi nhánh — sau
-                        đó mở lại màn Đóng ca.
+                        No high-value items in branch stock yet. Create products in risk categories
+                        (high-value tobacco, cosmetics &amp; beauty, prepaid / service cards, premium
+                        alcohol), set retail price ≥ 300,000 VND, stock them at the branch, then reopen
+                        Shift Closing.
                       </td>
                     </tr>
                   ) : (

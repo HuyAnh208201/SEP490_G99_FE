@@ -5,7 +5,7 @@ import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import NavIcon from '../../components/layout/NavIcon.jsx';
 import { unitLabel } from '../../constants/productUnits.js';
-import { getCountSheet, submitCount } from '../../api/inventoryCount.js';
+import { getFullCountSheet, submitCount } from '../../api/inventoryCount.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { isDemoIsEmail } from '../../lib/demoAccounts.js';
 
@@ -51,7 +51,7 @@ export default function InventoryCountPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await getCountSheet({ page: 1, size: 100 });
+      const data = await getFullCountSheet({ size: 100 });
       setSheet(data);
       const initial = {};
       (data.products || []).forEach((p) => {

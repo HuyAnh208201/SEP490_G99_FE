@@ -4,7 +4,7 @@ import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import NavIcon from '../layout/NavIcon.jsx';
 import { unitLabel } from '../../constants/productUnits.js';
-import { getCountSheet, submitCount } from '../../api/inventoryCount.js';
+import { getFullCountSheet, submitCount } from '../../api/inventoryCount.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { isDemoIsEmail } from '../../lib/demoAccounts.js';
 
@@ -48,7 +48,7 @@ export default function InventoryCountPanel({ open, onClose }) {
     setLoading(true);
     setError('');
     try {
-      const data = await getCountSheet({ page: 1, size: 100 });
+      const data = await getFullCountSheet({ size: 100 });
       setSheet(data);
       const initial = {};
       (data.products || []).forEach((p) => {
