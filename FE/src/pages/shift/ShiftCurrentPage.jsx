@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -14,12 +14,14 @@ function formatMoney(value) {
 
 export default function ShiftCurrentPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { session, loading } = useShiftSession();
+  const shiftClosed = location.state?.shiftClosed;
 
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#0058be]/20 border-t-[#0058be]" />
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--admin-brand)]/20 border-t-[var(--admin-brand)]" />
       </div>
     );
   }
@@ -28,6 +30,27 @@ export default function ShiftCurrentPage() {
     return (
       <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
         <PageHeader title="Current shift" description="You do not have an active shift session." />
+
+        {shiftClosed === 'COMPLETED' && (
+          <Card className="border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p className="font-semibold">Shift closed successfully</p>
+            <p className="mt-1">
+              Your shift has been completed. Open the next published shift when your branch manager
+              schedules it, or continue testing with another slot if one is available.
+            </p>
+          </Card>
+        )}
+
+        {shiftClosed === 'PENDING_APPROVAL' && (
+          <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Submitted for manager approval</p>
+            <p className="mt-1">
+              Your closing was submitted with a cash difference. The branch manager must approve or
+              reject before you can open a new shift.
+            </p>
+          </Card>
+        )}
+
         <Button onClick={() => navigate('/pos/shift/opening')}>Go to shift opening</Button>
       </div>
     );
@@ -68,7 +91,9 @@ export default function ShiftCurrentPage() {
           </div>
           <div>
             <dt className="text-[var(--admin-muted)]">Opening fund</dt>
-            <dd className="font-medium">{formatMoney(session?.openingFundAmount)}</dd>
+            <dd className="font-medium text-[var(--admin-brand)]">
+              {formatMoney(session?.openingFundAmount)}
+            </dd>
           </div>
           <div>
             <dt className="text-[var(--admin-muted)]">Opened at</dt>
@@ -82,13 +107,8 @@ export default function ShiftCurrentPage() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        {!pendingClose && (
-          <Button onClick={() => navigate('/pos')}>Open POS</Button>
-        )}
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/pos/shift/history')}
-        >
+        {!pendingClose && <Button onClick={() => navigate('/pos')}>Open POS</Button>}
+        <Button variant="secondary" onClick={() => navigate('/pos/shift/history')}>
           Shift history
         </Button>
         <Button

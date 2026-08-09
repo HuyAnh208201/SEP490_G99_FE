@@ -40,7 +40,7 @@ function SectionHeader({ icon, children, badge }) {
     <div className="border-b border-[var(--admin-border)] pb-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--admin-text)]">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[#0058be]/10 text-[var(--admin-brand)]">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--admin-brand)]/10 text-[var(--admin-brand)]">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
               {icon}
             </svg>
@@ -56,7 +56,7 @@ function SectionHeader({ icon, children, badge }) {
 function InfoCell({ icon, label, value }) {
   return (
     <div className="flex gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0058be]/10 text-[var(--admin-brand)]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-brand)]/10 text-[var(--admin-brand)]">
         <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" aria-hidden>
           {icon}
         </svg>
@@ -143,7 +143,7 @@ export default function ShiftOpeningPage() {
     load();
   }, [load]);
 
-  async function handleConfirmOpeningFund() {
+  async function handleOpenShift() {
     if (!fundConfirmed) return;
     setBusy('open');
     setError('');
@@ -160,10 +160,20 @@ export default function ShiftOpeningPage() {
   }
 
   const shift = data?.shift;
+  const slotLabel = data?.currentSlotLabel;
+  const slotWindow =
+    data?.currentSlotStart && data?.currentSlotEnd
+      ? `${data.currentSlotStart.slice(0, 5)} – ${data.currentSlotEnd.slice(0, 5)}`
+      : null;
   const alreadyOpen = data?.status === 'OPEN';
-  const canConfirm = Boolean(shift?.id && fundConfirmed && !alreadyOpen);
+  const pendingApproval = data?.status === 'PENDING_APPROVAL';
+  const shiftFinished = ['COMPLETED', 'CLOSED', 'APPROVED'].includes(data?.status);
+  const mustCloseFirst = ['CLOSING', 'PENDING_HANDOVER', 'REJECTED'].includes(data?.status);
+  const canOpen = Boolean(
+    shift?.id && fundConfirmed && !alreadyOpen && !pendingApproval && !shiftFinished && !mustCloseFirst,
+  );
   const receiveDateSource = data?.openingFundReceivedAt ?? shift?.startTime;
-  const openingFundDisplay = OPENING_FUND_AMOUNT;
+  const openingFundDisplay = data?.openingFundAmount ?? OPENING_FUND_AMOUNT;
 
   return (
     <div className="min-h-0 w-full flex-1 space-y-4 overflow-y-auto p-4 lg:p-5">
@@ -173,6 +183,45 @@ export default function ShiftOpeningPage() {
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {!loading && data?.outsideOperatingHours && (
+        <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Outside normal branch hours — test mode is enabled so you can still open this shift slot
+          {slotLabel ? ` (${slotLabel}${slotWindow ? `, ${slotWindow}` : ''})` : ''}.
+        </Card>
+      )}
+
+      {!loading && slotLabel && !data?.outsideOperatingHours && (
+        <Card className="border-[var(--admin-border)] bg-[#f7f9fb] px-4 py-3 text-sm">
+          Current time slot: <span className="font-semibold text-[var(--admin-brand)]">{slotLabel}</span>
+          {slotWindow && <span className="text-[var(--admin-muted)]"> · {slotWindow}</span>}
+        </Card>
+      )}
+
+      {!loading && shiftFinished && (
+        <Card className="border-[var(--admin-brand-soft)] bg-[var(--admin-brand)]/5 p-4 text-sm text-[var(--admin-text)]">
+          This shift is already completed. Wait for the next published shift before opening again.
+        </Card>
+      )}
+
+      {!loading && pendingApproval && (
+        <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Your previous closing is waiting for branch manager cash approval. You cannot open a new shift yet.
+        </Card>
+      )}
+
+      {!loading && mustCloseFirst && (
+        <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {data?.status === 'REJECTED'
+            ? 'Your closing was rejected by the branch manager. Complete Shift Closing first.'
+            : 'This shift is still in the closing process. Finish Shift Closing before opening again.'}
+          <div className="mt-3">
+            <Button variant="secondary" onClick={() => navigate('/pos/shift/closing')}>
+              Go to Shift Closing
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {loading ? (
         <p className="text-sm text-[var(--admin-muted)]">Loading shift…</p>
@@ -214,6 +263,7 @@ export default function ShiftOpeningPage() {
                 </span>
                 {data.branchName ?? '—'}
               </div>
+              {alreadyOpen && <Badge tone="success">Open</Badge>}
             </div>
           </Card>
 
@@ -247,7 +297,7 @@ export default function ShiftOpeningPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <p className="text-xs text-[var(--admin-muted)]">Opening fund amount</p>
-                <p className="mt-0.5 text-xl font-semibold text-[var(--admin-text)]">
+                <p className="mt-0.5 text-xl font-semibold text-[var(--admin-brand)]">
                   {formatMoney(openingFundDisplay)}
                 </p>
               </div>
@@ -267,7 +317,7 @@ export default function ShiftOpeningPage() {
             <label className="flex items-start gap-2 border-t border-[var(--admin-border)] pt-3 text-sm">
               <input
                 type="checkbox"
-                className="mt-1"
+                className="mt-1 accent-[var(--admin-brand)]"
                 checked={fundConfirmed}
                 onChange={(e) => setFundConfirmed(e.target.checked)}
                 disabled={alreadyOpen}
@@ -282,8 +332,8 @@ export default function ShiftOpeningPage() {
             <Button variant="secondary" onClick={() => navigate(-1)}>
               Cancel
             </Button>
-            <Button disabled={!canConfirm || busy === 'open'} onClick={handleConfirmOpeningFund}>
-              {busy === 'open' ? 'Confirming…' : 'Confirm opening fund'}
+            <Button disabled={!canOpen || busy === 'open'} onClick={handleOpenShift}>
+              {busy === 'open' ? 'Opening…' : alreadyOpen ? 'Shift already open' : 'Open shift'}
             </Button>
           </div>
         </>

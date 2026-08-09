@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
 import { fetchShiftSessionHistory } from '../../api/shiftSessions.js';
+import useClientPage from '../../hooks/useClientPage.js';
 import { formatDateTime } from '../../lib/datetime.js';
 
 const STATUS_TONE = {
@@ -18,9 +20,12 @@ const STATUS_TONE = {
 };
 
 export default function ShiftHistoryPage() {
-  const [rows, setRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const pageData = useClientPage(allRows);
+  const { items: rows } = pageData;
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +33,7 @@ export default function ShiftHistoryPage() {
       setLoading(true);
       try {
         const data = await fetchShiftSessionHistory();
-        if (!cancelled) setRows(Array.isArray(data) ? data : []);
+        if (!cancelled) setAllRows(Array.isArray(data) ? data : []);
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Failed to load history');
       } finally {
@@ -47,29 +52,37 @@ export default function ShiftHistoryPage() {
       <Card padding={false} className="overflow-hidden">
         {loading ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">Loading…</p>
-        ) : rows.length === 0 ? (
+        ) : allRows.length === 0 ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">No shift sessions yet.</p>
         ) : (
-          <ul className="divide-y divide-[var(--admin-border)]">
-            {rows.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
-                <div>
-                  <p className="font-semibold text-[var(--admin-text)]">
-                    Shift #{row.shift?.shiftNumber ?? '—'}{' '}
-                    {row.shift && (
-                      <span className="text-sm font-normal text-[var(--admin-muted)]">
-                        {formatDateTime(row.shift.startTime)}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-[var(--admin-muted)]">
-                    Opened {formatDateTime(row.openedAt)} · Closed {formatDateTime(row.closedAt)}
-                  </p>
-                </div>
-                <Badge tone={STATUS_TONE[row.status] || 'default'}>{row.status}</Badge>
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y divide-[var(--admin-border)]">
+              {rows.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-4">
+                  <div>
+                    <p className="font-semibold text-[var(--admin-text)]">
+                      Shift #{row.shift?.shiftNumber ?? '—'}{' '}
+                      {row.shift && (
+                        <span className="text-sm font-normal text-[var(--admin-muted)]">
+                          {formatDateTime(row.shift.startTime)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-xs text-[var(--admin-muted)]">
+                      Opened {formatDateTime(row.openedAt)} · Closed {formatDateTime(row.closedAt)}
+                    </p>
+                  </div>
+                  <Badge tone={STATUS_TONE[row.status] || 'default'}>{row.status}</Badge>
+                </li>
+              ))}
+            </ul>
+            <Pagination
+              {...pageData}
+              onPageChange={pageData.setPage}
+              onSizeChange={pageData.setSize}
+              disabled={loading}
+            />
+          </>
         )}
       </Card>
     </div>
