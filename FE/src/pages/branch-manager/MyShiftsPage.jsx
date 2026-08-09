@@ -1,40 +1,126 @@
-import { useCallback, useEffect, useState } from 'react';
-import Card from '../../components/ui/Card.jsx';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { fetchMe } from '../../api/users.js';
+import { checkInShift, fetchMyWeeklySchedule } from '../../api/shifts.js';
 import Button from '../../components/ui/Button.jsx';
-import Badge from '../../components/ui/Badge.jsx';
+import Card from '../../components/ui/Card.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import { checkInShift, fetchMyShifts } from '../../api/shifts.js';
+import { deriveShiftSlots } from '../../lib/operatingHours.js';
 import { formatDateTime } from '../../lib/datetime.js';
+import ScheduleGrid from './shifts/ScheduleGrid.jsx';
+import {
+  addDays,
+  buildWeekDays,
+  dateOf,
+  fromDdMmYyyy,
+  mondayOf,
+  timeOf,
+  toDdMmYyyy,
+  toLocalDateStr,
+} from './shifts/shiftGrid.js';
 
-const STATUS_META = {
-  DRAFT: { label: 'Draft', tone: 'default' },
-  PUBLISHED: { label: 'Published', tone: 'success' },
-  CANCELLED: { label: 'Cancelled', tone: 'danger' },
-};
+const inputClass =
+  'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+
+function isCheckedInForUser(shift, userId) {
+  if (!shift || userId == null) return false;
+  const id = Number(userId);
+  return (shift.assignedEmployees || []).some(
+    (emp) => Number(emp.employeeId) === id && emp.checkInAt,
+  );
+}
 
 export default function MyShiftsPage() {
+  const [userId, setUserId] = useState(null);
+  const [branchId, setBranchId] = useState(null);
+  const [operatingHours, setOperatingHours] = useState('08:00 - 22:00');
+  const [weekStart, setWeekStart] = useState(() => mondayOf());
+  const [weekStartInput, setWeekStartInput] = useState(() => toDdMmYyyy(mondayOf()));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
 
+  const slots = useMemo(() => deriveShiftSlots(operatingHours), [operatingHours]);
+  const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
+  const today = useMemo(() => toLocalDateStr(new Date()), []);
+
+  const applyWeekStart = useCallback((next) => {
+    const normalized = mondayOf(next);
+    setWeekStart(normalized);
+    setWeekStartInput(toDdMmYyyy(normalized));
+  }, []);
+
+  const applySchedule = useCallback((data) => {
+    const normalized = data?.weekStart ? String(data.weekStart).slice(0, 10) : '';
+    if (normalized) {
+      setWeekStart((current) => (current === normalized ? current : normalized));
+      setWeekStartInput(toDdMmYyyy(normalized));
+    }
+    if (data?.operatingHours) setOperatingHours(data.operatingHours);
+    if (data?.branchId != null) setBranchId(data.branchId);
+    setRows((data?.days || []).flatMap((day) => day.shifts || []));
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await fetchMyShifts();
-      setRows(Array.isArray(data) ? data : []);
+      const data = await fetchMyWeeklySchedule(weekStart);
+      applySchedule(data);
     } catch (err) {
-      setError(err?.message || 'Failed to load shifts');
+      setError(err?.message || 'Failed to load schedule');
       setRows([]);
     } finally {
       setLoading(false);
     }
+  }, [applySchedule, weekStart]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await fetchMe();
+        if (me?.id != null) setUserId(me.id);
+        if (me?.branchId != null) setBranchId(me.branchId);
+      } catch {
+        // Schedule load still works via /shifts/my/weekly; user id only needed for highlight/check-in.
+      }
+    })();
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const grid = useMemo(() => {
+    const map = {};
+    for (const day of weekDays) {
+      for (const slot of slots) {
+        map[`${day.date}|${slot.key}`] = null;
+      }
+    }
+    for (const shift of rows) {
+      const d = dateOf(shift.startTime);
+      if (d < weekStart || d > addDays(weekStart, 6)) continue;
+      const start = timeOf(shift.startTime);
+      const end = timeOf(shift.endTime);
+      const slot =
+        slots.find((s) => start >= s.start && start < s.end) ||
+        slots.find((s) => s.start === start && s.end === end) ||
+        null;
+      if (!slot) continue;
+      const key = `${d}|${slot.key}`;
+      if (!map[key] || new Date(shift.startTime) < new Date(map[key].startTime)) {
+        map[key] = shift;
+      }
+    }
+    return map;
+  }, [rows, slots, weekDays, weekStart]);
+
+  const todayShifts = useMemo(() => {
+    return rows
+      .filter((shift) => dateOf(shift.startTime) === today && shift.status === 'PUBLISHED')
+      .sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+  }, [rows, today]);
 
   async function handleCheckIn(shift) {
     setBusyId(shift.id);
@@ -49,45 +135,79 @@ export default function MyShiftsPage() {
     }
   }
 
-  function isCheckedIn(shift) {
-    return (shift.assignedEmployees || []).some((emp) => emp.checkInAt);
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="h-full w-full space-y-4 overflow-y-auto p-3 lg:p-4">
       <PageHeader
-        title="My shifts"
-        description="Your assigned shifts — view the schedule and check in."
+        title="My schedule"
+        description="Your published shifts for the week — check in when your shift starts."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => applyWeekStart(addDays(weekStart, -7))}>
+              ← Prev
+            </Button>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="DD/MM/YYYY"
+              value={weekStartInput}
+              onChange={(e) => setWeekStartInput(e.target.value)}
+              onBlur={() => {
+                const parsed = fromDdMmYyyy(weekStartInput);
+                if (parsed) applyWeekStart(parsed);
+                else setWeekStartInput(toDdMmYyyy(weekStart));
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.currentTarget.blur();
+              }}
+              className={inputClass + ' !w-[7.5rem]'}
+              title="Week start (DD/MM/YYYY)"
+            />
+            <Button variant="secondary" size="sm" onClick={() => applyWeekStart(addDays(weekStart, 7))}>
+              Next →
+            </Button>
+          </div>
+        }
       />
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      <ScheduleGrid
+        loading={loading}
+        slots={slots}
+        weekDays={weekDays}
+        grid={grid}
+        busy=""
+        branchId={branchId}
+        readOnly
+        currentUserId={userId}
+      />
+
       <Card className="overflow-hidden">
-        {loading ? (
-          <p className="p-6 text-sm text-[var(--admin-muted)]">Loading shifts…</p>
-        ) : rows.length === 0 ? (
-          <p className="p-6 text-sm text-[var(--admin-muted)]">No published shifts assigned to you.</p>
+        <div className="border-b border-[var(--admin-border)] px-4 py-3">
+          <p className="text-sm font-semibold text-[var(--admin-text)]">Today&apos;s check-in</p>
+          <p className="text-xs text-[var(--admin-muted)]">
+            Check in to your published shift for today ({today}).
+          </p>
+        </div>
+        {todayShifts.length === 0 ? (
+          <p className="p-4 text-sm text-[var(--admin-muted)]">No published shift assigned to you today.</p>
         ) : (
           <ul className="divide-y divide-[var(--admin-border)]">
-            {rows.map((shift) => {
-              const meta = STATUS_META[shift.status] || STATUS_META.DRAFT;
-              const checkedIn = isCheckedIn(shift);
+            {todayShifts.map((shift) => {
+              const checkedIn = isCheckedInForUser(shift, userId);
               return (
-                <li key={shift.id} className="flex flex-wrap items-center justify-between gap-4 px-4 py-4">
+                <li
+                  key={shift.id}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                >
                   <div>
-                    <p className="font-semibold text-[var(--admin-text)]">
+                    <p className="text-sm font-semibold text-[var(--admin-text)]">
                       {formatDateTime(shift.startTime)} → {formatDateTime(shift.endTime)}
                     </p>
-                    <p className="text-xs text-[var(--admin-muted)]">
-                      Opening cash: {(shift.openingCash ?? 0).toLocaleString('en-US')} VND
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Badge tone={meta.tone}>{meta.label}</Badge>
-                      {checkedIn && <Badge tone="brand">Checked in</Badge>}
-                    </div>
                   </div>
                   <Button
-                    disabled={checkedIn || busyId === shift.id || shift.status !== 'PUBLISHED'}
+                    disabled={checkedIn || busyId === shift.id}
                     onClick={() => handleCheckIn(shift)}
                   >
                     {checkedIn ? 'Checked in' : busyId === shift.id ? 'Checking in…' : 'Check in'}

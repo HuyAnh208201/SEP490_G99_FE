@@ -13,6 +13,7 @@ const SHIFT_NAV = [
     to: '/pos/shift',
     end: true,
     label: 'Shift',
+    matchPrefix: '/pos/shift',
     icon: (
       <>
         <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
@@ -23,6 +24,21 @@ const SHIFT_NAV = [
           strokeLinecap="round"
         />
       </>
+    ),
+  },
+  {
+    to: '/pos/my-shifts',
+    end: true,
+    label: 'My schedule',
+    matchPrefix: '/pos/my-shifts',
+    icon: (
+      <path
+        d="M8 3v2M16 3v2M4 8h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 7h3m-3 4h8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     ),
   },
 ];
@@ -122,7 +138,12 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
             end={item.end}
             onClick={onNavigate}
             className={({ isActive }) => {
-              const active = isActive || location.pathname.startsWith('/pos/shift/');
+              const active =
+                isActive ||
+                (item.matchPrefix
+                  ? location.pathname === item.matchPrefix ||
+                    location.pathname.startsWith(`${item.matchPrefix}/`)
+                  : false);
               return [
                 'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition lg:py-2.5',
                 active
@@ -134,7 +155,8 @@ function PosSidebarContent({ onNavigate, onSignOutClick }) {
             <span
               className={[
                 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border bg-[#f7f9fb] transition',
-                location.pathname.startsWith('/pos/shift')
+                location.pathname === item.matchPrefix ||
+                location.pathname.startsWith(`${item.matchPrefix}/`)
                   ? 'border-[#0058be]/20 bg-white text-[var(--admin-brand)]'
                   : 'border-transparent text-[var(--admin-subtle)]',
               ].join(' ')}
@@ -217,9 +239,6 @@ export default function PosLayout() {
   const { signOut } = useAuth();
   const { session } = useShiftSession();
   const isPayment = location.pathname.startsWith('/pos/payment/');
-  const onWorkPage =
-    !location.pathname.startsWith('/pos/shift/') &&
-    !location.pathname.startsWith('/pos/payment/');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -239,13 +258,19 @@ export default function PosLayout() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const headerTitle = location.pathname.startsWith('/pos/shift/')
+  const headerTitle = location.pathname.startsWith('/pos/my-shifts')
+    ? 'My schedule'
+    : location.pathname.startsWith('/pos/shift/') || location.pathname === '/pos/shift'
     ? 'Shift'
     : isPayment
       ? 'Payment'
       : location.pathname.startsWith('/pos/settings')
         ? 'Account Settings'
         : 'Point of Sale';
+  const onWorkPage =
+    !location.pathname.startsWith('/pos/shift') &&
+    !location.pathname.startsWith('/pos/my-shifts') &&
+    !location.pathname.startsWith('/pos/payment/');
   const shift = session?.shift;
   const currentShiftLabel = shiftLabel(shift?.shiftNumber);
   const shiftTime = `${formatShiftTime(shift?.startTime)} – ${formatShiftTime(shift?.endTime)}`;

@@ -123,6 +123,13 @@ export async function fetchWeeklySchedule(branchId, weekStart) {
   return unwrap(data);
 }
 
+export async function fetchMyWeeklySchedule(weekStart) {
+  const { data } = await http.get('/shifts/my/weekly', {
+    params: { weekStart },
+  });
+  return unwrap(data);
+}
+
 export async function fetchMyShifts() {
   const { data } = await http.get('/shifts/my');
   return unwrap(data);

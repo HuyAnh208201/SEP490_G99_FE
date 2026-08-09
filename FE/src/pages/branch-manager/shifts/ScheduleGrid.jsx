@@ -10,11 +10,27 @@ import {
   staffingMissing,
 } from './shiftGrid.js';
 
-function ScheduleGrid({ loading, slots, weekDays, grid, busy, branchId, onAssign }) {
+function isMine(staff, currentUserId) {
+  if (currentUserId == null) return false;
+  const id = Number(currentUserId);
+  return staff.some((e) => Number(e.employeeId) === id);
+}
+
+function ScheduleGrid({
+  loading,
+  slots,
+  weekDays,
+  grid,
+  busy,
+  branchId,
+  onAssign,
+  readOnly = false,
+  currentUserId = null,
+}) {
   return (
     <Card className="!p-0 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-sm">
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-full w-full border-collapse text-left text-sm">
           <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
             <tr>
               <th className="sticky left-0 z-10 bg-[#f7f9fb] px-3 py-2">Slot</th>
@@ -59,62 +75,91 @@ function ScheduleGrid({ loading, slots, weekDays, grid, busy, branchId, onAssign
                   {weekDays.map((day) => {
                     const shift = grid[`${day.date}|${slot.key}`];
                     const state = cellState(shift, slot);
-                    const missing = shift ? staffingMissing(shift, slot) : [];
+                    const missing = !readOnly && shift ? staffingMissing(shift, slot) : [];
                     const published = shift?.status === 'PUBLISHED';
                     const staff = (shift?.assignedEmployees || []).filter(Boolean);
+                    const mine = isMine(staff, currentUserId);
+                    const cellClass = [
+                      CELL_STYLES[state],
+                      mine ? 'ring-2 ring-[#0058be] ring-offset-1' : '',
+                      readOnly ? 'cursor-default' : published ? 'cursor-default' : 'cursor-pointer',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+
+                    const body =
+                      state === 'empty' ? (
+                        readOnly ? (
+                          <span className="m-auto text-xs text-[var(--admin-subtle)]">—</span>
+                        ) : (
+                          <span className="m-auto text-xs font-medium">Assign</span>
+                        )
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap items-center gap-1">
+                            {mine && <Badge tone="brand">You</Badge>}
+                            {!readOnly &&
+                              (published ? (
+                                <Badge tone="success">Published</Badge>
+                              ) : state === 'incomplete' ? (
+                                <Badge tone="warning">Incomplete</Badge>
+                              ) : (
+                                <Badge tone="default">Draft</Badge>
+                              ))}
+                            {readOnly && published && !mine && (
+                              <Badge tone="success">Published</Badge>
+                            )}
+                            {!readOnly && (
+                              <span className="text-[10px] text-[var(--admin-subtle)]">
+                                {staff.length}/{MAX_EMPLOYEES_PER_SHIFT}
+                              </span>
+                            )}
+                          </div>
+                          {slot.isFirst && !readOnly && (
+                            <p className="text-[10px] tabular-nums text-[var(--admin-subtle)]">
+                              Float {formatVnd(shift.openingCash)}
+                            </p>
+                          )}
+                          <ul className="space-y-0.5 text-xs text-[var(--admin-text)]">
+                            {staff.map((e) => (
+                              <li key={e.employeeId || e.assignmentId}>
+                                <span className="font-medium">{e.fullName}</span>
+                                <span className="text-[var(--admin-subtle)]">
+                                  {' '}
+                                  · {roleLabel(e.role)}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          {missing.length > 0 && (
+                            <p className="text-[10px] font-medium text-amber-800">
+                              Needs {missing.join(' + ')}
+                            </p>
+                          )}
+                          {!readOnly && !published && (
+                            <span className="text-[10px] font-medium text-[#0058be]">Edit</span>
+                          )}
+                        </>
+                      );
+
                     return (
                       <td key={day.date} className="border-l border-[var(--admin-border)] p-1.5">
-                        <button
-                          type="button"
-                          disabled={!!busy || !branchId || published}
-                          onClick={() => onAssign(day.date, slot)}
-                          className={`flex w-full min-h-[4.5rem] flex-col items-stretch gap-1 rounded-lg px-2 py-2 text-left transition ${CELL_STYLES[state]} ${
-                            published ? 'cursor-default' : 'cursor-pointer'
-                          }`}
-                        >
-                          {state === 'empty' ? (
-                            <span className="m-auto text-xs font-medium">Assign</span>
-                          ) : (
-                            <>
-                              <div className="flex flex-wrap items-center gap-1">
-                                {published ? (
-                                  <Badge tone="success">Published</Badge>
-                                ) : state === 'incomplete' ? (
-                                  <Badge tone="warning">Incomplete</Badge>
-                                ) : (
-                                  <Badge tone="default">Draft</Badge>
-                                )}
-                                <span className="text-[10px] text-[var(--admin-subtle)]">
-                                  {staff.length}/{MAX_EMPLOYEES_PER_SHIFT}
-                                </span>
-                              </div>
-                              {slot.isFirst && (
-                                <p className="text-[10px] tabular-nums text-[var(--admin-subtle)]">
-                                  Float {formatVnd(shift.openingCash)}
-                                </p>
-                              )}
-                              <ul className="space-y-0.5 text-xs text-[var(--admin-text)]">
-                                {staff.map((e) => (
-                                  <li key={e.employeeId || e.assignmentId}>
-                                    <span className="font-medium">{e.fullName}</span>
-                                    <span className="text-[var(--admin-subtle)]">
-                                      {' '}
-                                      · {roleLabel(e.role)}
-                                    </span>
-                                  </li>
-                                ))}
-                              </ul>
-                              {missing.length > 0 && (
-                                <p className="text-[10px] font-medium text-amber-800">
-                                  Needs {missing.join(' + ')}
-                                </p>
-                              )}
-                              {!published && (
-                                <span className="text-[10px] font-medium text-[#0058be]">Edit</span>
-                              )}
-                            </>
-                          )}
-                        </button>
+                        {readOnly ? (
+                          <div
+                            className={`flex w-full min-h-[4.5rem] flex-col items-stretch gap-1 rounded-lg px-2 py-2 text-left ${cellClass}`}
+                          >
+                            {body}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={!!busy || !branchId || published}
+                            onClick={() => onAssign?.(day.date, slot)}
+                            className={`flex w-full min-h-[4.5rem] flex-col items-stretch gap-1 rounded-lg px-2 py-2 text-left transition ${cellClass}`}
+                          >
+                            {body}
+                          </button>
+                        )}
                       </td>
                     );
                   })}

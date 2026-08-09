@@ -146,7 +146,7 @@ export const NAV_GROUPS = [
     items: [
       {
         path: '/my-shifts',
-        label: 'My shifts',
+        label: 'My schedule',
         icon: 'clock',
         permissions: ['MY_SHIFTS'],
       },
