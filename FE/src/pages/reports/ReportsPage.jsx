@@ -696,7 +696,15 @@ export default function ReportsPage() {
                   </tr>
                 )}
               />
-              <Pagination pageData={pageData} />
+              <Pagination
+                page={pageData.page}
+                size={pageData.size}
+                totalRecords={pageData.totalRecords}
+                totalPages={pageData.totalPages}
+                onPageChange={pageData.setPage}
+                onSizeChange={pageData.setSize}
+                disabled={loading}
+              />
             </>
           )}
 
@@ -727,7 +735,15 @@ export default function ReportsPage() {
                   </tr>
                 )}
               />
-              <Pagination pageData={pageData} />
+              <Pagination
+                page={pageData.page}
+                size={pageData.size}
+                totalRecords={pageData.totalRecords}
+                totalPages={pageData.totalPages}
+                onPageChange={pageData.setPage}
+                onSizeChange={pageData.setSize}
+                disabled={loading}
+              />
             </>
           )}
 
@@ -766,7 +782,15 @@ export default function ReportsPage() {
                   </tr>
                 )}
               />
-              <Pagination pageData={pageData} />
+              <Pagination
+                page={pageData.page}
+                size={pageData.size}
+                totalRecords={pageData.totalRecords}
+                totalPages={pageData.totalPages}
+                onPageChange={pageData.setPage}
+                onSizeChange={pageData.setSize}
+                disabled={loading}
+              />
             </>
           )}
         </>

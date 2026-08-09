@@ -3,7 +3,6 @@ import { PRODUCT_UNITS, unitLabel } from './productUnits.js';
 export const CAMPAIGN_TYPES = [
   { value: 'PERCENT', label: 'Percentage off' },
   { value: 'FIXED_AMOUNT', label: 'Fixed discount' },
-  { value: 'BUY_X_GET_Y', label: 'Buy X get Y' },
 ];
 
 export const CAMPAIGN_SCOPES = [
@@ -78,6 +77,7 @@ export const CREATOR_FILTERS = [
 ];
 
 export function formatCampaignType(type) {
+  if (type === 'BUY_X_GET_Y') return 'Buy X get Y (retired)';
   return CAMPAIGN_TYPES.find((t) => t.value === type)?.label || type;
 }
 

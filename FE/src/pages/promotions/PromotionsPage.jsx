@@ -140,9 +140,8 @@ function canEditCampaign(campaign, { webRole, currentUserId, canManage }) {
 
 
 function canDeleteCampaign(campaign, ctx) {
-
+  if (!campaign || campaign.status === 'ACTIVE') return false;
   return canEditCampaign(campaign, ctx);
-
 }
 
 
