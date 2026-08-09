@@ -166,7 +166,7 @@ export default function ShiftOpeningPage() {
   const openingFundDisplay = OPENING_FUND_AMOUNT;
 
   return (
-    <div className="w-full space-y-4 p-4 lg:p-5">
+    <div className="min-h-0 w-full flex-1 space-y-4 overflow-y-auto p-4 lg:p-5">
       <PageHeader
         title="Shift Opening"
         description="Review your shift details and start your assigned shift."

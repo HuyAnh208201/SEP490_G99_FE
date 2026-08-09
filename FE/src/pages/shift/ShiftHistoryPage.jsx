@@ -41,7 +41,7 @@ export default function ShiftHistoryPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 lg:p-6">
+    <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-6 overflow-y-auto p-4 lg:p-6">
       <PageHeader title="Shift history" description="Your recent shift sessions." />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Card padding={false} className="overflow-hidden">
