@@ -26,7 +26,7 @@ export default function ShiftCurrentPage() {
 
   if (!isShiftOpen(session) && !isShiftClosing(session)) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4 p-4 lg:p-6">
+      <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-4 overflow-y-auto p-4 lg:p-6">
         <PageHeader title="Current shift" description="You do not have an active shift session." />
         <Button onClick={() => navigate('/pos/shift/opening')}>Go to shift opening</Button>
       </div>
@@ -37,7 +37,7 @@ export default function ShiftCurrentPage() {
   const pendingClose = isShiftClosing(session);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 lg:p-6">
+    <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-6 overflow-y-auto p-4 lg:p-6">
       <PageHeader
         title="Current shift"
         description="Your active shift session. Use POS for sales until you end the shift."

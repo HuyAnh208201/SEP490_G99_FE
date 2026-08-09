@@ -148,7 +148,7 @@ export default function ShiftClosingPage() {
   const shift = data?.shift;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 lg:p-6">
+    <div className="mx-auto min-h-0 w-full max-w-4xl flex-1 space-y-6 overflow-y-auto p-4 lg:p-6">
       <PageHeader
         title="Shift Closing"
         description="Review your shift before ending and completing handover."
