@@ -82,6 +82,7 @@ export default function App() {
           <Route path="/pos/shift/current" element={<ShiftCurrentPage />} />
           <Route path="/pos/shift/closing" element={<ShiftClosingPage />} />
           <Route path="/pos/shift/history" element={<ShiftHistoryPage />} />
+          <Route path="/pos/my-shifts" element={<MyShiftsPage />} />
           <Route element={<RequireOpenShift />}>
             <Route path="/pos" element={<PosNewOrderPage />} />
             <Route path="/pos/history" element={<OrderHistoryPage />} />
