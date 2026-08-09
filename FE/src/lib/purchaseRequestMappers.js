@@ -21,6 +21,7 @@ export function normalizeRequestDetail(row) {
     approvedQuantity: it.approvedQuantity ?? null,
     topPackagingLabel: it.topPackagingLabel,
     topPackagingConversionQty: it.topPackagingConversionQty ?? 1,
+    shortDate: Boolean(it.shortDate),
   }));
   return {
     ...normalizeRequestSummary(row),

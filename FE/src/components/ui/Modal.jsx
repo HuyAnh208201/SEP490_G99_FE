@@ -1,4 +1,21 @@
-export default function Modal({ open, onClose, title, description, children, size = 'md', footer }) {
+import { createPortal } from 'react-dom';
+
+const LAYER_CLASS = {
+  50: 'z-50',
+  60: 'z-[60]',
+  70: 'z-[70]',
+};
+
+export default function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  size = 'md',
+  footer,
+  layer = 50,
+}) {
   if (!open) return null;
 
   const widths = {
@@ -15,9 +32,11 @@ export default function Modal({ open, onClose, title, description, children, siz
       ? 'max-h-[min(94vh,960px)]'
       : 'max-h-[min(92vh,900px)]';
 
-  return (
+  const zClass = LAYER_CLASS[layer] || LAYER_CLASS[50];
+
+  const node = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -60,4 +79,6 @@ export default function Modal({ open, onClose, title, description, children, siz
       </div>
     </div>
   );
+
+  return createPortal(node, document.body);
 }

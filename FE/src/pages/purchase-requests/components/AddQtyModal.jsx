@@ -43,7 +43,7 @@ export default function AddQtyModal({ open, product, defaultQty = 1, onConfirm, 
   }
 
   return (
-    <Modal open={open} onClose={onCancel} title="Add to request" size="sm">
+    <Modal open={open} onClose={onCancel} title="Add to request" size="sm" layer={60}>
       <div className="space-y-4">
         <div>
           <p className="font-medium text-[var(--admin-text)]">{product.name}</p>
