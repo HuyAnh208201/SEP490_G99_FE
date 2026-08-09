@@ -27,6 +27,9 @@ function Section({ title, children }) {
   );
 }
 
+const inputClass =
+  'w-full rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[var(--admin-brand)]/15';
+
 export default function CashReconciliationReviewPage() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -113,7 +116,7 @@ export default function CashReconciliationReviewPage() {
             <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-[var(--admin-muted)]">Shift ID</dt>
-                <dd className="font-medium">{detail.shiftId ?? '—'}</dd>
+                <dd className="font-medium text-[var(--admin-brand)]">{detail.shiftId ?? '—'}</dd>
               </div>
               <div>
                 <dt className="text-[var(--admin-muted)]">Cashier</dt>
@@ -212,7 +215,7 @@ export default function CashReconciliationReviewPage() {
             <label className="block text-sm">
               <span className="mb-1 block text-[var(--admin-muted)]">Manager note</span>
               <textarea
-                className="w-full rounded-lg border border-[var(--admin-border)] px-3 py-2"
+                className={inputClass}
                 rows={4}
                 placeholder="Optional for approve; required for reject."
                 value={managerNote}
@@ -223,11 +226,7 @@ export default function CashReconciliationReviewPage() {
               <Button variant="secondary" onClick={() => navigate('/branch-manager/cash-reconciliation')}>
                 Cancel
               </Button>
-              <Button
-                variant="secondary"
-                disabled={busy === 'reject'}
-                onClick={() => submit(false)}
-              >
+              <Button variant="secondary" disabled={busy === 'reject'} onClick={() => submit(false)}>
                 Reject
               </Button>
               <Button disabled={busy === 'approve'} onClick={() => submit(true)}>

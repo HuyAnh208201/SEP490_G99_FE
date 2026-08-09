@@ -26,6 +26,7 @@ import {
   showWarehouseStockColumn,
 } from '../../constants/productAccess.js';
 import { formatVnd } from '../../lib/money.js';
+import { highValueVerificationHint, willAppearInShiftVerification } from '../../lib/highValueProducts.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -157,6 +158,19 @@ export default function ProductsPage() {
   }, [searchParams, setSearchParams]);
 
   const filtered = items;
+
+  const selectedCategoryName = useMemo(
+    () => categories.find((c) => String(c.id) === String(form.categoryId))?.name ?? '',
+    [categories, form.categoryId],
+  );
+  const shiftVerificationHint = highValueVerificationHint(
+    selectedCategoryName,
+    form.defaultSalePrice,
+  );
+  const qualifiesForShiftVerification = willAppearInShiftVerification(
+    selectedCategoryName,
+    form.defaultSalePrice,
+  );
 
   const summary = useMemo(() => {
     if (!showWarehouseStock) return null;
@@ -520,6 +534,21 @@ export default function ProductsPage() {
                       onChange={(v) => patchForm({ defaultSalePrice: v })}
                     />
                   </FormField>
+                </div>
+                <div
+                  className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+                    qualifiesForShiftVerification
+                      ? 'border-[var(--admin-brand-soft)] bg-[var(--admin-brand)]/5 text-[var(--admin-text)]'
+                      : 'border-[var(--admin-border)] bg-[#f7f9fb] text-[var(--admin-muted)]'
+                  }`}
+                >
+                  <p className="font-semibold text-[var(--admin-text)]">Shift closing — high-value count</p>
+                  <p className="mt-1">{shiftVerificationHint}</p>
+                  <p className="mt-1">
+                    There is no separate &quot;high-value&quot; product type. Pick a high-theft category
+                    (e.g. High-value tobacco, Cosmetics &amp; beauty, Prepaid cards, Premium alcohol),
+                    set the retail price above the threshold, and make sure the branch has stock on hand.
+                  </p>
                 </div>
               </section>
 

@@ -6,9 +6,9 @@
   --admin-text: #191c1e;
   --admin-muted: #45464d;
   --admin-subtle: #76777d;
-  --admin-brand: #0058be;
+  --admin-brand: #2d5be3;
   --admin-brand-soft: #adc6ff;
-  --admin-brand-hover: #004a9f;
+  --admin-brand-hover: #244db8;
   --admin-success: #0d7a3e;
   --admin-warning: #b45309;
   --admin-danger: #93000a;
@@ -23,7 +23,7 @@
 
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
     0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  --shadow-elevated: 0 10px 25px -5px rgba(0, 88, 190, 0.08);
+  --shadow-elevated: 0 10px 25px -5px rgba(45, 91, 227, 0.08);
 
   --duration-fast: 150ms;
   --duration-normal: 250ms;

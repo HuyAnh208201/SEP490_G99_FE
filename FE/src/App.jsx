@@ -83,11 +83,11 @@ export default function App() {
           <Route path="/pos/shift/closing" element={<ShiftClosingPage />} />
           <Route path="/pos/shift/history" element={<ShiftHistoryPage />} />
           <Route path="/pos/my-shifts" element={<MyShiftsPage />} />
+          <Route path="/pos/settings" element={<SettingsPage />} />
           <Route element={<RequireOpenShift />}>
             <Route path="/pos" element={<PosNewOrderPage />} />
             <Route path="/pos/history" element={<OrderHistoryPage />} />
             <Route path="/pos/inventory" element={<InventoryPage />} />
-            <Route path="/pos/settings" element={<SettingsPage />} />
             <Route path="/pos/payment" element={<PosPaymentPage />} />
             <Route path="/pos/payment/cash" element={<CashPaymentPage />} />
             <Route path="/pos/payment/payos" element={<PayOSPaymentPage />} />

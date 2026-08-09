@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
 import { fetchPendingReconciliation } from '../../api/shiftSessions.js';
+import useClientPage from '../../hooks/useClientPage.js';
 import { formatDateTime } from '../../lib/datetime.js';
 
 function formatMoney(value) {
@@ -19,19 +21,22 @@ function differenceClass(value) {
 
 export default function CashReconciliationListPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const pageData = useClientPage(allRows);
+  const { items: rows } = pageData;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const data = await fetchPendingReconciliation();
-      setRows(Array.isArray(data) ? data : []);
+      setAllRows(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || 'Failed to load pending shifts');
-      setRows([]);
+      setAllRows([]);
     } finally {
       setLoading(false);
     }
@@ -52,14 +57,14 @@ export default function CashReconciliationListPage() {
       <Card padding={false} className="overflow-hidden">
         {loading ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">Loading…</p>
-        ) : rows.length === 0 ? (
+        ) : allRows.length === 0 ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">
             No shifts are waiting for cash reconciliation.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-[var(--admin-border)] bg-[#f7f9fb] text-xs uppercase tracking-wide text-[var(--admin-muted)]">
+              <thead className="bg-[var(--admin-brand)] text-xs uppercase tracking-wide text-white">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Shift ID</th>
                   <th className="px-4 py-3 font-semibold">Cashier</th>
@@ -75,9 +80,11 @@ export default function CashReconciliationListPage() {
                   <tr
                     key={row.id}
                     onClick={() => navigate(`/branch-manager/cash-reconciliation/${row.id}`)}
-                    className="cursor-pointer border-b border-[var(--admin-border)] transition hover:bg-[#f0f4f8]"
+                    className="cursor-pointer border-b border-[var(--admin-border)] transition hover:bg-[var(--admin-brand)]/5"
                   >
-                    <td className="px-4 py-3 font-medium">{row.shiftId ?? row.id}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--admin-brand)]">
+                      {row.shiftId ?? row.id}
+                    </td>
                     <td className="px-4 py-3">{row.employeeName ?? '—'}</td>
                     <td className="px-4 py-3">{row.branchName ?? '—'}</td>
                     <td className="px-4 py-3">{formatMoney(row.expectedCash)}</td>
@@ -93,6 +100,14 @@ export default function CashReconciliationListPage() {
               </tbody>
             </table>
           </div>
+        )}
+        {!loading && allRows.length > 0 && (
+          <Pagination
+            {...pageData}
+            onPageChange={pageData.setPage}
+            onSizeChange={pageData.setSize}
+            disabled={loading}
+          />
         )}
       </Card>
     </div>

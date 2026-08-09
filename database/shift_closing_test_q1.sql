@@ -7,6 +7,7 @@
 -- with sample cash sales so /pos/shift/closing shows expected cash.
 --
 -- Run against the same DB as BE (see application.properties).
+-- Prerequisite: run high_value_products.sql once so verification items exist.
 -- WARNING: Removes existing shift_sessions for this cashier first.
 -- =============================================================================
 

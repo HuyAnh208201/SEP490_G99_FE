@@ -501,6 +501,53 @@ INSERT INTO branch_inventory (branch_id, product_id, quantity, reorder_point, up
 (3, 10, 15, 50, NOW()),
 (3, 11, 4, 15, NOW());
 
+-- ---- Danh mục & sản phẩm giá trị cao (kiểm kê đóng ca) ----
+INSERT INTO categories (id, name, parent_id, description) VALUES
+(5, 'Thuốc lá', NULL, 'Thuốc lá, xì gà — đơn giá cao, kích thước nhỏ'),
+(6, 'Mỹ phẩm & dược mỹ phẩm', NULL, 'Son, kem chống nắng, serum giá trị cao'),
+(7, 'Thẻ cào & thẻ dịch vụ', NULL, 'Thẻ điện thoại, thẻ game vật lý'),
+(8, 'Đồ uống có cồn giá trị cao', NULL, 'Rượu mạnh, whisky, bia nhập khẩu lẻ');
+
+INSERT INTO products
+(id, code, barcode, name, description, category_id, unit, reference_import_price, default_sale_price, status)
+VALUES
+(16, 'TOB001', '893100000016', 'Marlboro Red — thùng 10 gói', 'Thùng 10 gói Marlboro Red', 5, 'carton', 480000, 550000, 'active'),
+(17, 'TOB002', '893100000017', '555 State Express — thùng 10 gói', 'Thùng 10 gói 555', 5, 'carton', 450000, 520000, 'active'),
+(18, 'TOB003', '893100000018', 'Davidoff Mini Cigarillo — hộp 20 điếu', 'Xì gà mini cao cấp', 5, 'tin', 580000, 680000, 'active'),
+(19, 'TOB004', '893100000019', 'Dunhill Swiss Blend — gói lẻ cao cấp', 'Gói lẻ thuốc nhập', 5, 'pack', 260000, 320000, 'active'),
+(20, 'COS001', '893100000020', 'MAC Lipstick Ruby Woo 3g', 'Son môi MAC', 6, 'piece', 520000, 650000, 'active'),
+(21, 'COS002', '893100000021', 'La Roche-Posay Anthelios SPF50+ 50ml', 'Kem chống nắng', 6, 'tube', 420000, 550000, 'active'),
+(22, 'COS003', '893100000022', 'Estée Lauder Advanced Night Repair 30ml', 'Serum cao cấp', 6, 'bottle', 1500000, 1850000, 'active'),
+(23, 'COS004', '893100000023', 'YSL Rouge Volupté Shine', 'Son YSL', 6, 'piece', 580000, 720000, 'active'),
+(24, 'CRD001', '893100000024', 'Thẻ cào Viettel 500.000đ', 'Thẻ Viettel 500k', 7, 'card', 495000, 500000, 'active'),
+(25, 'CRD002', '893100000025', 'Thẻ cào Vinaphone 500.000đ', 'Thẻ Vinaphone 500k', 7, 'card', 495000, 500000, 'active'),
+(26, 'CRD003', '893100000026', 'Thẻ Garena 500.000đ', 'Thẻ Garena 500k', 7, 'card', 490000, 500000, 'active'),
+(27, 'CRD004', '893100000027', 'Thẻ Steam Wallet 500.000đ', 'Thẻ Steam 500k', 7, 'card', 490000, 500000, 'active'),
+(28, 'ALC001', '893100000028', 'Johnnie Walker Red Label 750ml', 'Whisky 750ml', 8, 'bottle', 520000, 650000, 'active'),
+(29, 'ALC002', '893100000029', 'Hennessy VS Cognac 700ml', 'Cognac 700ml', 8, 'bottle', 980000, 1200000, 'active'),
+(30, 'ALC003', '893100000030', 'Corona Extra — lốc 6 lon nhập khẩu', 'Bia Corona lốc 6', 8, 'pack', 420000, 520000, 'active'),
+(31, 'ALC004', '893100000031', 'Suntory Kakubin Whisky 700ml', 'Whisky Nhật 700ml', 8, 'bottle', 460000, 580000, 'active');
+
+INSERT INTO product_packagings (product_id, name, conversion_qty, barcode, is_base) VALUES
+(16, 'Thùng', 1, '893100000016', true), (17, 'Thùng', 1, '893100000017', true),
+(18, 'Hộp', 1, '893100000018', true), (19, 'Gói', 1, '893100000019', true),
+(20, 'Cây', 1, '893100000020', true), (21, 'Tuýp', 1, '893100000021', true),
+(22, 'Chai', 1, '893100000022', true), (23, 'Cây', 1, '893100000023', true),
+(24, 'Thẻ', 1, '893100000024', true), (25, 'Thẻ', 1, '893100000025', true),
+(26, 'Thẻ', 1, '893100000026', true), (27, 'Thẻ', 1, '893100000027', true),
+(28, 'Chai', 1, '893100000028', true), (29, 'Chai', 1, '893100000029', true),
+(30, 'Lốc', 1, '893100000030', true), (31, 'Chai', 1, '893100000031', true);
+
+INSERT INTO branch_inventory (branch_id, product_id, quantity, reorder_point, updated_at) VALUES
+(1, 16, 8, 4, NOW()), (1, 17, 6, 3, NOW()), (1, 18, 12, 5, NOW()), (1, 19, 24, 10, NOW()),
+(1, 20, 10, 4, NOW()), (1, 21, 14, 5, NOW()), (1, 22, 6, 2, NOW()), (1, 23, 8, 3, NOW()),
+(1, 24, 20, 8, NOW()), (1, 25, 18, 8, NOW()), (1, 26, 15, 6, NOW()), (1, 27, 12, 5, NOW()),
+(1, 28, 9, 3, NOW()), (1, 29, 5, 2, NOW()), (1, 30, 11, 4, NOW()), (1, 31, 7, 3, NOW()),
+(2, 16, 5, 3, NOW()), (2, 17, 4, 2, NOW()), (2, 18, 8, 3, NOW()), (2, 19, 15, 6, NOW()),
+(2, 20, 6, 2, NOW()), (2, 21, 8, 3, NOW()), (2, 22, 3, 1, NOW()), (2, 23, 5, 2, NOW()),
+(2, 24, 12, 5, NOW()), (2, 25, 10, 5, NOW()), (2, 26, 8, 4, NOW()), (2, 27, 6, 3, NOW()),
+(2, 28, 4, 2, NOW()), (2, 29, 3, 1, NOW()), (2, 30, 6, 2, NOW()), (2, 31, 4, 2, NOW());
+
 INSERT INTO suppliers (id, name, contact_person, phone, address, status) VALUES
 (1, 'Nhà phân phối nước giải khát ABC', 'Anh Nam', '0988000001', 'TP.HCM', 'active'),
 (2, 'Công ty thực phẩm nhanh XYZ', 'Chị Hạnh', '0988000002', 'Hà Nội', 'active'),
