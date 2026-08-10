@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  activateCategory,
   createCategory,
-  deleteCategory,
+  deactivateCategory,
   fetchCategories,
   fetchCategoriesPage,
   updateCategory,
@@ -21,7 +22,10 @@ export default function CategoriesPage() {
   const [allCategories, setAllCategories] = useState([]);
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
-  const pageData = useServerPage(fetchCategoriesPage, { search: debouncedQuery });
+  const pageData = useServerPage(fetchCategoriesPage, {
+    search: debouncedQuery,
+    includeInactive: true,
+  });
   const [actionError, setActionError] = useState('');
   const { items, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
@@ -29,11 +33,17 @@ export default function CategoriesPage() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+
+  const reloadParents = useCallback(() => {
+    fetchCategories({ includeInactive: true })
+      .then((data) => setAllCategories(Array.isArray(data) ? data : []))
+      .catch(() => setAllCategories([]));
+  }, []);
 
   useEffect(() => {
-    fetchCategories().then((data) => setAllCategories(Array.isArray(data) ? data : [])).catch(() => setAllCategories([]));
-  }, []);
+    reloadParents();
+  }, [reloadParents]);
 
   function updateField(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -72,7 +82,7 @@ export default function CategoriesPage() {
       }
       cancelEdit();
       load();
-      fetchCategories().then((data) => setAllCategories(Array.isArray(data) ? data : [])).catch(() => {});
+      reloadParents();
     } catch (err) {
       setFormError(err.message || 'Failed to save category');
     } finally {
@@ -80,19 +90,29 @@ export default function CategoriesPage() {
     }
   }
 
-  async function handleDelete(id) {
-    setDeleteTargetId(id);
+  async function confirmDeactivate() {
+    const cat = deactivateTarget;
+    if (!cat) return;
+    try {
+      await deactivateCategory(cat.id);
+      if (editingId === cat.id) cancelEdit();
+      load();
+      reloadParents();
+    } catch (err) {
+      setActionError(err.message || 'Failed to deactivate category');
+    } finally {
+      setDeactivateTarget(null);
+    }
   }
 
-  async function confirmDelete() {
-    const id = deleteTargetId;
-    if (!id) return;
+  async function handleActivate(id) {
+    setActionError('');
     try {
-      await deleteCategory(id);
-      if (editingId === id) cancelEdit();
+      await activateCategory(id);
       load();
+      reloadParents();
     } catch (err) {
-      setActionError(err.message || 'Failed to delete category');
+      setActionError(err.message || 'Failed to activate category');
     }
   }
 
@@ -100,7 +120,7 @@ export default function CategoriesPage() {
     <div className="w-full">
       <PageHeader
         title="Product categories"
-        description="Step 1 of admin setup — create product groups before adding SKUs."
+        description="Step 1 of admin setup — create product groups before adding SKUs. Categories can be deactivated, not deleted."
       />
 
       {error && (
@@ -137,7 +157,7 @@ export default function CategoriesPage() {
               >
                 <option value="">None (top level)</option>
                 {allCategories
-                  .filter((c) => c.id !== editingId)
+                  .filter((c) => c.id !== editingId && c.active !== false)
                   .map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -179,8 +199,16 @@ export default function CategoriesPage() {
 
         <Card className="lg:col-span-2 !p-0 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
-            <p className="text-sm text-[var(--admin-muted)]">Total <strong>{pageData.totalRecords}</strong> categories</p>
-            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search categories…" className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm" />
+            <p className="text-sm text-[var(--admin-muted)]">
+              Total <strong>{pageData.totalRecords}</strong> categories
+            </p>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search categories…"
+              className="w-full max-w-xs rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+            />
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
@@ -188,6 +216,7 @@ export default function CategoriesPage() {
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Parent</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Description</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -196,16 +225,24 @@ export default function CategoriesPage() {
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={4} className="px-4 py-4">
+                        <td colSpan={5} className="px-4 py-4">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
                     ))
                   : items.map((c) => (
                       <tr key={c.id} className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80">
-                        <td className="px-4 py-3 font-medium">{c.name}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {c.parentName || '—'}
+                        <td className="px-4 py-3 font-medium">
+                          {c.name}
+                          {c.shortDate ? (
+                            <span className="ml-2 text-xs font-normal text-amber-700">Short-date</span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">{c.parentName || '—'}</td>
+                        <td className="px-4 py-3">
+                          <Badge tone={c.active !== false ? 'success' : 'soon'}>
+                            {c.active !== false ? 'Active' : 'Inactive'}
+                          </Badge>
                         </td>
                         <td className="max-w-xs truncate px-4 py-3 text-[var(--admin-muted)]">
                           {c.description || '—'}
@@ -215,13 +252,23 @@ export default function CategoriesPage() {
                             <Button variant="ghost" className="!px-2 !py-1" onClick={() => startEdit(c)}>
                               Edit
                             </Button>
-                            <Button
-                              variant="ghost"
-                              className="!px-2 !py-1 !text-red-600"
-                              onClick={() => handleDelete(c.id)}
-                            >
-                              Delete
-                            </Button>
+                            {c.active !== false ? (
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1 !text-amber-700"
+                                onClick={() => setDeactivateTarget(c)}
+                              >
+                                Deactivate
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                className="!px-2 !py-1 !text-[#0058be]"
+                                onClick={() => handleActivate(c.id)}
+                              >
+                                Activate
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -239,12 +286,12 @@ export default function CategoriesPage() {
       </div>
 
       <ConfirmDialog
-        open={Boolean(deleteTargetId)}
-        onClose={() => setDeleteTargetId(null)}
-        onConfirm={confirmDelete}
-        title="Delete category"
-        message="Delete this category?"
-        confirmLabel="Confirm"
+        open={Boolean(deactivateTarget)}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={confirmDeactivate}
+        title="Deactivate category"
+        message={`Deactivate “${deactivateTarget?.name || 'this category'}”? It can be activated again later.`}
+        confirmLabel="Deactivate"
         danger
       />
     </div>

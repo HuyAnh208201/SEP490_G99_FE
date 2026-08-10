@@ -11,8 +11,8 @@ function unwrap(body) {
   return body.data;
 }
 
-export async function fetchCategories() {
-  const { data } = await http.get('/categories');
+export async function fetchCategories(params = {}) {
+  const { data } = await http.get('/categories', { params });
   return unwrap(data);
 }
 
@@ -36,6 +36,17 @@ export async function updateCategory(id, payload) {
   return unwrap(data);
 }
 
+export async function deactivateCategory(id) {
+  const { data } = await http.patch(`/categories/${id}/deactivate`);
+  return unwrap(data);
+}
+
+export async function activateCategory(id) {
+  const { data } = await http.patch(`/categories/${id}/activate`);
+  return unwrap(data);
+}
+
+/** @deprecated Use deactivateCategory — hard delete is no longer supported. */
 export async function deleteCategory(id) {
-  await http.delete(`/categories/${id}`);
+  await deactivateCategory(id);
 }

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { fetchBranches } from '../../api/branches.js';
-import { fetchCategories } from '../../api/categories.js';
 
 import { createCampaign, updateCampaign } from '../../api/campaigns.js';
 
@@ -34,7 +33,6 @@ import Button from '../ui/Button.jsx';
 import FormField from '../ui/FormField.jsx';
 
 import MoneyInput from '../ui/MoneyInput.jsx';
-import { PRODUCT_UNITS, unitLabel } from '../../constants/productUnits.js';
 
 
 
@@ -97,8 +95,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
   const [form, setForm] = useState(EMPTY);
 
   const [branches, setBranches] = useState([]);
-  const [categories, setCategories] = useState([]);
-
   const [loading, setLoading] = useState(false);
 
   const [error, setError] = useState('');
@@ -129,7 +125,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
         name: editing.name || '',
 
-        type: editing.type || 'PERCENT',
+        type: editing.type === 'BUY_X_GET_Y' ? 'PERCENT' : editing.type || 'PERCENT',
 
         discountValue: editing.discountValue ?? '',
 
@@ -158,12 +154,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
       .then((data) => setBranches(Array.isArray(data) ? data : []))
 
       .catch(() => setBranches([]));
-
-    fetchCategories()
-
-      .then((data) => setCategories(Array.isArray(data) ? data : []))
-
-      .catch(() => setCategories([]));
 
   }, [open, editing]);
 
@@ -227,33 +217,14 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
     }
 
-    if (form.type !== 'BUY_X_GET_Y') {
+    const discount = Number(form.discountValue);
 
-      const discount = Number(form.discountValue);
+    if (!Number.isFinite(discount) || discount < 0) {
 
-      if (!Number.isFinite(discount) || discount < 0) {
+      setError('Discount value must be a valid number.');
 
-        setError('Discount value must be a valid number.');
+      return;
 
-        return;
-
-      }
-
-    }
-
-    if (form.type === 'BUY_X_GET_Y') {
-      if (!form.buyQuantity || !form.getQuantity) {
-        setError('Buy and get quantities are required for this promotion type.');
-        return;
-      }
-      if (!form.categoryId) {
-        setError('Select a product category for this promotion.');
-        return;
-      }
-      if (!form.unit) {
-        setError('Select a unit for this promotion.');
-        return;
-      }
     }
 
     if (scopeEditable && form.chainScopeMode === 'SUBSET' && form.branchIds.length === 0) {
@@ -296,7 +267,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
       type: form.type,
 
-      discountValue: form.type === 'BUY_X_GET_Y' ? 0 : Number(form.discountValue),
+      discountValue: Number(form.discountValue),
 
       conditions: buildConditions(form.type, form),
 
@@ -500,91 +471,7 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
 
 
-              {form.type === 'BUY_X_GET_Y' ? (
-
-                <div className="sm:col-span-2">
-
-                  <div className="flex flex-wrap items-center justify-center gap-3 rounded-xl border border-dashed border-[#0058be]/30 bg-white px-4 py-5">
-
-                    <span className="text-sm font-medium text-[var(--admin-muted)]">Buy</span>
-
-                    <input
-
-                      required
-
-                      type="number"
-
-                      min="1"
-
-                      value={form.buyQuantity}
-
-                      onChange={(e) => patch({ buyQuantity: e.target.value })}
-
-                      className="w-20 rounded-lg border border-[var(--admin-border)] px-3 py-2 text-center text-lg font-semibold focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-
-                    />
-
-                    <span className="text-sm font-medium text-[var(--admin-muted)]">get</span>
-
-                    <input
-
-                      required
-
-                      type="number"
-
-                      min="1"
-
-                      value={form.getQuantity}
-
-                      onChange={(e) => patch({ getQuantity: e.target.value })}
-
-                      className="w-20 rounded-lg border border-[var(--admin-border)] px-3 py-2 text-center text-lg font-semibold focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-
-                    />
-
-                    <span className="text-sm font-medium text-[var(--admin-text)]">free</span>
-
-                  </div>
-
-                  <p className="mt-2 text-center text-xs text-[var(--admin-subtle)]">
-                    Example: Buy 2 get 1 — customer pays for 2, receives 3 items.
-                  </p>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <FormField label="Product category" required>
-                      <select
-                        required
-                        value={form.categoryId}
-                        onChange={(e) => patch({ categoryId: e.target.value })}
-                        className={inputClass}
-                      >
-                        <option value="">Select category</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </FormField>
-                    <FormField label="Unit" required hint="e.g. bottle or case">
-                      <select
-                        required
-                        value={form.unit}
-                        onChange={(e) => patch({ unit: e.target.value })}
-                        className={inputClass}
-                      >
-                        {PRODUCT_UNITS.map((u) => (
-                          <option key={u.value} value={u.value}>
-                            {u.label}
-                          </option>
-                        ))}
-                      </select>
-                    </FormField>
-                  </div>
-                </div>
-
-              ) : (
-
-                <FormField
+              <FormField
 
                   label={form.type === 'PERCENT' ? 'Discount (%)' : 'Fixed discount (₫)'}
 
@@ -640,13 +527,9 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
                 </FormField>
 
-              )}
 
 
-
-              {form.type !== 'BUY_X_GET_Y' && (
-
-                <FormField
+              <FormField
 
                   label="Minimum order (₫)"
 
@@ -667,8 +550,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
                   />
 
                 </FormField>
-
-              )}
 
             </div>
 

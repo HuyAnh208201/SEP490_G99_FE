@@ -40,6 +40,8 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
   const shortages = useMemo(() => {
     if (!request?.items) return [];
     return request.items.filter((it) => {
+      // Short-date SKUs skip central warehouse — BE does not reserve stock for them.
+      if (it.shortDate) return false;
       if (it.warehouseStock == null) return false;
       const approvedTopUnits = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
       const approvedBaseUnits = approvedTopUnits * (it.topPackagingConversionQty || 1);
@@ -145,10 +147,14 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                   const conversionQty = it.topPackagingConversionQty || 1;
                   const approved = Number(approvedQty[it.id] ?? it.requestedQuantity ?? 0) || 0;
                   const approvedBaseUnits = approved * conversionQty;
-                  const isShort = it.warehouseStock != null && approvedBaseUnits > it.warehouseStock;
+                  const isShortDate = Boolean(it.shortDate);
+                  const isShort =
+                    !isShortDate &&
+                    it.warehouseStock != null &&
+                    approvedBaseUnits > it.warehouseStock;
                   // Display warehouse stock in TOP units to match Requested / Approved.
                   const warehouseStockTop =
-                    it.warehouseStock == null
+                    isShortDate || it.warehouseStock == null
                       ? null
                       : Math.floor(Number(it.warehouseStock) / conversionQty);
                   return (
@@ -158,6 +164,11 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                         <div className="font-mono text-xs text-[var(--admin-subtle)]">
                           {it.productCode}
                         </div>
+                        {isShortDate && (
+                          <div className="mt-0.5 text-[11px] font-medium text-amber-700">
+                            Short-date — supplier direct (no central stock)
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-[var(--admin-muted)]">{it.categoryName}</td>
                       <td className="px-4 py-2.5 text-[var(--admin-muted)]">
@@ -165,7 +176,9 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{it.requestedQuantity}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">
-                        {warehouseStockTop == null ? (
+                        {isShortDate ? (
+                          <span className="text-[var(--admin-subtle)]">N/A</span>
+                        ) : warehouseStockTop == null ? (
                           <span className="text-[var(--admin-subtle)]">—</span>
                         ) : (
                           <span className={isShort ? 'font-semibold text-amber-700' : ''}>

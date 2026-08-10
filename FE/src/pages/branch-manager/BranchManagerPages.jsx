@@ -14,6 +14,8 @@ import StatCard from '../../components/ui/StatCard.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
+import Pagination from '../../components/ui/Pagination.jsx';
+import useClientPage from '../../hooks/useClientPage.js';
 import { PR_STATUS, normalizeStatus } from '../../constants/purchaseRequests.js';
 import { formatVnd } from '../../lib/money.js';
 import { formatDateTime } from '../../lib/datetime.js';
@@ -176,6 +178,7 @@ export function RefundApprovalPage() {
   const [error, setError] = useState('');
   const [notes, setNotes] = useState({});
   const [submittingId, setSubmittingId] = useState(null);
+  const pageData = useClientPage(refunds);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -253,19 +256,30 @@ export function RefundApprovalPage() {
           No refunds are waiting for approval.
         </Card>
       ) : (
-        <div className="space-y-4">
-          {refunds.map((refund) => (
-            <PendingRefundCard
-              key={refund.refundId}
-              refund={refund}
-              note={notes[refund.refundId]}
-              onNoteChange={handleNoteChange}
-              onApprove={handleApprove}
-              onReject={handleReject}
-              submitting={submittingId === refund.refundId}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-4">
+            {pageData.items.map((refund) => (
+              <PendingRefundCard
+                key={refund.refundId}
+                refund={refund}
+                note={notes[refund.refundId]}
+                onNoteChange={handleNoteChange}
+                onApprove={handleApprove}
+                onReject={handleReject}
+                submitting={submittingId === refund.refundId}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={pageData.page}
+            size={pageData.size}
+            totalRecords={pageData.totalRecords}
+            totalPages={pageData.totalPages}
+            onPageChange={pageData.setPage}
+            onSizeChange={pageData.setSize}
+            disabled={loading}
+          />
+        </>
       )}
     </div>
   );

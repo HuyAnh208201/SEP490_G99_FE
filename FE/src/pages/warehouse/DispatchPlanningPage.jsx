@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate } from '../../lib/datetime.js';
 import { listApprovedRequestsPage, createDispatchOrder } from '../../api/dispatch.js';
+import { fetchSuppliers } from '../../api/suppliers.js';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
@@ -18,11 +19,27 @@ export default function DispatchPlanningPage() {
   const [areaFilter, setAreaFilter] = useState('');
   const [routeFilter, setRouteFilter] = useState('');
   const [shippingId, setShippingId] = useState(null);
+  const [suppliers, setSuppliers] = useState([]);
+  /** @type {Record<string, number[]>} */
+  const [selectedSuppliersByRequest, setSelectedSuppliersByRequest] = useState({});
 
   const debouncedQuery = useDebouncedValue(query);
-  const pageData = useServerPage(listApprovedRequestsPage, { search: debouncedQuery, area: areaFilter, route: routeFilter });
+  const pageData = useServerPage(listApprovedRequestsPage, {
+    search: debouncedQuery,
+    area: areaFilter,
+    route: routeFilter,
+  });
   const { items: rows, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
+
+  useEffect(() => {
+    fetchSuppliers()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setSuppliers(list.filter((s) => String(s.status || '').toLowerCase() !== 'inactive'));
+      })
+      .catch(() => setSuppliers([]));
+  }, []);
 
   const areas = useMemo(
     () => [...new Set(rows.map((r) => r.area).filter(Boolean))],
@@ -33,15 +50,41 @@ export default function DispatchPlanningPage() {
     [rows],
   );
 
-  async function handleShip(requestId, requestNumber) {
+  function toggleSupplier(requestId, supplierId) {
+    setSelectedSuppliersByRequest((prev) => {
+      const current = prev[requestId] || [];
+      const next = current.includes(supplierId)
+        ? current.filter((id) => id !== supplierId)
+        : [...current, supplierId];
+      return { ...prev, [requestId]: next };
+    });
+  }
+
+  async function handleShip(request, requestNumber) {
+    const requestId = request.id;
+    const needsSuppliers = Boolean(request.hasShortDateCategories);
+    const supplierIds = selectedSuppliersByRequest[requestId] || [];
+    if (needsSuppliers && supplierIds.length === 0) {
+      setActionError('Select at least one supplier for short-date categories before shipping.');
+      return;
+    }
+
     setShippingId(requestId);
     setActionError('');
     setMessage('');
     try {
-      const order = await createDispatchOrder({ requestId });
+      const order = await createDispatchOrder({
+        requestId,
+        supplierIds: needsSuppliers ? supplierIds : undefined,
+      });
       setMessage(
         `Dispatch order ${order?.dispatchNumber || ''} created for ${requestNumber || 'request'}.`,
       );
+      setSelectedSuppliersByRequest((prev) => {
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
+      });
       load();
     } catch (err) {
       setActionError(err?.message || 'Failed to create dispatch order');
@@ -54,7 +97,7 @@ export default function DispatchPlanningPage() {
     <div className="w-full">
       <PageHeader
         title="Ship Orders"
-        description="Ship approved requests one at a time. Each request creates its own dispatch order."
+        description="Ship approved requests one at a time. Short-date categories require supplier selection (direct delivery)."
       />
 
       {error && (
@@ -82,7 +125,13 @@ export default function DispatchPlanningPage() {
               </option>
             ))}
           </select>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search requests…"
+            className={selectClass}
+          />
           <select
             value={areaFilter}
             onChange={(e) => setAreaFilter(e.target.value)}
@@ -109,6 +158,7 @@ export default function DispatchPlanningPage() {
                 <th className="px-4 py-3">Delivery Area</th>
                 <th className="px-4 py-3">Route</th>
                 <th className="px-4 py-3">Categories</th>
+                <th className="px-4 py-3">Suppliers</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -117,46 +167,81 @@ export default function DispatchPlanningPage() {
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={7} className="px-4 py-4">
+                      <td colSpan={8} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
                   ))
-                : rows.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
-                    >
-                      <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
-                        {r.requestNumber}
-                      </td>
-                      <td className="px-4 py-3 font-medium">{r.branchName}</td>
-                      <td className="px-4 py-3 text-[var(--admin-muted)]">{r.area || '—'}</td>
-                      <td className="px-4 py-3 text-[var(--admin-muted)]">{r.route || '—'}</td>
-                      <td className="px-4 py-3 text-[var(--admin-muted)]">
-                        {(r.categories || []).join(', ') || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--admin-muted)]">
-                        {formatDate(r.createdAt)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          className="!px-3 !py-1 !text-xs"
-                          loading={shippingId === r.id}
-                          onClick={() => handleShip(r.id, r.requestNumber)}
-                        >
-                          Ship
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
+                : rows.map((r) => {
+                    const needsSuppliers = Boolean(r.hasShortDateCategories);
+                    const selected = selectedSuppliersByRequest[r.id] || [];
+                    return (
+                      <tr
+                        key={r.id}
+                        className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
+                          {r.requestNumber}
+                        </td>
+                        <td className="px-4 py-3 font-medium">{r.branchName}</td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.area || '—'}</td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.route || '—'}</td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {(r.categories || []).join(', ') || '—'}
+                          {needsSuppliers ? (
+                            <div className="mt-1 text-xs text-amber-700">
+                              Short-date: {(r.shortDateCategories || []).join(', ')}
+                            </div>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          {needsSuppliers ? (
+                            <div className="max-h-28 min-w-[11rem] space-y-1 overflow-y-auto rounded-lg border border-[var(--admin-border)] bg-white p-2">
+                              {suppliers.length === 0 ? (
+                                <p className="text-xs text-[var(--admin-muted)]">No suppliers</p>
+                              ) : (
+                                suppliers.map((s) => (
+                                  <label
+                                    key={s.id}
+                                    className="flex cursor-pointer items-start gap-2 text-xs text-[var(--admin-text)]"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="mt-0.5"
+                                      checked={selected.includes(s.id)}
+                                      onChange={() => toggleSupplier(r.id, s.id)}
+                                    />
+                                    <span>{s.name}</span>
+                                  </label>
+                                ))
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[var(--admin-muted)]">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {formatDate(r.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button
+                            className="!px-3 !py-1 !text-xs"
+                            loading={shippingId === r.id}
+                            disabled={needsSuppliers && selected.length === 0}
+                            onClick={() => handleShip(r, r.requestNumber)}
+                          >
+                            Ship
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
           {!loading && rows.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
               No approved requests ready to ship. Approved requests only appear here when warehouse
-              stock (in base units) covers the approved quantity after packaging conversion. Check
-              Incoming Requests for approved items that may still be awaiting stock replenishment.
+              stock covers non–short-date lines (short-date goods ship via selected suppliers).
             </p>
           )}
         </div>

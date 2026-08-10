@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -6,10 +7,39 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import { isShiftClosing, isShiftOpen } from '../../api/shiftSessions.js';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
 import { formatDateTime } from '../../lib/datetime.js';
+import { getAutoCloseStatus, SHIFT_AUTO_CLOSE_GRACE_MINUTES } from '../../lib/shiftAutoClose.js';
 
 function formatMoney(value) {
   const n = Number(value ?? 0);
   return `${n.toLocaleString('en-US')} VND`;
+}
+
+function AutoCloseBanner({ session }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(t);
+  }, []);
+  const status = useMemo(() => getAutoCloseStatus(session, now), [session, now]);
+  if (!status || status.state === 'ok') return null;
+  const tone =
+    status.state === 'overdue' || status.state === 'critical'
+      ? 'border-red-200 bg-red-50 text-red-900'
+      : 'border-amber-200 bg-amber-50 text-amber-900';
+  return (
+    <Card className={`p-4 text-sm ${tone}`}>
+      <p className="font-semibold">
+        {status.state === 'overdue'
+          ? 'Shift end + grace period reached'
+          : `Auto-close in about ${status.minutesLeft} min`}
+      </p>
+      <p className="mt-1">
+        After the scheduled end time, you have {SHIFT_AUTO_CLOSE_GRACE_MINUTES} minutes to finish
+        closing. Past that, the system auto-closes this session (expected cash, verified HV) and
+        notifies the branch manager. Deadline: {formatDateTime(status.deadline.toISOString())}.
+      </p>
+    </Card>
+  );
 }
 
 export default function ShiftCurrentPage() {
@@ -65,6 +95,8 @@ export default function ShiftCurrentPage() {
         title="Current shift"
         description="Your active shift session. Use POS for sales until you end the shift."
       />
+
+      <AutoCloseBanner session={session} />
 
       <Card className="space-y-4 bg-[#f7f9fb]">
         <div className="flex flex-wrap items-center justify-between gap-2">

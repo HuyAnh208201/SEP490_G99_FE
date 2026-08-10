@@ -31,6 +31,40 @@ export async function getCountSheet(params = {}) {
   return unwrap(data);
 }
 
+/**
+ * Load every page of the count sheet (BE max size 100) so cashiers/IS are not
+ * silently capped at the first 100 SKUs.
+ */
+export async function getFullCountSheet(params = {}) {
+  const size = Math.min(Number(params.size) || 100, 100);
+  const categoryId = params.categoryId;
+  let page = 1;
+  let totalPages = 1;
+  const products = [];
+  let meta = null;
+
+  do {
+    const data = await getCountSheet({
+      page,
+      size,
+      ...(categoryId != null ? { categoryId } : {}),
+    });
+    if (!meta) meta = data;
+    products.push(...(data?.products || []));
+    totalPages = Math.max(1, Number(data?.totalPages) || 1);
+    page += 1;
+  } while (page <= totalPages);
+
+  return {
+    ...meta,
+    products,
+    pageNumber: 1,
+    pageSize: products.length,
+    totalElements: products.length,
+    totalPages: 1,
+  };
+}
+
 /** Nộp phiên kiểm kê. */
 export async function submitCount({ note, items }) {
   const { data } = await http.post(BASE, { note, items });

@@ -3,7 +3,12 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { fetchMembershipTiers, updateMembershipTier } from '../../api/systemSettings.js';
+import {
+  fetchMembershipTiers,
+  fetchShortDateCategories,
+  updateMembershipTier,
+  updateShortDateCategories,
+} from '../../api/systemSettings.js';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-[var(--admin-text)] focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -46,6 +51,12 @@ export default function SystemSettingsPage() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
 
+  const [categories, setCategories] = useState([]);
+  const [selectedShortDateIds, setSelectedShortDateIds] = useState([]);
+  const [shortDateLoading, setShortDateLoading] = useState(true);
+  const [shortDateSaving, setShortDateSaving] = useState(false);
+  const [shortDateMessage, setShortDateMessage] = useState('');
+
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -60,9 +71,26 @@ export default function SystemSettingsPage() {
     }
   }, []);
 
+  const loadShortDate = useCallback(async () => {
+    setShortDateLoading(true);
+    try {
+      const data = await fetchShortDateCategories();
+      const list = Array.isArray(data) ? data : [];
+      setCategories(list);
+      setSelectedShortDateIds(list.filter((c) => c.shortDate).map((c) => c.id));
+    } catch (err) {
+      setError(err?.message || 'Failed to load short-date categories');
+      setCategories([]);
+      setSelectedShortDateIds([]);
+    } finally {
+      setShortDateLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadShortDate();
+  }, [load, loadShortDate]);
 
   function startEdit(tier) {
     setEditingId(tier.id);
@@ -73,6 +101,30 @@ export default function SystemSettingsPage() {
   function cancelEdit() {
     setEditingId(null);
     setForm(emptyForm());
+  }
+
+  function toggleShortDate(id) {
+    setSelectedShortDateIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    setShortDateMessage('');
+  }
+
+  async function handleSaveShortDate() {
+    setShortDateSaving(true);
+    setShortDateMessage('');
+    setError('');
+    try {
+      const data = await updateShortDateCategories(selectedShortDateIds);
+      const list = Array.isArray(data) ? data : [];
+      setCategories(list);
+      setSelectedShortDateIds(list.filter((c) => c.shortDate).map((c) => c.id));
+      setShortDateMessage('Short-date categories saved. Central inventory cleared for those SKUs.');
+    } catch (err) {
+      setError(err?.message || 'Failed to save short-date categories');
+    } finally {
+      setShortDateSaving(false);
+    }
   }
 
   async function handleSave(e) {
@@ -110,10 +162,56 @@ export default function SystemSettingsPage() {
     <div className="w-full space-y-5">
       <PageHeader
         title="System settings"
-        description="Membership tiers shared with the customer app. Point earn/redeem rates are configured on the server."
+        description="Membership tiers and short-date category flags. Short-date goods are not stored in central warehouse inventory."
       />
 
       {error ? <p className="text-sm text-amber-700">{error}</p> : null}
+
+      <Card className="!p-0 overflow-hidden w-full">
+        <div className="border-b border-[var(--admin-border)] px-4 py-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--admin-text)]">Short-date categories</h2>
+            <p className="text-xs text-[var(--admin-muted)]">
+              Flag perishable categories (frozen, fresh, ready-to-eat). When shipping, WM must pick
+              suppliers for requests that include these categories.
+            </p>
+          </div>
+          <Button type="button" loading={shortDateSaving} onClick={handleSaveShortDate}>
+            Save short-date flags
+          </Button>
+        </div>
+        {shortDateMessage ? (
+          <p className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+            {shortDateMessage}
+          </p>
+        ) : null}
+        <div className="grid gap-2 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {shortDateLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-9 animate-pulse rounded-lg bg-[#eceef0]" />
+              ))
+            : categories.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedShortDateIds.includes(c.id)}
+                    onChange={() => toggleShortDate(c.id)}
+                    disabled={c.active === false}
+                  />
+                  <span className={c.active === false ? 'text-[var(--admin-muted)]' : ''}>
+                    {c.name}
+                    {c.active === false ? ' (inactive)' : ''}
+                  </span>
+                </label>
+              ))}
+          {!shortDateLoading && categories.length === 0 ? (
+            <p className="col-span-full text-sm text-[var(--admin-muted)]">No categories found.</p>
+          ) : null}
+        </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-5 w-full">
         <Card className="lg:col-span-3 !p-0 overflow-hidden">
