@@ -72,8 +72,18 @@ export async function login({ username, password }) {
 }
 
 /**
- * BE dùng JWT stateless nên không có endpoint logout — chỉ cần xoá token phía client.
+ * BE thu hồi token qua POST /api/auth/logout (blacklist phía server), nên phải gọi
+ * trước khi xoá token khỏi localStorage — interceptor lấy token từ đó để gắn header.
+ *
+ * Không bao giờ throw: token hết hạn hoặc BE chết cũng không được chặn người dùng
+ * đăng xuất, phía client vẫn phải xoá phiên.
+ * @returns {Promise<{ ok: boolean, revoked: boolean }>}
  */
 export async function logout() {
-  return { ok: true };
+  try {
+    await http.post('/auth/logout');
+    return { ok: true, revoked: true };
+  } catch {
+    return { ok: true, revoked: false };
+  }
 }
