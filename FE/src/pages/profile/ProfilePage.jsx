@@ -11,7 +11,6 @@ import PasswordInput from '../../components/ui/PasswordInput.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
 import {
   normalizePhone,
-  validateBirthDate,
   validateEmail,
   validateNewPassword,
   validateRequiredName,
@@ -34,12 +33,9 @@ export default function ProfilePage() {
   const activeTab = searchParams.get('tab') === 'security' ? 'security' : 'profile';
 
   const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
+    fullName: '',
     email: '',
     phone: '',
-    gender: '',
-    birthDate: '',
   });
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: '',
@@ -61,23 +57,17 @@ export default function ProfilePage() {
       .then((me) => {
         if (cancelled) return;
         setForm({
-          firstName: me.firstName || '',
-          lastName: me.lastName || '',
+          fullName: [me.firstName, me.lastName].filter(Boolean).join(' ').trim(),
           email: me.email || '',
           phone: me.phone || '',
-          gender: me.gender || '',
-          birthDate: me.birthDate ? String(me.birthDate).slice(0, 10) : '',
         });
       })
       .catch(() => {
         if (!cancelled && user) {
           setForm({
-            firstName: user.firstName || user.name?.split(' ')[0] || '',
-            lastName: user.lastName || '',
+            fullName: user.fullName || user.name || '',
             email: user.email || '',
             phone: user.phone || '',
-            gender: user.gender || '',
-            birthDate: '',
           });
         }
       })
@@ -106,18 +96,16 @@ export default function ProfilePage() {
     setProfileError('');
     setProfileSuccess('');
 
+    const fullName = form.fullName.trim().replace(/\s+/g, ' ');
+    const splitAt = fullName.indexOf(' ');
     const validationError =
-      validateRequiredName(form.firstName, {
-        label: 'First name',
+      validateRequiredName(fullName, {
+        label: 'Full name',
         max: PROFILE_NAME_MAX_LENGTH,
       }) ||
-      validateRequiredName(form.lastName, {
-        label: 'Last name',
-        max: PROFILE_NAME_MAX_LENGTH,
-      }) ||
+      (splitAt < 0 ? 'Full name must contain at least two words.' : null) ||
       validateEmail(form.email, { required: true }) ||
-      validateVnPhone(form.phone, { required: false, label: 'Phone number' }) ||
-      validateBirthDate(form.birthDate);
+      validateVnPhone(form.phone, { required: false, label: 'Phone number' });
     if (validationError) {
       setProfileError(validationError);
       return;
@@ -126,13 +114,13 @@ export default function ProfilePage() {
     setProfileLoading(true);
     try {
       const phone = normalizePhone(form.phone);
+      // The API still takes firstName/lastName separately and joins them with one
+      // space into the single stored name, so split here to keep what the user typed.
       await updateProfile({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
+        firstName: fullName.slice(0, splitAt),
+        lastName: fullName.slice(splitAt + 1),
         email: form.email.trim(),
         phone: phone || undefined,
-        gender: form.gender || undefined,
-        birthDate: form.birthDate || undefined,
       });
       const refreshed = await fetchMe();
       updateCurrentUser(refreshed);
@@ -216,27 +204,15 @@ export default function ProfilePage() {
             ) : (
               <form onSubmit={handleProfileSubmit} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block space-y-1">
+                  <label className="block space-y-1 sm:col-span-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      First name *
+                      Full name *
                     </span>
                     <input
                       required
                       maxLength={PROFILE_NAME_MAX_LENGTH}
-                      value={form.firstName}
-                      onChange={updateProfileField('firstName')}
-                      className={inputClass}
-                    />
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      Last name *
-                    </span>
-                    <input
-                      required
-                      maxLength={PROFILE_NAME_MAX_LENGTH}
-                      value={form.lastName}
-                      onChange={updateProfileField('lastName')}
+                      value={form.fullName}
+                      onChange={updateProfileField('fullName')}
                       className={inputClass}
                     />
                   </label>
@@ -259,32 +235,6 @@ export default function ProfilePage() {
                     <input
                       value={form.phone}
                       onChange={updateProfileField('phone')}
-                      className={inputClass}
-                    />
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      Gender
-                    </span>
-                    <select
-                      value={form.gender}
-                      onChange={updateProfileField('gender')}
-                      className={inputClass}
-                    >
-                      <option value="">—</option>
-                      <option value="MALE">Male</option>
-                      <option value="FEMALE">Female</option>
-                      <option value="OTHER">Other</option>
-                    </select>
-                  </label>
-                  <label className="block space-y-1 sm:col-span-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      Date of birth
-                    </span>
-                    <input
-                      type="date"
-                      value={form.birthDate}
-                      onChange={updateProfileField('birthDate')}
                       className={inputClass}
                     />
                   </label>
