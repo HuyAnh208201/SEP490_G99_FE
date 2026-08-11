@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatVnd } from '../../../lib/money.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import PosProductImage from './PosProductImage.jsx';
+import RedeemVoucherBox from './RedeemVoucherBox.jsx';
 import { categoryAccent } from '../categoryAccent.js';
 
 function TrashIcon() {
@@ -235,6 +236,13 @@ export default function PosCartPanel({
                     {totals.pointsUsed > 0 ? `${totals.pointsUsed} pts redeemed. ` : ''}
                     {totals.pointsEarned > 0 ? `Earn ~${totals.pointsEarned} pts.` : ''}
                   </p>
+                )}
+                {/* Đổi điểm xong thì tra lại khách để số điểm hiển thị khớp DB. */}
+                {!readOnly && (
+                  <RedeemVoucherBox
+                    customer={customer}
+                    onRedeemed={() => onLookupCustomer?.(customer.phone)}
+                  />
                 )}
               </div>
             ) : null}

@@ -7,6 +7,7 @@ import UsersPage from './pages/users/UsersPage.jsx';
 import ProfilePage from './pages/profile/ProfilePage.jsx';
 import BranchesPage from './pages/branches/BranchesPage.jsx';
 import PromotionsPage from './pages/promotions/PromotionsPage.jsx';
+import VouchersPage from './pages/promotions/VouchersPage.jsx';
 import SystemSettingsPage from './pages/system/SystemSettingsPage.jsx';
 import CategoriesPage from './pages/catalog/CategoriesPage.jsx';
 import ProductsPage from './pages/catalog/ProductsPage.jsx';
@@ -149,6 +150,15 @@ export default function App() {
               anyOf={['PROMOTION_LIST', 'PROMOTION_DETAILS', 'BRANCH_REVENUE_PROMOS']}
             >
               <PromotionsPage />
+            </PermissionRoute>
+          }
+        />
+
+        <Route
+          path="/vouchers"
+          element={
+            <PermissionRoute anyOf={['VOUCHER_LIST', 'VOUCHER_MANAGEMENT']}>
+              <VouchersPage />
             </PermissionRoute>
           }
         />

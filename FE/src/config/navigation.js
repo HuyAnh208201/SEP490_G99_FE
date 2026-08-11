@@ -55,6 +55,13 @@ export const NAV_GROUPS = [
         permissions: ['PROMOTION_LIST', 'PROMOTION_DETAILS', 'BRANCH_REVENUE_PROMOS'],
       },
       {
+        path: '/vouchers',
+        label: 'Discount codes',
+        icon: 'tag',
+        anyPermission: true,
+        permissions: ['VOUCHER_LIST', 'VOUCHER_MANAGEMENT'],
+      },
+      {
         path: '/system/settings',
         label: 'System settings',
         icon: 'settings',

@@ -44,3 +44,22 @@ export async function addPoints({ phoneOrEmail, invoiceAmount, pointsToRedeem = 
   });
   return unwrap(data);
 }
+
+/** Loại voucher khách đang đổi được bằng điểm → mảng (rỗng nếu chưa mở loại nào). */
+export async function fetchRedeemableVouchers() {
+  const { data } = await http.get('/cashier/vouchers/redeemable');
+  return unwrap(data) ?? [];
+}
+
+/**
+ * Khách đổi điểm lấy một mã giảm giá dùng cho lần mua sau. BE trừ điểm và sinh mã
+ * trong cùng một transaction.
+ * → { voucherId, code, name, discountType, discountValue, expiresAt, pointsSpent, pointsRemaining }
+ */
+export async function redeemVoucher({ customerPhone, voucherCatalogId }) {
+  const { data } = await http.post('/cashier/vouchers/redeem', {
+    customerPhone,
+    voucherCatalogId,
+  });
+  return unwrap(data);
+}

@@ -348,7 +348,7 @@ export function PosCartProvider({ children }) {
     }
     setDiscountCodeBusy(true);
     try {
-      const voucher = await apiLookupVoucher(code);
+      const voucher = await apiLookupVoucher(code, customer?.phone);
       setAppliedVoucher(voucher);
       setDiscountCodeError('');
       return { ok: true, voucher };
@@ -359,7 +359,36 @@ export function PosCartProvider({ children }) {
     } finally {
       setDiscountCodeBusy(false);
     }
-  }, [discountCodeInput]);
+  }, [discountCodeInput, customer?.phone]);
+
+  /**
+   * Cashier thường gõ mã trước rồi mới nhập SĐT khách. Mã phát riêng cho một khách
+   * chỉ kiểm được khi biết khách là ai, nên phải tra lại mỗi lần khách trên đơn đổi —
+   * không thì mã lọt qua bước tra rồi mới hỏng lúc chốt đơn.
+   */
+  const appliedVoucherCode = appliedVoucher?.code;
+  const validatedVoucherPhone = useRef(null);
+  useEffect(() => {
+    const phone = customer?.phone ?? null;
+    if (validatedVoucherPhone.current === phone) return undefined;
+    validatedVoucherPhone.current = phone;
+    if (!appliedVoucherCode) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const voucher = await apiLookupVoucher(appliedVoucherCode, phone);
+        if (!cancelled) setAppliedVoucher(voucher);
+      } catch (error) {
+        if (cancelled) return;
+        setAppliedVoucher(null);
+        setDiscountCodeError(error.message || 'Invalid or expired discount code');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customer?.phone, appliedVoucherCode]);
 
   const clearDiscountCode = useCallback(() => {
     setDiscountCodeInput('');

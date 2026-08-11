@@ -51,9 +51,14 @@ export async function fetchOrdersPage(params = {}) {
   return unwrapPage(data);
 }
 
-/** Tra mã giảm giá trước khi chốt đơn. */
-export async function lookupVoucher(code) {
-  const { data } = await http.get(`/pos/orders/vouchers/${encodeURIComponent(code)}`);
+/**
+ * Tra mã giảm giá trước khi chốt đơn. Gửi kèm SĐT khách nếu đã có: mã phát riêng
+ * cho khách khác sẽ bị từ chối ngay tại đây thay vì lúc chốt đơn.
+ */
+export async function lookupVoucher(code, customerPhone) {
+  const params = {};
+  if (customerPhone) params.customerPhone = customerPhone;
+  const { data } = await http.get(`/pos/orders/vouchers/${encodeURIComponent(code)}`, { params });
   return unwrap(data);
 }
 
