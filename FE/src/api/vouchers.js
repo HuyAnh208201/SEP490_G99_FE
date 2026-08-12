@@ -12,7 +12,7 @@ function unwrap(body) {
   return body.data;
 }
 
-// ---- Loại voucher ----
+// ---- Voucher types ----
 
 export async function fetchVoucherCatalogs() {
   const { data } = await http.get('/voucher-catalog');
@@ -34,7 +34,7 @@ export async function updateVoucherCatalog(id, payload) {
   return unwrap(data);
 }
 
-/** Tắt một loại là chặn mọi mã thuộc loại đó tại quầy. */
+/** Disabling a type blocks every code of that type at the counter. */
 export async function setVoucherCatalogStatus(id, status) {
   const { data } = await http.patch(`/voucher-catalog/${id}/status`, null, { params: { status } });
   return unwrap(data);
@@ -44,14 +44,14 @@ export async function deleteVoucherCatalog(id) {
   await http.delete(`/voucher-catalog/${id}`);
 }
 
-// ---- Mã đã phát ----
+// ---- Issued codes ----
 
 export async function fetchVouchersPage(params = {}) {
   const { data } = await http.get('/vouchers/page', { params: compactPageParams(params) });
   return unwrapPage(data);
 }
 
-/** Sinh một mã cho khách cụ thể, hoặc một lô mã dùng chung. Trả về mảng mã. */
+/** Issues one code for a named customer, or a batch of shared codes. Returns the codes. */
 export async function issueVouchers(payload) {
   const { data } = await http.post('/vouchers', payload);
   return unwrap(data) ?? [];

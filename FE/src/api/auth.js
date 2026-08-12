@@ -72,11 +72,11 @@ export async function login({ username, password }) {
 }
 
 /**
- * BE thu hồi token qua POST /api/auth/logout (blacklist phía server), nên phải gọi
- * trước khi xoá token khỏi localStorage — interceptor lấy token từ đó để gắn header.
+ * Revokes the token server-side before the caller clears local storage: the request
+ * interceptor reads the token from storage to build the auth header.
  *
- * Không bao giờ throw: token hết hạn hoặc BE chết cũng không được chặn người dùng
- * đăng xuất, phía client vẫn phải xoá phiên.
+ * Never throws — an expired token or an unreachable server must not trap the user in
+ * a signed-in state, so the client drops its session either way.
  * @returns {Promise<{ ok: boolean, revoked: boolean }>}
  */
 export async function logout() {

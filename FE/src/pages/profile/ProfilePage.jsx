@@ -114,7 +114,7 @@ export default function ProfilePage() {
       const phone = normalizePhone(form.phone);
       // The API still takes firstName/lastName separately and joins them with one
       // space into the single stored name, so split here to keep what the user typed.
-      // Không gửi email: UpdateProfileDto bên BE không còn nhận trường này nữa.
+      // Email is not sent: UpdateProfileDto on the server no longer accepts the field.
       await updateProfile({
         firstName: fullName.slice(0, splitAt),
         lastName: fullName.slice(splitAt + 1),
@@ -218,8 +218,9 @@ export default function ProfilePage() {
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
                       Email
                     </span>
-                    {/* Chỉ đọc, cùng kiểu ô Branch bị khoá ở CreateUserModal. Email là địa
-                        chỉ nhận link đặt lại mật khẩu nên không cho tự đổi ở màn hình này. */}
+                    {/* Read-only, styled like the locked Branch field in CreateUserModal.
+                        Email is where the password reset link is sent, so it cannot be
+                        changed from this screen. */}
                     <input
                       readOnly
                       value={form.email}

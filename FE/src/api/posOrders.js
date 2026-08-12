@@ -38,9 +38,9 @@ export async function checkout({
 }
 
 /**
- * Khuyến mãi cashier chọn được cho đơn đang lập. Chi nhánh do server lấy từ tài
- * khoản đang đăng nhập. Chỉ trả định nghĩa campaign — số tiền giảm cuối cùng do
- * server tính lại lúc chốt đơn.
+ * Campaigns the current order is entitled to. The server derives the branch from the
+ * signed-in account. Returns campaign definitions only — the actual discount is
+ * recomputed server-side at checkout.
  */
 export async function fetchApplicablePromotions() {
   const { data } = await http.get('/pos/orders/promotions');
@@ -62,8 +62,8 @@ export async function fetchOrdersPage(params = {}) {
 }
 
 /**
- * Tra mã giảm giá trước khi chốt đơn. Gửi kèm SĐT khách nếu đã có: mã phát riêng
- * cho khách khác sẽ bị từ chối ngay tại đây thay vì lúc chốt đơn.
+ * Looks a voucher up before checkout. Pass the customer phone when known: a code
+ * issued to a different customer is rejected here rather than at checkout.
  */
 export async function lookupVoucher(code, customerPhone) {
   const params = {};

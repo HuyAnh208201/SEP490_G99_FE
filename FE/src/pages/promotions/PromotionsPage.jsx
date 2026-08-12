@@ -117,9 +117,9 @@ function getCreatorTier(campaign, userMap) {
 
 function canEditCampaign(campaign, { webRole, currentUserId, canManage }) {
 
-  // BE từ chối sửa campaign đang ACTIVE (CampaignServiceImpl.updateCampaign), nên giấu
-  // nút Edit luôn thay vì để người dùng điền hết form rồi mới nhận 400. Dùng status thô
-  // giống canDeleteCampaign, không dùng getEffectiveStatus — BE cũng so trên status thô.
+  // The server refuses to edit an ACTIVE campaign (CampaignServiceImpl.updateCampaign),
+  // so hide Edit rather than let the user fill the whole form and then take a 400.
+  // Compare the raw status like canDeleteCampaign does — the server compares it too.
   if (!campaign || campaign.status === 'ACTIVE') return false;
 
   if (!canManage) return false;

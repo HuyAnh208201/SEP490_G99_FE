@@ -3,9 +3,9 @@ import { fetchRedeemableVouchers, redeemVoucher } from '../../../api/cashier.js'
 import { formatVnd } from '../../../lib/money.js';
 
 /**
- * Đổi điểm tích luỹ của khách lấy một mã giảm giá dùng cho lần mua sau.
- * Cố ý tách khỏi ô "Redeem points" của đơn hiện tại: đó là quy đổi điểm thành tiền
- * ngay trên hoá đơn này, còn đây là phát một mã riêng khách mang về.
+ * Spends the customer's points on a voucher code for a later purchase.
+ * Deliberately separate from the "Redeem points" box on the current order: that one
+ * turns points into money on this invoice, this one issues a code to take away.
  */
 export default function RedeemVoucherBox({ customer, onRedeemed }) {
   const [options, setOptions] = useState([]);
@@ -19,7 +19,7 @@ export default function RedeemVoucherBox({ customer, onRedeemed }) {
     try {
       setOptions(await fetchRedeemableVouchers());
     } catch {
-      // Không mở được danh sách thì chỉ ẩn tính năng, không chặn bán hàng.
+      // A failed load only hides the feature; it must never block selling.
       setOptions([]);
     }
   }, []);
@@ -28,7 +28,7 @@ export default function RedeemVoucherBox({ customer, onRedeemed }) {
     if (open && options.length === 0) loadOptions();
   }, [open, options.length, loadOptions]);
 
-  // Đổi khách thì kết quả của khách trước không còn đúng nữa.
+  // A different customer invalidates whatever the previous one was issued.
   useEffect(() => {
     setIssued(null);
     setError('');

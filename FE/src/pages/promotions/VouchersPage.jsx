@@ -90,7 +90,7 @@ export default function VouchersPage() {
 }
 
 // =============================================================================
-// Tab 1 — Loại voucher
+// Tab 1 — Voucher types
 // =============================================================================
 
 function CatalogTab() {
@@ -314,7 +314,7 @@ function CatalogTab() {
                             <Button variant="ghost" className="!px-2 !py-1" onClick={() => toggleStatus(c)}>
                               {c.status === 'active' ? 'Disable' : 'Enable'}
                             </Button>
-                            {/* Loại đã phát mã không xoá được — BE chặn, ẩn nút cho khỏi bấm nhầm. */}
+                            {/* A type with issued codes cannot be deleted — the server refuses, so hide the button. */}
                             {!c.inUse && (
                               <Button
                                 variant="ghost"
@@ -359,7 +359,7 @@ function CatalogTab() {
 }
 
 // =============================================================================
-// Tab 2 — Mã đã phát
+// Tab 2 — Issued codes
 // =============================================================================
 
 function CodesTab() {
@@ -387,7 +387,7 @@ function CodesTab() {
     try {
       setCatalogs(await fetchVoucherCatalogs());
     } catch {
-      // Danh sách loại chỉ để gợi ý; lỗi tải không được chặn cả trang.
+      // The type list is only a hint; a failed load must not block the whole page.
     }
   }, []);
 
@@ -412,7 +412,7 @@ function CodesTab() {
         voucherCatalogId: Number(form.voucherCatalogId),
         customerId: form.customerId.trim() ? Number(form.customerId) : null,
         codePrefix: form.codePrefix.trim() || null,
-        // Mã phát riêng cho khách chỉ được sinh 1 — BE cũng chặn.
+        // A code tied to one customer is always a single code — the server enforces it too.
         quantity: isPersonal ? 1 : Number(form.quantity) || 1,
         expiresAt: form.expiresAt ? `${form.expiresAt}T23:59:59` : null,
       });
@@ -634,7 +634,7 @@ function CodesTab() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {/* Mã đã dùng phải giữ nguyên để đối soát với hoá đơn. */}
+                            {/* A used code must stay as it is so it can be reconciled against the invoice. */}
                             {v.status === 'active' && (
                               <>
                                 <Button
