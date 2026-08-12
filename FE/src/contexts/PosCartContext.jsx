@@ -14,6 +14,7 @@ import {
 } from '../api/cashier.js';
 import {
   checkout as apiCheckout,
+  fetchApplicablePromotions as apiFetchApplicablePromotions,
   fetchOrders as apiFetchOrders,
   lookupVoucher as apiLookupVoucher,
 } from '../api/posOrders.js';
@@ -56,6 +57,23 @@ function calcTotals(state) {
   const promoSavings = subtotalOriginal - subtotalAfterPromo;
   let afterPromo = subtotalAfterPromo;
 
+  // Khuyến mãi cửa hàng áp TỰ ĐỘNG hết, trước voucher, và trừ dần trên số tiền còn
+  // lại — phải khớp từng bước với resolveCampaigns bên BE, nếu không tổng trên màn
+  // hình khác tổng server ghi vào đơn và tiền thối bị lệch.
+  const campaignLines = [];
+  for (const campaign of state.availablePromotions ?? []) {
+    if (afterPromo <= 0) break;
+    const value = Number(campaign.discountValue) || 0;
+    const raw = campaign.type === 'PERCENT'
+      ? Math.round((afterPromo * value) / 100)
+      : value;
+    const amount = Math.min(raw, afterPromo);
+    if (amount <= 0) continue;
+    campaignLines.push({ id: campaign.id, name: campaign.name, amount });
+    afterPromo -= amount;
+  }
+  const campaignDiscount = campaignLines.reduce((sum, line) => sum + line.amount, 0);
+
   // Voucher lấy từ BE (GET /pos/orders/vouchers/{code}); đây chỉ là bản xem trước,
   // server tính lại con số cuối cùng lúc chốt đơn.
   let codeDiscount = 0;
@@ -82,6 +100,8 @@ function calcTotals(state) {
     subtotalOriginal,
     subtotalAfterPromo,
     promoSavings,
+    campaignLines,
+    campaignDiscount,
     codeDiscount,
     pointsUsed: Math.floor(cappedPointsDiscount / pointValueVnd),
     pointsDiscount: cappedPointsDiscount,
@@ -109,6 +129,8 @@ export function PosCartProvider({ children }) {
   const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [loyalty, setLoyalty] = useState(DEFAULT_LOYALTY);
+  /** Khuyến mãi đang chạy của chi nhánh — áp hết, quầy không chọn được cái nào. */
+  const [availablePromotions, setAvailablePromotions] = useState([]);
 
   // Tỉ lệ điểm do server quyết định — tải một lần khi mở POS.
   useEffect(() => {
@@ -126,16 +148,33 @@ export function PosCartProvider({ children }) {
     };
   }, []);
 
+  // Khuyến mãi áp được do server lọc theo chi nhánh — tải một lần khi mở POS.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiFetchApplicablePromotions();
+        if (!cancelled) setAvailablePromotions(rows);
+      } catch {
+        // Không chặn bán hàng: tải hỏng thì coi như chi nhánh không có khuyến mãi nào.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const totals = useMemo(
     () =>
       calcTotals({
         lines,
+        availablePromotions,
         appliedVoucher,
         customer,
         pointsToRedeem,
         loyalty,
       }),
-    [lines, appliedVoucher, customer, pointsToRedeem, loyalty],
+    [lines, availablePromotions, appliedVoucher, customer, pointsToRedeem, loyalty],
   );
 
   const addProduct = useCallback((product, qty = 1) => {
@@ -257,6 +296,8 @@ export function PosCartProvider({ children }) {
     setAppliedVoucher(null);
     setDiscountCodeError('');
     setPointsToRedeem(0);
+    // Thiếu dòng này thì đơn sau thừa hưởng khuyến mãi cashier tick cho đơn trước.
+    setSelectedCampaignIds([]);
   }, []);
 
   /** Gỡ khách khỏi đơn hiện tại (không xóa tài khoản trong DB). */
@@ -516,6 +557,7 @@ export function PosCartProvider({ children }) {
       appliedVoucher,
       discountCodeError,
       discountCodeBusy,
+      availablePromotions,
       pointsToRedeem,
       setPointsToRedeem,
       totals,
@@ -550,6 +592,7 @@ export function PosCartProvider({ children }) {
       appliedVoucher,
       discountCodeError,
       discountCodeBusy,
+      availablePromotions,
       pointsToRedeem,
       totals,
       orderHistory,

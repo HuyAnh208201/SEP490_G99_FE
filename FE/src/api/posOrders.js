@@ -37,6 +37,16 @@ export async function checkout({
   return unwrap(data);
 }
 
+/**
+ * Khuyến mãi cashier chọn được cho đơn đang lập. Chi nhánh do server lấy từ tài
+ * khoản đang đăng nhập. Chỉ trả định nghĩa campaign — số tiền giảm cuối cùng do
+ * server tính lại lúc chốt đơn.
+ */
+export async function fetchApplicablePromotions() {
+  const { data } = await http.get('/pos/orders/promotions');
+  return unwrap(data) ?? [];
+}
+
 /** Lịch sử đơn của chi nhánh; bỏ trống from/to thì lấy 50 đơn gần nhất. */
 export async function fetchOrders({ from, to } = {}) {
   const params = {};

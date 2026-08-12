@@ -41,6 +41,7 @@ export default function PosCartPanel({
   setDiscountCodeInput,
   applyDiscountCode,
   clearDiscountCode,
+  availablePromotions = [],
   updateQty,
   removeLine,
   customerPhone = '',
@@ -107,6 +108,11 @@ export default function PosCartPanel({
           ),
         )
       : 0;
+
+  /** id khuyến mãi → số tiền nó thực sự giảm, để ô chọn hiện số thay vì hiện tỉ lệ. */
+  const appliedAmountById = new Map(
+    (totals.campaignLines ?? []).map((line) => [line.id, line.amount]),
+  );
 
   return (
     <aside
@@ -237,20 +243,28 @@ export default function PosCartPanel({
                     {totals.pointsEarned > 0 ? `Earn ~${totals.pointsEarned} pts.` : ''}
                   </p>
                 )}
-                {/* Đổi điểm xong thì tra lại khách để số điểm hiển thị khớp DB. */}
+                {/* ẨN VOUCHER (1/2) — ô đổi điểm lấy mã.
+                    Ẩn cùng lúc với ô nhập mã ở khối dưới. Để lại riêng ô này thì khách
+                    vẫn đổi được điểm (deductPointsAtomic trừ thật) rồi cầm mã không có
+                    chỗ nào dùng. Bỏ hai khối comment là hiện lại nguyên vẹn.
+
                 {!readOnly && (
                   <RedeemVoucherBox
                     customer={customer}
                     onRedeemed={() => onLookupCustomer?.(customer.phone)}
                   />
                 )}
+                */}
               </div>
             ) : null}
           </div>
         )}
       </div>
 
-      <div className="min-h-[220px] flex-1 overflow-y-auto">
+      {/* Sàn 120 thay vì 220: danh sách hàng vốn cuộn được, còn hàng nút ở đáy thì
+          không — panel là overflow-hidden nên sàn quá cao là nút bị cắt trên màn thấp.
+          Màn cao không đổi gì vì flex-1 vẫn giãn hết chỗ trống. */}
+      <div className="min-h-[120px] flex-1 overflow-y-auto">
         {lines.length ? (
           <ul className="divide-y divide-[var(--admin-border)]">
             {lines.map((line) => {
@@ -384,67 +398,140 @@ export default function PosCartPanel({
         )}
       </div>
 
-      <div className="shrink-0 space-y-3 border-t border-[var(--admin-border)] bg-[#fbfcfe] p-4">
-        {!readOnly && (
-          <>
-            <div className="flex gap-2">
-              <input
-                value={discountCodeInput}
-                onChange={(event) => setDiscountCodeInput(event.target.value.toUpperCase())}
-                placeholder="Discount code"
-                className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-xs uppercase outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
-              />
-              {appliedVoucher ? (
-                <button type="button" onClick={clearDiscountCode} className="rounded-lg border border-[var(--admin-danger)]/30 px-3 text-xs font-semibold text-[var(--admin-danger)] transition hover:bg-[var(--admin-danger-bg)]">
-                  Remove
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={discountCodeBusy || !discountCodeInput.trim()}
-                  onClick={applyDiscountCode}
-                  className="rounded-lg border border-[var(--admin-brand)] px-3 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/8 disabled:opacity-40"
+      {/* Không dùng shrink-0 nữa: aside cắt phần thừa nên khối này mà giữ nguyên chiều
+          cao thì nút thanh toán bị cắt mất khi màn thấp. Cho nó co lại, phần giữa tự
+          cuộn, còn hàng nút luôn ghim ở đáy. */}
+      <div className="flex min-h-0 flex-col gap-3 border-t border-[var(--admin-border)] bg-[#fbfcfe] p-4">
+        {/* Khuyến mãi của cửa hàng — không tick sẵn, cashier tự chọn cho từng đơn.
+            Ẩn hẳn khi chi nhánh không có khuyến mãi nào đang chạy.
+
+            aside là overflow-hidden với chiều cao cố định calc(100vh-80px), nên mọi
+            thứ đẩy nút Checkout xuống đều bị CẮT chứ không cuộn tới được. Vì vậy
+            danh sách nổi lên trên (absolute + bottom-full) thay vì giãn tại chỗ:
+            mở hay đóng thì ô này vẫn chỉ chiếm đúng một dòng. */}
+        {!readOnly && availablePromotions.length > 0 && (
+          <details className="group relative rounded-lg border border-[var(--admin-border)] bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold">
+              <span>
+                Promotions
+                {totals.campaignLines?.length > 0 && (
+                  <span className="ml-1.5 font-bold text-[var(--admin-success)]">
+                    · {totals.campaignLines.length} applied
+                  </span>
+                )}
+              </span>
+              <span className="text-[11px] font-normal text-[var(--admin-subtle)] group-open:hidden">Show</span>
+              <span className="hidden text-[11px] font-normal text-[var(--admin-subtle)] group-open:inline">Hide</span>
+            </summary>
+            <div className="absolute bottom-full left-0 right-0 z-20 mb-1 max-h-52 space-y-1 overflow-y-auto rounded-lg border border-[var(--admin-border)] bg-white p-2 shadow-[var(--shadow-card)]">
+              {availablePromotions.map((campaign) => (
+                <div
+                  key={campaign.id}
+                  className="flex items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-xs"
                 >
-                  Apply
-                </button>
-              )}
+                  <span className="min-w-0 flex-1 truncate font-medium">{campaign.name}</span>
+                  {/* Giỏ có hàng thì hiện số tiền thật nó giảm; giỏ rỗng thì hiện tỉ lệ.
+                      Bảng tổng chỉ còn một dòng gộp nên đây là chỗ duy nhất xem được
+                      từng khuyến mãi đóng góp bao nhiêu. */}
+                  {appliedAmountById.has(campaign.id) ? (
+                    <span className="shrink-0 font-semibold text-[var(--admin-success)]">
+                      − {formatVnd(appliedAmountById.get(campaign.id))}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 font-semibold text-[var(--admin-brand)]">
+                      {campaign.type === 'PERCENT'
+                        ? `− ${Number(campaign.discountValue)}%`
+                        : `− ${formatVnd(campaign.discountValue)}`}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
-            {discountCodeError && <p className="text-xs text-[var(--admin-danger)]">{discountCodeError}</p>}
-          </>
-        )}
-        {appliedVoucher && (
-          <p className="text-xs font-medium text-[var(--admin-success)]">
-            {appliedVoucher.code} applied · {appliedVoucher.name}
-          </p>
+          </details>
         )}
 
-        <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between text-[var(--admin-muted)]">
-            <span>Subtotal</span>
-            <span>{formatVnd(totals.subtotalAfterPromo)}</span>
-          </div>
-          {totals.codeDiscount > 0 && (
-            <div className="flex justify-between text-[var(--admin-success)]">
-              <span>Discount</span>
-              <span>− {formatVnd(totals.codeDiscount)}</span>
-            </div>
+        {/* Ô chọn khuyến mãi nằm NGOÀI vùng cuộn này: danh sách của nó nổi lên trên
+            bằng absolute, đặt vào trong overflow-y-auto là bị cắt mất. */}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+          {/* ẨN VOUCHER (2/2) — ô nhập mã của khách và dòng báo mã đã áp.
+              Chỉ ẩn giao diện: applyDiscountCode, lookupVoucher và đường voucherCode
+              bên BE giữ nguyên, chưa xoá dòng nào. Đây là UC-101 của Giang — bỏ
+              comment ở cả hai khối là trả lại đúng như cũ.
+
+          {!readOnly && (
+            <>
+              <div className="flex gap-2">
+                <input
+                  value={discountCodeInput}
+                  onChange={(event) => setDiscountCodeInput(event.target.value.toUpperCase())}
+                  placeholder="Discount code"
+                  className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-xs uppercase outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
+                />
+                {appliedVoucher ? (
+                  <button type="button" onClick={clearDiscountCode} className="rounded-lg border border-[var(--admin-danger)]/30 px-3 text-xs font-semibold text-[var(--admin-danger)] transition hover:bg-[var(--admin-danger-bg)]">
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={discountCodeBusy || !discountCodeInput.trim()}
+                    onClick={applyDiscountCode}
+                    className="rounded-lg border border-[var(--admin-brand)] px-3 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/8 disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                )}
+              </div>
+              {discountCodeError && <p className="text-xs text-[var(--admin-danger)]">{discountCodeError}</p>}
+            </>
           )}
-          {totals.pointsDiscount > 0 && (
-            <div className="flex justify-between text-[var(--admin-success)]">
-              <span>{totals.pointsUsed} redeemed points</span>
-              <span>− {formatVnd(totals.pointsDiscount)}</span>
-            </div>
+          {appliedVoucher && (
+            <p className="text-xs font-medium text-[var(--admin-success)]">
+              {appliedVoucher.code} applied · {appliedVoucher.name}
+            </p>
           )}
-          <div className="flex items-end justify-between border-t border-[var(--admin-border)] pt-2">
-            <span className="font-semibold">Total amount due</span>
-            <span className="text-2xl font-extrabold tracking-tight text-[var(--admin-brand)]">
-              {formatVnd(totals.total)}
-            </span>
+          */}
+
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-[var(--admin-muted)]">
+              <span>Subtotal</span>
+              <span>{formatVnd(totals.subtotalAfterPromo)}</span>
+            </div>
+            {/* Một dòng gộp, cố ý không liệt kê từng khuyến mãi: danh sách dài buộc bảng
+                tổng phải cuộn trong một ô hẹp, đọc rất khó. Xem chi tiết từng cái giảm
+                bao nhiêu ở ô Promotions phía trên. */}
+            {totals.campaignDiscount > 0 && (
+              <div className="flex justify-between text-[var(--admin-success)]">
+                <span>Promotions · {totals.campaignLines.length}</span>
+                <span>− {formatVnd(totals.campaignDiscount)}</span>
+              </div>
+            )}
+            {totals.codeDiscount > 0 && (
+              <div className="flex justify-between text-[var(--admin-success)]">
+                <span>Discount</span>
+                <span>− {formatVnd(totals.codeDiscount)}</span>
+              </div>
+            )}
+            {totals.pointsDiscount > 0 && (
+              <div className="flex justify-between text-[var(--admin-success)]">
+                <span>{totals.pointsUsed} redeemed points</span>
+                <span>− {formatVnd(totals.pointsDiscount)}</span>
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Dòng tổng nằm NGOÀI vùng cuộn, cùng chỗ với hàng nút: trên màn thấp các
+            dòng chi tiết cuộn khuất được, nhưng số khách phải trả thì không. */}
+        <div className="flex shrink-0 items-end justify-between border-t border-[var(--admin-border)] pt-2 text-sm">
+          <span className="font-semibold">Total amount due</span>
+          <span className="text-2xl font-extrabold tracking-tight text-[var(--admin-brand)]">
+            {formatVnd(totals.total)}
+          </span>
+        </div>
+
         {!readOnly && (
-          <div className="grid grid-cols-[auto_1fr] gap-2">
+          <div className="grid shrink-0 grid-cols-[auto_1fr] gap-2">
             <button
               type="button"
               disabled={!lines.length}

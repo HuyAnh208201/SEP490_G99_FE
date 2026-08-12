@@ -42,6 +42,7 @@ export default function PosNewOrderPage() {
     appliedVoucher,
     discountCodeError,
     discountCodeBusy,
+    availablePromotions,
     totals,
     addProduct,
     updateQty,
@@ -693,6 +694,7 @@ export default function PosNewOrderPage() {
             setDiscountCodeInput={setDiscountCodeInput}
             applyDiscountCode={applyDiscountCode}
             clearDiscountCode={clearDiscountCode}
+            availablePromotions={availablePromotions}
             updateQty={updateQty}
             removeLine={removeLine}
             customerPhone={customerPhone}
