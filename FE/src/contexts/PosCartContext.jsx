@@ -57,9 +57,9 @@ function calcTotals(state) {
   const promoSavings = subtotalOriginal - subtotalAfterPromo;
   let afterPromo = subtotalAfterPromo;
 
-  // Khuyến mãi cửa hàng áp TỰ ĐỘNG hết, trước voucher, và trừ dần trên số tiền còn
-  // lại — phải khớp từng bước với resolveCampaigns bên BE, nếu không tổng trên màn
-  // hình khác tổng server ghi vào đơn và tiền thối bị lệch.
+  // Store campaigns all apply automatically, before any voucher, each one taken off the
+  // running remainder. This must mirror resolveCampaigns on the server step for step:
+  // if it drifts, the on-screen total differs from the stored one and change is wrong.
   const campaignLines = [];
   for (const campaign of state.availablePromotions ?? []) {
     if (afterPromo <= 0) break;
@@ -129,7 +129,7 @@ export function PosCartProvider({ children }) {
   const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [loyalty, setLoyalty] = useState(DEFAULT_LOYALTY);
-  /** Khuyến mãi đang chạy của chi nhánh — áp hết, quầy không chọn được cái nào. */
+  /** Live campaigns for this branch. Every one applies; the counter cannot pick. */
   const [availablePromotions, setAvailablePromotions] = useState([]);
 
   // Tỉ lệ điểm do server quyết định — tải một lần khi mở POS.
@@ -148,7 +148,7 @@ export function PosCartProvider({ children }) {
     };
   }, []);
 
-  // Khuyến mãi áp được do server lọc theo chi nhánh — tải một lần khi mở POS.
+  // The server filters campaigns by branch — loaded once when POS opens.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -156,7 +156,7 @@ export function PosCartProvider({ children }) {
         const rows = await apiFetchApplicablePromotions();
         if (!cancelled) setAvailablePromotions(rows);
       } catch {
-        // Không chặn bán hàng: tải hỏng thì coi như chi nhánh không có khuyến mãi nào.
+        // Never block selling: a failed load is treated as "this branch has no campaigns".
       }
     })();
     return () => {
@@ -296,8 +296,8 @@ export function PosCartProvider({ children }) {
     setAppliedVoucher(null);
     setDiscountCodeError('');
     setPointsToRedeem(0);
-    // Thiếu dòng này thì đơn sau thừa hưởng khuyến mãi cashier tick cho đơn trước.
-    setSelectedCampaignIds([]);
+    // Campaigns are not reset here: they are branch-wide and reloaded once per POS
+    // session, so they carry over to the next order on purpose.
   }, []);
 
   /** Gỡ khách khỏi đơn hiện tại (không xóa tài khoản trong DB). */
@@ -403,9 +403,9 @@ export function PosCartProvider({ children }) {
   }, [discountCodeInput, customer?.phone]);
 
   /**
-   * Cashier thường gõ mã trước rồi mới nhập SĐT khách. Mã phát riêng cho một khách
-   * chỉ kiểm được khi biết khách là ai, nên phải tra lại mỗi lần khách trên đơn đổi —
-   * không thì mã lọt qua bước tra rồi mới hỏng lúc chốt đơn.
+   * Cashiers usually type the code before the customer phone. A code issued to one
+   * customer can only be checked once that customer is known, so re-validate whenever
+   * the customer on the order changes — otherwise it passes lookup and fails at checkout.
    */
   const appliedVoucherCode = appliedVoucher?.code;
   const validatedVoucherPhone = useRef(null);
