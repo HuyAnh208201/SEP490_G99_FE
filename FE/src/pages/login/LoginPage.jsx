@@ -8,14 +8,13 @@ export default function LoginPage() {
   const location = useLocation();
   const { signIn, loading } = useAuth();
 
-  const [form, setForm] = useState({ username: '', password: '', remember: false });
+  const [form, setForm] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   function updateField(field) {
     return (e) => {
-      const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-      setForm((f) => ({ ...f, [field]: value }));
+      setForm((f) => ({ ...f, [field]: e.target.value }));
     };
   }
 
@@ -216,20 +215,6 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
-            </div>
-
-            {/* Remember */}
-            <div className="flex items-center gap-2">
-              <input
-                id="remember"
-                type="checkbox"
-                checked={form.remember}
-                onChange={updateField('remember')}
-                className="h-4 w-4 rounded-sm border-[#c6c6cd] text-[#0058be] focus:ring-[#0058be]/20"
-              />
-              <label htmlFor="remember" className="text-sm text-[#45464d]">
-                Keep me signed in for 30 days
-              </label>
             </div>
 
             {/* Error */}
