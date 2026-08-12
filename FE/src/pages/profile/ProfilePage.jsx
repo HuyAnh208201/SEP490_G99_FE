@@ -11,7 +11,6 @@ import PasswordInput from '../../components/ui/PasswordInput.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
 import {
   normalizePhone,
-  validateEmail,
   validateNewPassword,
   validateRequiredName,
   validateVnPhone,
@@ -104,7 +103,6 @@ export default function ProfilePage() {
         max: PROFILE_NAME_MAX_LENGTH,
       }) ||
       (splitAt < 0 ? 'Full name must contain at least two words.' : null) ||
-      validateEmail(form.email, { required: true }) ||
       validateVnPhone(form.phone, { required: false, label: 'Phone number' });
     if (validationError) {
       setProfileError(validationError);
@@ -116,10 +114,10 @@ export default function ProfilePage() {
       const phone = normalizePhone(form.phone);
       // The API still takes firstName/lastName separately and joins them with one
       // space into the single stored name, so split here to keep what the user typed.
+      // Không gửi email: UpdateProfileDto bên BE không còn nhận trường này nữa.
       await updateProfile({
         firstName: fullName.slice(0, splitAt),
         lastName: fullName.slice(splitAt + 1),
-        email: form.email.trim(),
         phone: phone || undefined,
       });
       const refreshed = await fetchMe();
@@ -218,15 +216,18 @@ export default function ProfilePage() {
                   </label>
                   <label className="block space-y-1 sm:col-span-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-                      Email *
+                      Email
                     </span>
+                    {/* Chỉ đọc, cùng kiểu ô Branch bị khoá ở CreateUserModal. Email là địa
+                        chỉ nhận link đặt lại mật khẩu nên không cho tự đổi ở màn hình này. */}
                     <input
-                      type="email"
-                      required
+                      readOnly
                       value={form.email}
-                      onChange={updateProfileField('email')}
-                      className={inputClass}
+                      className={`${inputClass} bg-[#f7f9fb]`}
                     />
+                    <p className="text-xs text-[var(--admin-muted)]">
+                      Your email is used for account recovery and cannot be changed here.
+                    </p>
                   </label>
                   <label className="block space-y-1">
                     <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
