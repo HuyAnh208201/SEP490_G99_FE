@@ -50,9 +50,12 @@ export const PR_STATUS_OPTIONS = [
   })),
 ];
 
-/** Warehouse Incoming Requests — default Pending; other screens track later statuses. */
+/** Warehouse Incoming Requests — pending, short-stock, and approved (ready to ship). */
 export const WM_INCOMING_STATUS_OPTIONS = [
+  { value: '', label: 'All incoming' },
   { value: PR_STATUS.PENDING, label: PR_STATUS_META[PR_STATUS.PENDING].label },
+  { value: PR_STATUS.AWAITING_STOCK, label: PR_STATUS_META[PR_STATUS.AWAITING_STOCK].label },
+  { value: PR_STATUS.APPROVED, label: PR_STATUS_META[PR_STATUS.APPROVED].label },
 ];
 
 export function normalizeStatus(status) {

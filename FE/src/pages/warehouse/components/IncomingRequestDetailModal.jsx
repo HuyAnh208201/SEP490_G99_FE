@@ -156,6 +156,21 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
           </div>
         )}
 
+        {normalizeStatus(request.status) === PR_STATUS.AWAITING_STOCK && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <span className="font-semibold">Awaiting warehouse stock.</span> Record a supplier
+            receipt for the short products. When stock is sufficient, this request moves to{' '}
+            <strong>APPROVED</strong> automatically and appears on Ship Orders.
+          </div>
+        )}
+
+        {normalizeStatus(request.status) === PR_STATUS.APPROVED && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <span className="font-semibold">Ready to ship.</span> This request is approved and
+            available on Ship Orders.
+          </div>
+        )}
+
         <div className="overflow-x-auto rounded-xl border border-[var(--admin-border)]">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
