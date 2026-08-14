@@ -67,12 +67,7 @@ export async function getReceiptDetail(receiptId) {
   return unwrap(data);
 }
 
-export async function approveReceipt(receiptId) {
-  const { data } = await http.patch(`${BASE}/receipts/${receiptId}/approve`);
-  return unwrap(data);
-}
-
-export async function rejectReceipt(receiptId) {
-  const { data } = await http.patch(`${BASE}/receipts/${receiptId}/reject`);
+export async function createSupplementalRequest(receiptId) {
+  const { data } = await http.post(`${BASE}/receipts/${receiptId}/supplement`);
   return unwrap(data);
 }

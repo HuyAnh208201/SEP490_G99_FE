@@ -10,8 +10,10 @@ import {
   getCountSession,
   rejectCountSession,
 } from '../../../api/inventoryCount.js';
+import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
 
 export default function CountSessionDetailModal({ open, sessionId, onClose, onChanged }) {
+  const confirmSave = useSaveConfirmation();
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,6 +44,16 @@ export default function CountSessionDetailModal({ open, sessionId, onClose, onCh
   const pending = String(detail?.status).toUpperCase() === 'PENDING_APPROVAL';
 
   async function act(kind) {
+    const confirmed = await confirmSave({
+      title: kind === 'approve' ? 'Confirm count approval' : 'Confirm count rejection',
+      message:
+        kind === 'approve'
+          ? 'Approve this physical count and update stock with every recorded variance?'
+          : 'Reject this physical count without updating stock?',
+      confirmLabel: kind === 'approve' ? 'Yes, approve and update' : 'Yes, reject count',
+      danger: kind !== 'approve',
+    });
+    if (!confirmed) return;
     setBusy(kind);
     setError('');
     try {

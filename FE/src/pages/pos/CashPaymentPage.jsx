@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 
-/** Legacy route — unified Payment screen owns Cash + PayOS. */
+/** Compatibility route retained for old bookmarks. */
 export default function CashPaymentPage() {
-  return <Navigate to="/pos/payment?method=cash" replace />;
+  return <Navigate to="/pos" replace state={{ openPayment: true, paymentMethod: 'cash' }} />;
 }

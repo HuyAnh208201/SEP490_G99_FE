@@ -33,16 +33,19 @@ export async function listRecommendedProducts() {
 }
 
 /** Tìm sản phẩm để thêm tay vào đơn. */
-export async function searchPurchaseProducts(keyword) {
+export async function searchPurchaseProducts(supplierId, keyword) {
   const { data } = await http.get(`${BASE}/search-products`, {
-    params: keyword ? { keyword } : {},
+    params: {
+      ...(supplierId ? { supplierId } : {}),
+      ...(keyword ? { keyword } : {}),
+    },
   });
   return asList(unwrap(data));
 }
 
 /** Tạo đơn đặt hàng NCC. items: [{ productId, quantity, unitPrice? }] */
-export async function createPurchaseOrder({ supplierId, notes, items }) {
-  const { data } = await http.post(BASE, { supplierId, notes, items });
+export async function createPurchaseOrder(payload) {
+  const { data } = await http.post(BASE, payload);
   return unwrap(data);
 }
 

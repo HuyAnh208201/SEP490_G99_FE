@@ -70,6 +70,8 @@ export default function OrderTrackingPage() {
                 <th className="px-4 py-3">Dispatch Order ID</th>
                 <th className="px-4 py-3">Request ID</th>
                 <th className="px-4 py-3">Shipment Date</th>
+                <th className="px-4 py-3">Desired Receive</th>
+                <th className="px-4 py-3">Requested By</th>
                 <th className="px-4 py-3">Categories</th>
                 <th className="px-4 py-3 text-right">Products</th>
                 <th className="px-4 py-3">Status</th>
@@ -80,7 +82,7 @@ export default function OrderTrackingPage() {
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={7} className="px-4 py-4">
+                      <td colSpan={9} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -100,6 +102,12 @@ export default function OrderTrackingPage() {
                         </td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
                           {formatDate(r.shipmentDate)}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {formatDate(r.desiredReceiveDate)}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {r.requestedByName || '—'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-1">

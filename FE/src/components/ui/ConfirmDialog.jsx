@@ -9,9 +9,10 @@ export default function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   danger = false,
+  layer = 60,
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={title} size="sm">
+    <Modal open={open} onClose={onClose} title={title} size="sm" layer={layer}>
       <p className="text-sm text-[var(--admin-muted)] whitespace-pre-line">{message}</p>
       <div className="mt-5 grid grid-cols-2 gap-3">
         <button

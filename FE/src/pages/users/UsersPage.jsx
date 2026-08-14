@@ -21,7 +21,6 @@ const ROLE_FILTERS = [
   { id: 'all', label: 'All roles' },
   { id: 'ADMIN', label: 'Admin' },
   { id: 'DIRECTOR', label: 'Director' },
-  { id: 'PROMOTION_DIRECTOR', label: 'Promotion director' },
   { id: 'WAREHOUSE_MANAGER', label: 'Warehouse' },
   { id: 'BRANCH_MANAGER', label: 'Branch manager' },
   { id: 'INVENTORY_STAFF', label: 'Inventory' },
@@ -58,7 +57,7 @@ export default function UsersPage() {
   const roleFilters = useMemo(() => {
     if (!isBranchManager) return ROLE_FILTERS;
     return ROLE_FILTERS.filter((f) =>
-      ['all', 'ADMIN', 'DIRECTOR', 'PROMOTION_DIRECTOR', 'BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'].includes(
+      ['all', 'ADMIN', 'DIRECTOR', 'BRANCH_MANAGER', 'INVENTORY_STAFF', 'CASHIER'].includes(
         f.id,
       ),
     );
@@ -87,7 +86,7 @@ export default function UsersPage() {
     return map;
   }, [branches]);
 
-  const filtered = users;
+  const filtered = users.filter((user) => user.role !== 'CUSTOMER');
 
   function isCriticalUser(user) {
     return ['ADMIN', 'DIRECTOR', 'OWNER', 'PROMOTION_DIRECTOR'].includes(user.role);

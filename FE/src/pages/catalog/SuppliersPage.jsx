@@ -11,6 +11,7 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
@@ -30,6 +31,7 @@ function fieldErrors(err) {
 }
 
 export default function SuppliersPage() {
+  const confirmSave = useSaveConfirmation();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const debouncedQuery = useDebouncedValue(query);
@@ -68,6 +70,14 @@ export default function SuppliersPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
+    const confirmed = await confirmSave({
+      title: editingId ? 'Confirm supplier changes' : 'Confirm new supplier',
+      message: editingId
+        ? `Save the changes to ${form.name.trim() || 'this supplier'}?`
+        : `Create ${form.name.trim() || 'this supplier'}?`,
+      confirmLabel: editingId ? 'Yes, save changes' : 'Yes, create supplier',
+    });
+    if (!confirmed) return;
     setSaving(true);
 
     const payload = {

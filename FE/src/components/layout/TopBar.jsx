@@ -2,20 +2,32 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { ROLE_LABELS } from '../../config/navigation.js';
+import { normalizeWebRole } from '../../constants/userRoles.js';
 import Button from '../ui/Button.jsx';
+
+const CONSOLE_TITLES = {
+  ADMIN: 'Admin console',
+  DIRECTOR: 'Director console',
+  BRANCH_MANAGER: 'Branch console',
+  WAREHOUSE_MANAGER: 'Warehouse console',
+  INVENTORY_STAFF: 'Inventory console',
+};
 
 export default function TopBar({ onMenuToggle, showMenuButton }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { role } = usePermissions();
+  const webRole = normalizeWebRole(role || user?.role);
+  const consoleTitle = CONSOLE_TITLES[webRole] || 'ChainStore';
 
   async function handleSignOut() {
     await signOut();
     navigate('/login', { replace: true });
   }
 
-  const roleLabel = ROLE_LABELS[role] || ROLE_LABELS[user?.role] || user?.role || '—';
-  const initials = (user?.name || 'U')
+  const roleLabel = ROLE_LABELS[webRole] || ROLE_LABELS[user?.role] || user?.role || '—';
+  const displayName = user?.fullName || user?.name || 'there';
+  const initials = (displayName === 'there' ? 'U' : displayName)
     .split(' ')
     .map((w) => w[0])
     .join('')
@@ -39,10 +51,10 @@ export default function TopBar({ onMenuToggle, showMenuButton }) {
         )}
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--admin-subtle)]">
-            Admin console
+            {consoleTitle}
           </p>
           <p className="text-sm font-semibold text-[var(--admin-text)]">
-            Hello, {user?.name || 'there'}
+            Hello, {displayName}
           </p>
         </div>
       </div>

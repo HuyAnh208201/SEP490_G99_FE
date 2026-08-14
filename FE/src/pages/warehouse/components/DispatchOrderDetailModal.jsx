@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
-import { formatDateTime } from '../../../lib/datetime.js';
+import { formatDate, formatDateTime } from '../../../lib/datetime.js';
 import { unitLabel } from '../../../constants/productUnits.js';
 import {
   WAREHOUSE_DISPATCH_STATUS_OPTIONS,
@@ -11,8 +11,10 @@ import {
   normalizeDispatchStatus,
 } from '../../../constants/dispatch.js';
 import { updateDispatchStatus } from '../../../api/dispatch.js';
+import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
 
 export default function DispatchOrderDetailModal({ open, onClose, order, onChanged }) {
+  const confirmSave = useSaveConfirmation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -30,6 +32,12 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
 
   async function applyStatus() {
     if (!editable || !dirty) return;
+    const confirmed = await confirmSave({
+      title: 'Confirm dispatch status',
+      message: `Change ${order.dispatchNumber || 'this dispatch order'} status to ${dispatchStatusMeta(selectedStatus).label}?`,
+      confirmLabel: 'Yes, update status',
+    });
+    if (!confirmed) return;
     setBusy(true);
     setError('');
     try {
@@ -49,7 +57,7 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
       onClose={onClose}
       title={`Dispatch ${order.dispatchNumber || ''}`}
       description="Delivery details. Delivered status is set when branch inventory staff confirms receipt."
-      size="xl"
+      size="viewport"
     >
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-3">
@@ -78,6 +86,9 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
             )}
           </div>
           <Info label="Created" value={formatDateTime(order.createdAt)} />
+          <Info label="Shipment date" value={formatDateTime(order.shippedAt)} />
+          <Info label="Sender" value={contact(order.senderName, order.senderPhone)} />
+          <Info label="Assigned receiver" value={contact(order.recipientName, order.recipientPhone)} />
           <Info
             label="Delivered"
             value={order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
@@ -92,13 +103,23 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
               </span>
               <span className="text-sm font-medium text-[var(--admin-text)]">{req.branchName}</span>
             </div>
+            <div className="grid gap-3 border-b border-[var(--admin-border)] bg-[#fbfcfd] px-4 py-3 text-sm sm:grid-cols-4">
+              <Info label="Sent request" value={formatDateTime(req.requestSubmittedAt)} />
+              <Info label="Desired receive" value={formatDate(req.desiredReceiveDate)} />
+              <Info label="Requested by" value={req.requestedByName || '—'} />
+              <Info label="Actual receiver" value={req.receivedByName || 'Not received'} />
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                   <tr>
                     <th className="px-4 py-2">Product</th>
                     <th className="px-4 py-2">Unit</th>
-                    <th className="px-4 py-2 text-right">Quantity</th>
+                    <th className="px-4 py-2">Type</th>
+                    <th className="px-4 py-2 text-right">Cost</th>
+                    <th className="px-4 py-2 text-right">Document Qty</th>
+                    <th className="px-4 py-2 text-right">Actual Qty</th>
+                    <th className="px-4 py-2 text-right">Difference</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,7 +132,13 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
                         </div>
                       </td>
                       <td className="px-4 py-2 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
+                      <td className="px-4 py-2 text-[var(--admin-muted)]">{it.categoryName || '—'}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{money(it.unitCost)}</td>
                       <td className="px-4 py-2 text-right tabular-nums">{it.quantity}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{it.actualReceivedQuantity ?? '—'}</td>
+                      <td className={`px-4 py-2 text-right tabular-nums ${(it.difference ?? 0) < 0 ? 'font-semibold text-red-600' : ''}`}>
+                        {it.difference == null ? '—' : it.difference > 0 ? `+${it.difference}` : it.difference}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -151,3 +178,6 @@ function Info({ label, value }) {
     </div>
   );
 }
+
+function contact(name, phone) { return [name, phone].filter(Boolean).join(' · ') || '—'; }
+function money(value) { return value == null ? '—' : `${new Intl.NumberFormat('vi-VN').format(Number(value) || 0)} ₫`; }

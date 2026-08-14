@@ -30,7 +30,7 @@ export async function fetchProductCount() {
  */
 export async function fetchPosCatalog(params = {}) {
   const { data } = await http.get('/pos/orders/catalog', {
-    timeout: 10000,
+    timeout: 60000,
     params: {
       ...compactPageParams(params),
       paged: true,
@@ -72,4 +72,15 @@ export async function updateProduct(id, payload) {
 
 export async function deleteProduct(id) {
   await http.delete(`/products/${id}`);
+}
+
+export async function fetchProductSalePrices(id) {
+  const { data } = await http.get(`/products/${id}/sale-prices`);
+  const rows = unwrap(data);
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function scheduleProductSalePrice(id, payload) {
+  const { data } = await http.post(`/products/${id}/sale-prices`, payload);
+  return unwrap(data);
 }

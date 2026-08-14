@@ -55,7 +55,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
     if (roleSlots) {
       list = list.filter((r) => {
         if (r === 'ADMIN') return roleSlots.adminAvailable;
-        if (r === 'DIRECTOR' || r === 'PROMOTION_DIRECTOR') return roleSlots.directorAvailable;
+        if (r === 'DIRECTOR') return roleSlots.directorAvailable;
         if (r === 'WAREHOUSE_MANAGER') return roleSlots.warehouseManagerAvailable;
         return true;
       });

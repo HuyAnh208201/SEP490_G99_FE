@@ -21,7 +21,7 @@ const selectClass =
 export default function ReceivingHistoryPage() {
   const location = useLocation();
   const [flash, setFlash] = useState(location.state?.message || '');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('APPROVED');
   const [search, setSearch] = useState('');
   const [detailId, setDetailId] = useState(null);
 
@@ -33,7 +33,7 @@ export default function ReceivingHistoryPage() {
     <div className="w-full">
       <PageHeader
         title="Receiving History"
-        description="Submitted receipts await branch manager approval before stock is finalized."
+        description="Completed receipts and quantity variances. Branch managers can view the same report."
       />
 
       {flash && (
@@ -62,7 +62,7 @@ export default function ReceivingHistoryPage() {
             className={selectClass}
           >
             {APPROVAL_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <option key={o.value || 'all'} value={o.value || 'all'}>
                 {o.label}
               </option>
             ))}

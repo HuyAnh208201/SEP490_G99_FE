@@ -1,36 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate } from '../../lib/datetime.js';
-import {
-  PO_STATUS,
-  PO_STATUS_OPTIONS,
-  poStatusMeta,
-  normalizePoStatus,
-} from '../../constants/purchaseOrders.js';
-import {
-  listPurchaseOrdersPage,
-  receivePurchaseOrder,
-} from '../../api/purchaseOrders.js';
+import { PO_STATUS_OPTIONS, poStatusMeta } from '../../constants/purchaseOrders.js';
+import { getPurchaseOrder, listPurchaseOrdersPage } from '../../api/purchaseOrders.js';
 import CreatePurchaseOrderModal from './components/CreatePurchaseOrderModal.jsx';
 import PurchaseOrderDetailModal from './components/PurchaseOrderDetailModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function PurchaseOrdersPage() {
+  const { has } = usePermissions();
+  const canReceive = has('CHOOSE_EXTERNAL_SUPPLIER');
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState(null);
-  const [receivingId, setReceivingId] = useState(null);
+  const [detailLoadingId, setDetailLoadingId] = useState(null);
 
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(listPurchaseOrdersPage, {
@@ -42,34 +37,24 @@ export default function PurchaseOrdersPage() {
 
   const filteredRows = rows;
 
-  const awaitingCount = useMemo(
-    () => rows.filter((r) => normalizePoStatus(r.status) === PO_STATUS.ORDERED).length,
-    [rows],
-  );
-
-  async function receive(order) {
-    setReceivingId(order.id);
+  async function openDetail(order) {
+    setDetailLoadingId(order.id);
     setActionError('');
-    setMessage('');
     try {
-      await receivePurchaseOrder(order.id);
-      setMessage(
-        `Purchase order ${order.orderNumber || ''} received. Central stock updated and awaiting requests re-checked.`,
-      );
-      load();
+      setDetail(await getPurchaseOrder(order.id));
     } catch (err) {
-      setActionError(err?.message || 'Failed to receive purchase order');
+      setActionError(err?.message || 'Failed to load supplier receipt');
     } finally {
-      setReceivingId(null);
+      setDetailLoadingId(null);
     }
   }
 
   return (
     <div className="w-full">
       <PageHeader
-        title="Purchase Orders"
-        description="Order stock from suppliers to replenish the central warehouse and release requests waiting for stock."
-        actions={<Button onClick={() => setCreating(true)}>Create Purchase Order</Button>}
+        title="Supplier Receipts"
+        description="Goods received from suppliers. Recording a receipt updates central stock immediately."
+        actions={canReceive ? <Button onClick={() => setCreating(true)}>New Supplier Receipt</Button> : null}
       />
 
       {error && (
@@ -96,12 +81,12 @@ export default function PurchaseOrdersPage() {
               </option>
             ))}
           </select>
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search purchase orders…" className={selectClass} />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search supplier receipts…" className={selectClass} />
           <span className="text-sm text-[var(--admin-muted)]">
-            <strong>{awaitingCount}</strong> awaiting receipt
+            Receipt history is view-only for Director accounts.
           </span>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{pageData.totalRecords}</strong> purchase orders
+            <strong>{pageData.totalRecords}</strong> receipts
           </span>
         </div>
 
@@ -109,11 +94,11 @@ export default function PurchaseOrdersPage() {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               <tr>
-                <th className="px-4 py-3">PO ID</th>
+                <th className="px-4 py-3">Receipt ID</th>
                 <th className="px-4 py-3">Supplier</th>
                 <th className="px-4 py-3 text-right">Products</th>
                 <th className="px-4 py-3 text-right">Total qty</th>
-                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Delivery date</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
@@ -129,7 +114,6 @@ export default function PurchaseOrdersPage() {
                   ))
                 : filteredRows.map((r) => {
                     const meta = poStatusMeta(r.status);
-                    const isOrdered = normalizePoStatus(r.status) === PO_STATUS.ORDERED;
                     return (
                       <tr
                         key={r.id}
@@ -142,7 +126,7 @@ export default function PurchaseOrdersPage() {
                         <td className="px-4 py-3 text-right tabular-nums">{r.itemCount ?? 0}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{r.totalQuantity ?? 0}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {formatDate(r.createdAt)}
+                          {formatDate(r.supplierDeliveryDate || r.receivedAt || r.createdAt)}
                         </td>
                         <td className="px-4 py-3">
                           <Badge tone={meta.tone}>{meta.display}</Badge>
@@ -152,19 +136,11 @@ export default function PurchaseOrdersPage() {
                             <Button
                               variant="secondary"
                               className="!px-3 !py-1 !text-xs"
-                              onClick={() => setDetail(r)}
+                              loading={detailLoadingId === r.id}
+                              onClick={() => openDetail(r)}
                             >
                               View Details
                             </Button>
-                            {isOrdered && (
-                              <Button
-                                className="!px-3 !py-1 !text-xs"
-                                loading={receivingId === r.id}
-                                onClick={() => receive(r)}
-                              >
-                                Receive
-                              </Button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -174,7 +150,7 @@ export default function PurchaseOrdersPage() {
           </table>
           {!loading && filteredRows.length === 0 && (
             <p className="px-4 py-12 text-center text-sm text-[var(--admin-muted)]">
-              No purchase orders yet.
+              No supplier receipts yet.
             </p>
           )}
         </div>
@@ -185,7 +161,7 @@ export default function PurchaseOrdersPage() {
         open={creating}
         onClose={() => setCreating(false)}
         onCreated={(order) => {
-          setMessage(`Purchase order ${order?.orderNumber || ''} created.`);
+          setMessage(`Supplier receipt ${order?.orderNumber || ''} recorded. Central stock updated.`);
           load();
         }}
       />

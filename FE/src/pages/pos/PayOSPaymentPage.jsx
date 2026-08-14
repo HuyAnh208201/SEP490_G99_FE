@@ -8,9 +8,9 @@ import {
   createPaymentLink as apiCreatePaymentLink,
   fetchPaymentStatus as apiFetchPaymentStatus,
 } from '../../api/payments.js';
-import OrderSummary from './components/OrderSummary.jsx';
 import PosOrderTable from './components/PosOrderTable.jsx';
 import PosPageTitle from './components/PosPageTitle.jsx';
+import { openCustomerDisplay, publishCustomerDisplay } from './customerDisplayChannel.js';
 
 /**
  * payOS chỉ gọi webhook được vào URL công khai, máy quầy thì không — nên FE hỏi
@@ -61,7 +61,6 @@ export default function PayOSPaymentPage() {
   const {
     lines,
     totals,
-    appliedVoucher,
     createPayOSOrder,
     finishPayOSOrder,
   } = usePosCart();
@@ -78,6 +77,7 @@ export default function PayOSPaymentPage() {
   const startedRef = useRef(false);
   /** Chốt đơn vào lịch sử đúng một lần khi payOS báo PAID. */
   const settledRef = useRef(false);
+  const amountDue = link ? Number(link.amount) : totals.total;
 
   // 1. Tạo đơn PENDING_PAYMENT rồi xin payOS link + QR.
   useEffect(() => {
@@ -121,6 +121,18 @@ export default function PayOSPaymentPage() {
     };
   }, [link]);
 
+  useEffect(() => {
+    publishCustomerDisplay({
+      status,
+      qrCode: link?.qrCode,
+      amount: amountDue,
+      itemCount: totals.itemCount,
+      discount: totals.promoSavings + totals.codeDiscount + totals.pointsDiscount,
+      invoiceCode: order?.invoiceCode,
+      orderCode: link?.orderCode,
+    });
+  }, [amountDue, link?.orderCode, link?.qrCode, order?.invoiceCode, status, totals]);
+
   // 3. Hỏi trạng thái tới khi payOS chốt (PAID / CANCELLED / EXPIRED).
   useEffect(() => {
     if (status !== 'PENDING' || !link) return undefined;
@@ -151,7 +163,10 @@ export default function PayOSPaymentPage() {
     finishPayOSOrder(order);
     navigate('/pos', {
       replace: true,
-      state: { completedInvoice: order?.invoiceCode },
+      state: {
+        completedInvoice: order?.invoiceCode,
+        completedOrder: order,
+      },
     });
   }, [status, order, finishPayOSOrder, navigate]);
 
@@ -182,6 +197,14 @@ export default function PayOSPaymentPage() {
     setError('');
     try {
       await apiCancelPaymentLink(link.orderCode);
+      publishCustomerDisplay({
+        status: 'CANCELLED',
+        amount: amountDue,
+        itemCount: totals.itemCount,
+        discount: totals.promoSavings + totals.codeDiscount + totals.pointsDiscount,
+        invoiceCode: order?.invoiceCode,
+        orderCode: link.orderCode,
+      });
       navigate('/pos', { replace: true });
     } catch (err) {
       setError(err.message || 'Could not cancel the payment link');
@@ -191,8 +214,6 @@ export default function PayOSPaymentPage() {
 
   // Giỏ trống mà cũng chưa có đơn nào được tạo → vào thẳng URL này, quay lại POS.
   if (!lines.length && !link && !order) return <Navigate to="/pos" replace />;
-
-  const amountDue = link ? link.amount : totals.total;
 
   if (status === 'PAID') {
     return (
@@ -237,7 +258,10 @@ export default function PayOSPaymentPage() {
               onClick={() =>
                 navigate('/pos/history', {
                   replace: true,
-                  state: { completedInvoice: order?.invoiceCode },
+                  state: {
+                    completedInvoice: order?.invoiceCode,
+                    completedOrder: order,
+                  },
                 })
               }
               className="rounded-lg bg-[var(--admin-brand)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)]"
@@ -259,6 +283,16 @@ export default function PayOSPaymentPage() {
       <div className="space-y-4">
         <StatusBanner status={status} />
 
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={openCustomerDisplay}
+            className="rounded-lg border border-[var(--admin-border)] bg-white px-4 py-2 text-sm font-semibold text-[var(--admin-brand)] hover:bg-[#f7f9fb]"
+          >
+            Open customer display
+          </button>
+        </div>
+
         <section className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-white shadow-[var(--shadow-card)]">
           <div className="border-b border-[var(--admin-border)] px-4 py-3">
             <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--admin-muted)]">
@@ -267,8 +301,6 @@ export default function PayOSPaymentPage() {
           </div>
           <PosOrderTable lines={lines} />
         </section>
-
-        <OrderSummary totals={totals} appliedCode={appliedVoucher?.code} />
 
         <section className="rounded-xl border border-[var(--admin-border)] bg-white px-5 py-6 shadow-[var(--shadow-card)]">
           <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">
@@ -286,7 +318,16 @@ export default function PayOSPaymentPage() {
                 {closed ? 'QR code unavailable' : 'Generating QR code…'}
               </div>
             )}
-            <p className="mt-3 text-xl font-bold text-[var(--admin-text)]">
+            <div className="mt-4 flex items-center gap-3 text-xs text-[var(--admin-subtle)]">
+              <span>{totals.itemCount} items</span>
+              {totals.promoSavings + totals.pointsDiscount > 0 ? (
+                <span>
+                  Discount {formatVnd(totals.promoSavings + totals.pointsDiscount)}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">Amount to pay</p>
+            <p className="mt-1 text-2xl font-bold text-[var(--admin-text)]">
               {formatVnd(amountDue)}
             </p>
             <p className="mt-1 text-xs text-[var(--admin-subtle)]">

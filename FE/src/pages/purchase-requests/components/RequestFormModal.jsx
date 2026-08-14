@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
+import Card from '../../../components/ui/Card.jsx';
+import PageHeader from '../../../components/ui/PageHeader.jsx';
 import { fetchBranchById } from '../../../api/branches.js';
 import { fetchCategories } from '../../../api/categories.js';
 import {
@@ -14,6 +15,7 @@ import {
 import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
 import useDebouncedValue from '../../../hooks/useDebouncedValue.js';
 import ProductCatalogPicker from './ProductCatalogPicker.jsx';
+import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -29,7 +31,8 @@ function normId(id) {
  * Create / edit purchase request (mainly Branch Manager).
  * Catalog | Request lines side-by-side; Add suggested from low-stock API.
  */
-export default function RequestFormModal({ open, onClose, editing, branchId, createdBy, onSaved }) {
+export default function RequestFormModal({ editing, branchId, createdBy, onClose, onSaved }) {
+  const confirmSave = useSaveConfirmation();
   const lockedBranchId = branchId ? String(branchId) : '';
   const [branchName, setBranchName] = useState('');
   const [products, setProducts] = useState([]);
@@ -39,7 +42,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebouncedValue(keyword, 350);
   const [categoryId, setCategoryId] = useState('');
-  const [stockSort, setStockSort] = useState('');
+  const [stockSort, setStockSort] = useState('asc');
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [categories, setCategories] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -48,6 +51,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   const [recommendedError, setRecommendedError] = useState('');
   const [recommendedLoading, setRecommendedLoading] = useState(false);
   const [reason, setReason] = useState('');
+  const [desiredReceiveDate, setDesiredReceiveDate] = useState('');
   const [lines, setLines] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -60,11 +64,11 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   const reloadRecommended = useCallback(() => setRecommendedReloadToken((k) => k + 1), []);
 
   useEffect(() => {
-    if (!open) return;
     if (editing) {
       setReason(editing.reason || '');
+      setDesiredReceiveDate(editing.desiredReceiveDate || '');
       setLines(
-        editing.items.map((it) => ({
+        (editing.items || []).map((it) => ({
           productId: normId(it.productId),
           itemId: it.id,
           productName: it.productName,
@@ -76,19 +80,20 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
       if (editing.branchName) setBranchName(editing.branchName);
     } else {
       setReason('');
+      setDesiredReceiveDate('');
       setLines([]);
     }
     setError('');
     setKeyword('');
     setCategoryId('');
-    setStockSort('');
+    setStockSort('asc');
     setLowStockOnly(false);
     setCatalogPage(1);
     setInitialCatalogSettled(false);
-  }, [open, editing]);
+  }, [editing]);
 
   useEffect(() => {
-    if (!open || !lockedBranchId) return;
+    if (!lockedBranchId) return;
     fetchBranchById(lockedBranchId)
       .then((b) => setBranchName(b?.name || ''))
       .catch(() => {
@@ -99,10 +104,9 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
           })
           .catch(() => setBranchName(''));
       });
-  }, [open, lockedBranchId]);
+  }, [lockedBranchId]);
 
   useEffect(() => {
-    if (!open) return undefined;
     let cancelled = false;
     fetchCategories()
       .then((rows) => {
@@ -121,11 +125,10 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, []);
 
   // Catalog loads first; recommended waits until catalog settles to avoid DB contention.
   useEffect(() => {
-    if (!open) return undefined;
     if (!lockedBranchId) {
       setProducts([]);
       setCatalogTotalPages(0);
@@ -174,7 +177,6 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
       cancelled = true;
     };
   }, [
-    open,
     lockedBranchId,
     debouncedKeyword,
     catalogPage,
@@ -185,7 +187,6 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   ]);
 
   useEffect(() => {
-    if (!open) return undefined;
     if (!lockedBranchId) {
       setRecommended([]);
       setRecommendedError('');
@@ -214,7 +215,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     return () => {
       cancelled = true;
     };
-  }, [open, lockedBranchId, initialCatalogSettled, recommendedReloadToken]);
+  }, [lockedBranchId, initialCatalogSettled, recommendedReloadToken]);
 
   const addedIds = useMemo(() => new Set(lines.map((l) => normId(l.productId))), [lines]);
 
@@ -237,6 +238,8 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
           reorderPoint: rec.reorderPoint ?? p.reorderPoint,
           currentStock: rec.currentStock ?? p.currentStock,
           lowStock: true,
+          soldLast30Days: rec.soldLast30Days,
+          priorityReason: rec.priorityReason,
           topPackagingLabel: p.topPackagingLabel || rec.topPackagingLabel,
           unitsPerImportUnit: p.unitsPerImportUnit || rec.topPackagingConversionQty,
         };
@@ -304,6 +307,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
       branchId: Number(lockedBranchId) || null,
       createdBy,
       reason: reason.trim(),
+      desiredReceiveDate: desiredReceiveDate || null,
       items: lines.map((l) => ({
         id: l.itemId,
         productId: l.productId,
@@ -317,6 +321,7 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
     if (lines.length === 0) return 'Add at least one product to the request.';
     if (lines.some((l) => !Number(l.requestedQuantity) || Number(l.requestedQuantity) <= 0))
       return 'Requested quantity must be greater than zero.';
+    if (!desiredReceiveDate) return 'Enter the desired receive date before submitting.';
     return '';
   }
 
@@ -331,6 +336,15 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
       setError('Add at least one product to save as draft.');
       return;
     }
+    const confirmed = await confirmSave({
+      title: action === 'submit' ? 'Confirm request submission' : 'Confirm draft changes',
+      message:
+        action === 'submit'
+          ? `Submit this purchase request with ${lines.length} product line(s) for approval?`
+          : `Save this purchase request with ${lines.length} product line(s) as a draft?`,
+      confirmLabel: action === 'submit' ? 'Yes, submit request' : 'Yes, save draft',
+    });
+    if (!confirmed) return;
     setBusy(action);
     setError('');
     try {
@@ -352,40 +366,13 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={editing ? `Edit ${editing.code}` : 'Create purchase request'}
-      description="Browse branch stock, filter the catalog, add suggested low-stock items, then submit for approval."
-      size="viewport"
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Badge tone="default">{lines.length} products</Badge>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={onClose}>
-              Close
-            </Button>
-            <Button
-              variant="ghost"
-              className="border border-[var(--admin-border)]"
-              loading={busy === 'draft'}
-              disabled={!lockedBranchId}
-              onClick={() => handle('draft', saveDraft)}
-            >
-              Save draft
-            </Button>
-            <Button
-              loading={busy === 'submit'}
-              disabled={!lockedBranchId}
-              onClick={() => handle('submit', submitRequest)}
-            >
-              Submit for approval
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      <div className="flex min-h-0 flex-col gap-4">
+    <div className="w-full">
+      <PageHeader
+        title={editing ? `Edit ${editing.code}` : 'Create purchase request'}
+        description="Prioritize low-stock and fast-selling products, then set the date the branch needs delivery."
+      />
+
+      <Card className="space-y-4">
         {!lockedBranchId && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             No branch assigned to your account — catalog and suggested products cannot load.
@@ -405,12 +392,13 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
-              Reason / notes
+              Desired receive date
             </span>
             <input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Restock fast-moving items for the weekend"
+              type="date"
+              value={desiredReceiveDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setDesiredReceiveDate(e.target.value)}
               className={inputClass}
             />
           </label>
@@ -530,7 +518,45 @@ export default function RequestFormModal({ open, onClose, editing, branchId, cre
             </div>
           </div>
         </div>
-      </div>
-    </Modal>
+
+        <label className="block space-y-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+            Reason / notes
+          </span>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="e.g. Restock fast-moving items for the weekend"
+            className={inputClass}
+          />
+        </label>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] pt-4">
+          <Badge tone="default">{lines.length} products</Badge>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={onClose}>
+              Close
+            </Button>
+            <Button
+              variant="ghost"
+              className="border border-[var(--admin-border)]"
+              loading={busy === 'draft'}
+              disabled={!lockedBranchId}
+              onClick={() => handle('draft', saveDraft)}
+            >
+              Save draft
+            </Button>
+            <Button
+              loading={busy === 'submit'}
+              disabled={!lockedBranchId}
+              onClick={() => handle('submit', submitRequest)}
+            >
+              Submit for approval
+            </Button>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 }

@@ -6,6 +6,13 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate } from '../../lib/datetime.js';
 import { unitLabel } from '../../constants/productUnits.js';
 import { getShipmentDetail, receiveShipment } from '../../api/branchReceiving.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
+import {
+  countShipmentDifferences,
+  formatSignedDifference,
+  resolveReceivedQuantity,
+  shipmentDifference,
+} from '../../lib/inventoryChange.js';
 
 const inputClass =
   'w-24 rounded-lg border border-[var(--admin-border)] bg-white px-2 py-1.5 text-right text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -15,6 +22,7 @@ const noteClass =
 export default function ReceiveShipmentPage() {
   const { dispatchOrderId, requestId } = useParams();
   const navigate = useNavigate();
+  const confirmSave = useSaveConfirmation();
   const [detail, setDetail] = useState(null);
   const [form, setForm] = useState({});
   const [loading, setLoading] = useState(true);
@@ -49,9 +57,9 @@ export default function ReceiveShipmentPage() {
     () => items.filter((it) => form[it.productId]?.received !== '').length,
     [items, form],
   );
-  const totalShipped = useMemo(
-    () => items.reduce((sum, it) => sum + (Number(it.shippedQuantity) || 0), 0),
-    [items],
+  const differenceCount = useMemo(
+    () => countShipmentDifferences(items, form),
+    [items, form],
   );
 
   function setField(productId, key, value) {
@@ -65,10 +73,7 @@ export default function ReceiveShipmentPage() {
     setError('');
     const payload = items.map((it) => {
       const entry = form[it.productId] || {};
-      const received =
-        entry.received === '' || entry.received == null
-          ? Number(it.shippedQuantity) || 0
-          : Number(entry.received);
+      const received = resolveReceivedQuantity(it.shippedQuantity, entry.received);
       return {
         productId: it.productId,
         receivedQuantity: Number.isNaN(received) ? 0 : received,
@@ -79,7 +84,7 @@ export default function ReceiveShipmentPage() {
     try {
       await receiveShipment(dispatchOrderId, requestId, payload);
       navigate('/inventory/receiving-history', {
-        state: { message: 'Receipt submitted for branch manager approval.' },
+        state: { message: 'Shipment received and branch stock updated.' },
       });
     } catch (err) {
       setError(err?.message || 'Failed to receive shipment');
@@ -88,11 +93,20 @@ export default function ReceiveShipmentPage() {
     }
   }
 
+  async function requestSubmit() {
+    const confirmed = await confirmSave({
+      title: 'Confirm shipment receipt',
+      message: `You are about to save actual quantities for ${items.length} product(s).\n${differenceCount} product(s) differ from the shipped quantity.`,
+      confirmLabel: 'Yes, save receipt',
+    });
+    if (confirmed) submit();
+  }
+
   return (
     <div className="w-full">
       <PageHeader
         title="Receive Shipment"
-        description="Record actual received quantities. Branch manager must approve before stock is updated."
+        description="Record actual quantities. Saving completes receipt and updates branch stock immediately."
         actions={
           <Button variant="secondary" onClick={() => navigate('/inventory/order-tracking')}>
             Back
@@ -120,12 +134,16 @@ export default function ReceiveShipmentPage() {
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               Shipment information
             </p>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-6">
               <Info label="Dispatch Order ID" value={detail.dispatchNumber} mono />
               <Info label="Request ID" value={detail.requestNumber} mono />
               <Info label="Shipment Date" value={formatDate(detail.shipmentDate)} />
+              <Info label="Desired Receive" value={formatDate(detail.desiredReceiveDate)} />
+              <Info label="Requested By" value={detail.requestedByName || '—'} />
               <Info label="Store" value={detail.storeName || '—'} />
               <Info label="Source" value={detail.source || '—'} />
+              <Info label="Sender" value={contact(detail.senderName, detail.senderPhone)} />
+              <Info label="Assigned Receiver" value={contact(detail.assignedReceiverName, detail.assignedReceiverPhone)} />
             </div>
           </Card>
 
@@ -145,8 +163,11 @@ export default function ReceiveShipmentPage() {
                     <th className="px-4 py-3">#</th>
                     <th className="px-4 py-3">Product</th>
                     <th className="px-4 py-3">Unit</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3 text-right">Cost</th>
                     <th className="px-4 py-3 text-right">Shipped Qty</th>
                     <th className="px-4 py-3 text-right">Received Qty *</th>
+                    <th className="px-4 py-3 text-right">Difference</th>
                     <th className="px-4 py-3">Notes</th>
                   </tr>
                 </thead>
@@ -161,6 +182,8 @@ export default function ReceiveShipmentPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
+                      <td className="px-4 py-3 text-[var(--admin-muted)]">{it.categoryName || '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{money(it.unitCost)}</td>
                       <td className="px-4 py-3 text-right tabular-nums">{it.shippedQuantity}</td>
                       <td className="px-4 py-3 text-right">
                         <input
@@ -171,6 +194,27 @@ export default function ReceiveShipmentPage() {
                           placeholder={String(it.shippedQuantity)}
                           className={inputClass}
                         />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums">
+                        {(() => {
+                          const difference = shipmentDifference(
+                            it.shippedQuantity,
+                            form[it.productId]?.received,
+                          );
+                          return (
+                            <span
+                              className={
+                                difference === 0
+                                  ? 'text-[var(--admin-muted)]'
+                                  : difference > 0
+                                    ? 'font-semibold text-emerald-600'
+                                    : 'font-semibold text-red-600'
+                              }
+                            >
+                              {formatSignedDifference(difference)}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3">
                         <input
@@ -183,16 +227,6 @@ export default function ReceiveShipmentPage() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t border-[var(--admin-border)] bg-[#f7f9fb]/60 font-semibold">
-                    <td className="px-4 py-3" colSpan={3}>
-                      Total
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{totalShipped}</td>
-                    <td className="px-4 py-3" />
-                    <td className="px-4 py-3" />
-                  </tr>
-                </tfoot>
               </table>
             </div>
           </Card>
@@ -204,7 +238,7 @@ export default function ReceiveShipmentPage() {
             <Button
               loading={submitting}
               disabled={!detail.canReceive || items.length === 0}
-              onClick={submit}
+              onClick={requestSubmit}
             >
               Confirm receipt
             </Button>
@@ -228,4 +262,13 @@ function Info({ label, value, mono }) {
       </p>
     </div>
   );
+}
+
+function contact(name, phone) {
+  return [name, phone].filter(Boolean).join(' · ') || '—';
+}
+
+function money(value) {
+  if (value == null) return '—';
+  return `${new Intl.NumberFormat('vi-VN').format(Number(value) || 0)} ₫`;
 }

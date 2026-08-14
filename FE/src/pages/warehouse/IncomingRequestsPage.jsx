@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import { formatDate } from '../../lib/datetime.js';
+import { formatDate, formatDateTime } from '../../lib/datetime.js';
 import {
   PR_STATUS,
-  PR_STATUS_OPTIONS,
+  WM_INCOMING_STATUS_OPTIONS,
   statusMeta,
-  normalizeStatus,
 } from '../../constants/purchaseRequests.js';
 import {
   listRequestsPage,
   getRequest,
-  approveRequest,
   fetchRequestBranches,
 } from '../../api/purchaseRequests.js';
 import IncomingRequestDetailModal from './components/IncomingRequestDetailModal.jsx';
@@ -28,11 +26,10 @@ export default function IncomingRequestsPage() {
   const [branches, setBranches] = useState([]);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(PR_STATUS.PENDING);
   const [branchFilter, setBranchFilter] = useState('');
   const [detail, setDetail] = useState(null);
   const [openingId, setOpeningId] = useState(null);
-  const [approvingId, setApprovingId] = useState(null);
 
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(listRequestsPage, { search: debouncedQuery, status: statusFilter, branchId: branchFilter });
@@ -44,19 +41,6 @@ export default function IncomingRequestsPage() {
   }, []);
 
   const filteredRows = rows;
-
-  const counts = useMemo(() => {
-    let pending = 0;
-    let approved = 0;
-    let awaitingStock = 0;
-    rows.forEach((r) => {
-      const s = normalizeStatus(r.status);
-      if (s === PR_STATUS.PENDING) pending += 1;
-      if (s === PR_STATUS.APPROVED) approved += 1;
-      if (s === PR_STATUS.AWAITING_STOCK) awaitingStock += 1;
-    });
-    return { pending, approved, awaitingStock };
-  }, [rows]);
 
   async function openDetail(request) {
     setOpeningId(request.id);
@@ -71,32 +55,11 @@ export default function IncomingRequestsPage() {
     }
   }
 
-  async function quickApprove(request) {
-    setApprovingId(request.id);
-    setActionError('');
-    try {
-      await approveRequest(request.id, []);
-      setActionError('');
-      load();
-    } catch (err) {
-      // Approve often commits before Axios times out; refresh list and drop sticky timeout banners.
-      load();
-      const message = err?.message || 'Failed to approve request';
-      if (String(message).toLowerCase().includes('timeout')) {
-        setActionError('');
-      } else {
-        setActionError(message);
-      }
-    } finally {
-      setApprovingId(null);
-    }
-  }
-
   return (
     <div className="w-full">
       <PageHeader
         title="Incoming Requests"
-        description="Review branch import requests and approve when warehouse inventory is sufficient."
+        description="Review pending branch import requests and approve when warehouse inventory is sufficient."
       />
 
       {error && (
@@ -125,7 +88,7 @@ export default function IncomingRequestsPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className={selectClass}
           >
-            {PR_STATUS_OPTIONS.map((o) => (
+            {WM_INCOMING_STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -135,8 +98,7 @@ export default function IncomingRequestsPage() {
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
 
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{counts.pending}</strong> pending review · <strong>{counts.approved}</strong>{' '}
-            approved · <strong>{counts.awaitingStock}</strong> awaiting stock
+            <strong>{pageData.totalRecords}</strong> pending review
           </span>
         </div>
 
@@ -146,7 +108,8 @@ export default function IncomingRequestsPage() {
               <tr>
                 <th className="px-4 py-3">Request ID</th>
                 <th className="px-4 py-3">Store</th>
-                <th className="px-4 py-3">Request Date</th>
+                <th className="px-4 py-3">Requested date</th>
+                <th className="px-4 py-3">Desired receive</th>
                 <th className="px-4 py-3 text-right">Total Products</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -156,14 +119,13 @@ export default function IncomingRequestsPage() {
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={6} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
                   ))
                 : filteredRows.map((r) => {
                     const meta = statusMeta(r.status);
-                    const isPending = normalizeStatus(r.status) === PR_STATUS.PENDING;
                     return (
                       <tr
                         key={r.id}
@@ -174,7 +136,10 @@ export default function IncomingRequestsPage() {
                         </td>
                         <td className="px-4 py-3 font-medium">{r.branchName}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {formatDate(r.createdAt)}
+                          {formatDateTime(r.submittedAt || r.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 text-[var(--admin-muted)]">
+                          {formatDate(r.desiredReceiveDate)}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{r.itemCount}</td>
                         <td className="px-4 py-3">
@@ -190,15 +155,6 @@ export default function IncomingRequestsPage() {
                             >
                               View Details
                             </Button>
-                            {isPending && (
-                              <Button
-                                className="!px-3 !py-1 !text-xs"
-                                loading={approvingId === r.id}
-                                onClick={() => quickApprove(r)}
-                              >
-                                Approve
-                              </Button>
-                            )}
                           </div>
                         </td>
                       </tr>

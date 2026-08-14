@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext.jsx';
-import { postLoginPath } from '../../lib/postLoginPath.js';
+import { isSafeReturnPath, postLoginPath } from '../../lib/postLoginPath.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -25,8 +25,7 @@ export default function LoginPage() {
     try {
       const user = await signIn({ username: form.username, password: form.password });
       const from = location.state?.from?.pathname;
-      const target =
-        from && from !== '/login' ? from : postLoginPath(user);
+      const target = isSafeReturnPath(from, user) ? from : postLoginPath(user);
       navigate(target, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -47,12 +46,6 @@ export default function LoginPage() {
               className="text-xs font-semibold uppercase tracking-[0.05em] text-[#45464d] transition-colors hover:text-[#0058be]"
             >
               Support
-            </a>
-            <a
-              href="#"
-              className="rounded-lg bg-[#0058be] px-6 py-1 text-xs font-semibold uppercase tracking-[0.05em] text-white transition-transform active:scale-[0.98]"
-            >
-              Sign up
             </a>
           </nav>
         </div>
@@ -251,15 +244,6 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in to ChainStore'}
             </button>
           </form>
-
-          <div className="mt-8 text-center">
-            <p className="text-sm text-[#45464d]">
-              Don't have an account?{' '}
-              <a href="#" className="ml-1 font-bold text-[#0058be] hover:underline">
-                Sign up now
-              </a>
-            </p>
-          </div>
         </div>
       </main>
 

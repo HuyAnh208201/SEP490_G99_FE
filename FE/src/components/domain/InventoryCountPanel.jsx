@@ -7,6 +7,7 @@ import { unitLabel } from '../../constants/productUnits.js';
 import { getFullCountSheet, submitCount } from '../../api/inventoryCount.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { isDemoIsEmail } from '../../lib/demoAccounts.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-24 rounded-lg border border-[var(--admin-border)] bg-white px-2 py-1.5 text-right text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -28,6 +29,7 @@ function pad2(n) {
 export default function InventoryCountPanel({ open, onClose }) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const confirmSave = useSaveConfirmation();
   const [now, setNow] = useState(() => new Date());
   const [sheet, setSheet] = useState(null);
   const [form, setForm] = useState({});
@@ -94,6 +96,14 @@ export default function InventoryCountPanel({ open, onClose }) {
     [products, form],
   );
   const remaining = products.length - countedTotal;
+  const varianceCount = useMemo(
+    () =>
+      products.filter((product) => {
+        const value = variance(product);
+        return value != null && value !== 0;
+      }).length,
+    [products, form],
+  );
 
   function setField(productId, key, value) {
     setForm((prev) => ({
@@ -131,6 +141,15 @@ export default function InventoryCountPanel({ open, onClose }) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function requestSubmit() {
+    const confirmed = await confirmSave({
+      title: 'Confirm inventory count',
+      message: `You are about to submit ${countedTotal} counted product(s).\n${varianceCount} product(s) have a variance from system stock.`,
+      confirmLabel: 'Yes, submit count',
+    });
+    if (confirmed) submit();
   }
 
   if (!open) return null;
@@ -293,7 +312,7 @@ export default function InventoryCountPanel({ open, onClose }) {
           className="ml-auto"
           loading={submitting}
           disabled={products.length === 0 || remaining > 0}
-          onClick={submit}
+          onClick={requestSubmit}
         >
           Submit count
         </Button>

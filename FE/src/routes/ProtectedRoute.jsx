@@ -2,6 +2,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { usePermissions } from '../contexts/PermissionsContext.jsx';
 import { normalizeWebRole } from '../constants/userRoles.js';
+import { postLoginPath } from '../lib/postLoginPath.js';
 
 export default function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth();
@@ -14,6 +15,7 @@ export default function ProtectedRoute({ children }) {
 }
 
 export function PermissionRoute({ permission, anyOf, roles, children }) {
+  const { user } = useAuth();
   const { loading, has, hasAny, role } = usePermissions();
 
   if (loading) {
@@ -37,14 +39,14 @@ export function PermissionRoute({ permission, anyOf, roles, children }) {
           Your account is not allowed to view this page.
         </p>
         <a
-          href="/dashboard"
+          href={postLoginPath(user)}
           onClick={(e) => {
             e.preventDefault();
-            window.location.assign('/dashboard');
+            window.location.assign(postLoginPath(user));
           }}
           className="mt-4 inline-block text-sm font-semibold text-[var(--admin-brand)] hover:underline"
         >
-          Back to dashboard
+          Back to home
         </a>
       </div>
     );

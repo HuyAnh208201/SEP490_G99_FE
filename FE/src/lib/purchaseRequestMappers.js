@@ -63,6 +63,7 @@ export function flattenConsolidated(branches = []) {
 export function toDraftPayload(payload) {
   return {
     notes: payload.reason?.trim() || null,
+    desiredReceiveDate: payload.desiredReceiveDate || null,
     items: (payload.items || []).map((it) => ({
       productId: Number(it.productId),
       requestedQty: Number(it.requestedQuantity) || 0,

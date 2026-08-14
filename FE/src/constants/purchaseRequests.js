@@ -30,12 +30,29 @@ export const PR_STATUS_META = {
   [PR_STATUS.CANCELLED]: { label: 'Cancelled', display: 'CANCELLED', tone: 'default', step: 0 },
 };
 
+/** Filter pills for list screens — default '' hides drafts (BE excludes DRAFT when status is empty). */
+const PR_FILTER_STATUS_ORDER = [
+  PR_STATUS.PENDING,
+  PR_STATUS.APPROVED,
+  PR_STATUS.AWAITING_STOCK,
+  PR_STATUS.DISPATCHING,
+  PR_STATUS.IN_TRANSIT,
+  PR_STATUS.RECEIVED,
+  PR_STATUS.DRAFT,
+  PR_STATUS.CANCELLED,
+];
+
 export const PR_STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
-  ...Object.values(PR_STATUS).map((value) => ({
+  { value: '', label: 'Active requests' },
+  ...PR_FILTER_STATUS_ORDER.map((value) => ({
     value,
     label: PR_STATUS_META[value].label,
   })),
+];
+
+/** Warehouse Incoming Requests — default Pending; other screens track later statuses. */
+export const WM_INCOMING_STATUS_OPTIONS = [
+  { value: PR_STATUS.PENDING, label: PR_STATUS_META[PR_STATUS.PENDING].label },
 ];
 
 export function normalizeStatus(status) {

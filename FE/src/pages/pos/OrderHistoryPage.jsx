@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { formatVnd } from '../../lib/money.js';
-import { usePosCart } from '../../contexts/PosCartContext.jsx';
 import { fetchOrdersPage, requestRefund } from '../../api/posOrders.js';
+import { openReceiptPdf } from '../../lib/posReceiptPdf.js';
 import Modal from '../../components/ui/Modal.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PosPageTitle from './components/PosPageTitle.jsx';
@@ -94,11 +94,11 @@ export default function OrderHistoryPage() {
       await requestRefund(refundOrder.id, reason);
       setRefundOrder(null);
       setRefundReason('');
-      setRefundNotice('Refund requested — pending manager approval.');
+      setRefundNotice('Refund completed. Stock and loyalty points were adjusted automatically.');
       const result = await loadOrderHistory();
       if (!result.ok) setError(result.message);
     } catch (err) {
-      setRefundError(err?.message || 'Could not request the refund.');
+      setRefundError(err?.message || 'Could not complete the refund.');
     } finally {
       setRefundSubmitting(false);
     }
@@ -117,11 +117,16 @@ export default function OrderHistoryPage() {
     name: line.productName,
     qty: line.quantity,
     unitPrice: Number(line.unitPrice),
+    refundable: line.refundable !== false,
   }));
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
       <PosPageTitle title="Order History" />
+
+      <p className="mb-4 text-xs text-[var(--admin-muted)]">
+        Showing invoices from the current shift only.
+      </p>
 
       {location.state?.completedInvoice && (
         <div className="mb-4 rounded-xl border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 px-4 py-3 text-sm text-[var(--admin-success)]">
@@ -217,6 +222,10 @@ export default function OrderHistoryPage() {
                       <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                         Refunded
                       </span>
+                    ) : order.refundable === false ? (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                        Non-refundable
+                      </span>
                     ) : (() => {
                       const remainingMs =
                         new Date(order.createdAt).getTime() + REFUND_WINDOW_MS - now;
@@ -231,7 +240,7 @@ export default function OrderHistoryPage() {
                           }}
                           className="inline-flex items-center gap-1 rounded-lg border border-[var(--admin-brand)] bg-white px-2.5 py-1 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
                         >
-                          Request refund
+                          Refund
                           <span className="tabular-nums text-[var(--admin-subtle)]">
                             {formatCountdown(remainingMs)}
                           </span>
@@ -271,7 +280,7 @@ export default function OrderHistoryPage() {
               <dl className="mt-4 space-y-2.5 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Invoice ID</dt><dd className="font-semibold">{selected.invoiceCode}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Date & Time</dt><dd className="text-right">{formatWhen(selected.createdAt)}</dd></div>
-                <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Cashier</dt><dd>Current Cashier</dd></div>
+                <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Cashier</dt><dd>{selected.cashierName || '—'}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Customer</dt><dd>{selected.customerName || 'Walk-in'}</dd></div>
                 <div className="flex justify-between gap-3"><dt className="text-[var(--admin-subtle)]">Payment Method</dt><dd>{selected.paymentMethod}</dd></div>
                 {(selected.pointsRedeemed > 0 || selected.pointsEarned > 0) && (
@@ -312,6 +321,15 @@ export default function OrderHistoryPage() {
                         <p className="text-xs text-[var(--admin-subtle)]">
                           {line.qty} × {formatVnd(line.unitPrice)}
                         </p>
+                        <span
+                          className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            line.refundable
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {line.refundable ? 'Refundable' : 'Non-refundable'}
+                        </span>
                       </div>
                       <span className="shrink-0 font-semibold">{formatVnd(line.qty * line.unitPrice)}</span>
                     </div>
@@ -349,6 +367,12 @@ export default function OrderHistoryPage() {
 
               <button
                 type="button"
+                onClick={() => {
+                  if (!selected) return;
+                  openReceiptPdf(selected).catch((err) => {
+                    setError(err?.message || 'Could not generate the receipt.');
+                  });
+                }}
                 className="w-full rounded-lg border border-[var(--admin-brand)] bg-white px-4 py-2.5 text-sm font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/5"
               >
                 Reprint Receipt
@@ -361,7 +385,7 @@ export default function OrderHistoryPage() {
       <Modal
         open={Boolean(refundOrder)}
         onClose={closeRefund}
-        title="Request refund"
+        title="Confirm refund"
         description={
           refundOrder
             ? `Invoice ${refundOrder.invoiceCode} · ${formatVnd(refundOrder.total)}`
@@ -377,15 +401,15 @@ export default function OrderHistoryPage() {
               loading={refundSubmitting}
               disabled={refundSubmitting || !refundReason.trim()}
             >
-              Submit request
+              Confirm refund
             </Button>
           </div>
         }
       >
         <div className="space-y-3">
           <p className="text-sm text-[var(--admin-muted)]">
-            This will send the order to your branch manager for approval. Refunds are only
-            allowed within 5 minutes of checkout.
+            This immediately refunds the full order, restores stock, and adjusts loyalty
+            points. Refunds are only allowed within 5 minutes of checkout.
           </p>
           <label className="block text-sm">
             <span className="mb-1 block font-medium text-[var(--admin-text)]">

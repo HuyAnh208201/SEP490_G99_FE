@@ -37,8 +37,8 @@ export async function listApprovedRequestsPage(params = {}) {
 }
 
 /** Tạo lô vận chuyển cho một yêu cầu đã duyệt. */
-export async function createDispatchOrder({ requestId, supplierIds }) {
-  const payload = { requestId };
+export async function createDispatchOrder({ requestId, supplierIds, shipperName, shipperPhone }) {
+  const payload = { requestId, shipperName, shipperPhone };
   if (Array.isArray(supplierIds) && supplierIds.length > 0) {
     payload.supplierIds = supplierIds;
   }

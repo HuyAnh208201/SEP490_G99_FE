@@ -15,11 +15,13 @@ import DispatchOrderDetailModal from './components/DispatchOrderDetailModal.jsx'
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function DispatchOrdersPage() {
+  const confirmSave = useSaveConfirmation();
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -46,6 +48,12 @@ export default function DispatchOrdersPage() {
   async function applyStatus(order) {
     const next = draftStatus[order.id];
     if (!next || normalizeDispatchStatus(order.status) === next) return;
+    const confirmed = await confirmSave({
+      title: 'Confirm dispatch status',
+      message: `Change ${order.dispatchNumber || 'this dispatch order'} status to ${dispatchStatusMeta(next).label}?`,
+      confirmLabel: 'Yes, update status',
+    });
+    if (!confirmed) return;
     setUpdatingId(order.id);
     setActionError('');
     try {

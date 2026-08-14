@@ -16,6 +16,7 @@ export async function initiateForgotPassword({ contactInfo }) {
   try {
     const { data: body } = await http.post('/auth/forgot-password/initiate', {
       contactInfo,
+      frontendBaseUrl: window.location.origin,
     });
     if (!body?.success) {
       throw new Error(body?.message || 'Unable to send the password reset request');

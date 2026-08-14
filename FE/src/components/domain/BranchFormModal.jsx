@@ -12,6 +12,7 @@ import Button from '../ui/Button.jsx';
 import FormField from '../ui/FormField.jsx';
 import OperatingHoursPicker from '../ui/OperatingHoursPicker.jsx';
 import VietnamAddressPicker from '../ui/VietnamAddressPicker.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const EMPTY_ADDRESS = { street: '', provinceId: '', districtId: '' };
 const EMPTY_HOURS = { open: '08:00', close: '22:00' };
@@ -27,6 +28,7 @@ function fieldErrors(err) {
 }
 
 export default function BranchFormModal({ open, onClose, onSaved, editing }) {
+  const confirmSave = useSaveConfirmation();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState(EMPTY_ADDRESS);
@@ -69,6 +71,15 @@ export default function BranchFormModal({ open, onClose, onSaved, editing }) {
       setError(hoursError);
       return;
     }
+
+    const confirmed = await confirmSave({
+      title: editing ? 'Confirm branch changes' : 'Confirm new branch',
+      message: editing
+        ? `Save the changes to ${name.trim() || 'this branch'}?`
+        : `Create ${name.trim() || 'this branch'} and make it available in the system?`,
+      confirmLabel: editing ? 'Yes, save changes' : 'Yes, create branch',
+    });
+    if (!confirmed) return;
 
     setSaving(true);
     const payload = {

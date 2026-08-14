@@ -15,7 +15,6 @@ import {
 import {
   checkout as apiCheckout,
   fetchOrders as apiFetchOrders,
-  lookupVoucher as apiLookupVoucher,
 } from '../api/posOrders.js';
 import { scanBarcode as apiScanBarcode } from '../api/barcode.js';
 import { normalizePhone, validateVnPhone } from '../lib/validation.js';
@@ -54,19 +53,7 @@ function calcTotals(state) {
   }
 
   const promoSavings = subtotalOriginal - subtotalAfterPromo;
-  let afterPromo = subtotalAfterPromo;
-
-  // Voucher lấy từ BE (GET /pos/orders/vouchers/{code}); đây chỉ là bản xem trước,
-  // server tính lại con số cuối cùng lúc chốt đơn.
-  let codeDiscount = 0;
-  const voucher = state.appliedVoucher;
-  if (voucher) {
-    codeDiscount = voucher.discountType === 'PERCENT'
-      ? Math.round((afterPromo * Number(voucher.discountValue)) / 100)
-      : Number(voucher.discountValue);
-    codeDiscount = Math.min(codeDiscount, afterPromo);
-    afterPromo -= codeDiscount;
-  }
+  const afterPromo = subtotalAfterPromo;
 
   const { vndPerPoint, pointValueVnd } = state.loyalty ?? DEFAULT_LOYALTY;
   const maxPoints = state.customer?.points ?? 0;
@@ -82,7 +69,7 @@ function calcTotals(state) {
     subtotalOriginal,
     subtotalAfterPromo,
     promoSavings,
-    codeDiscount,
+    codeDiscount: 0,
     pointsUsed: Math.floor(cappedPointsDiscount / pointValueVnd),
     pointsDiscount: cappedPointsDiscount,
     total,
@@ -100,10 +87,6 @@ export function PosCartProvider({ children }) {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   /** Chốt đơn là thao tác ghi DB — ref chặn double-click chắc hơn state. */
   const checkoutInFlight = useRef(false);
-  const [discountCodeInput, setDiscountCodeInput] = useState('');
-  const [appliedVoucher, setAppliedVoucher] = useState(null);
-  const [discountCodeError, setDiscountCodeError] = useState('');
-  const [discountCodeBusy, setDiscountCodeBusy] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [orderHistory, setOrderHistory] = useState([]);
   const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
@@ -130,12 +113,11 @@ export function PosCartProvider({ children }) {
     () =>
       calcTotals({
         lines,
-        appliedVoucher,
         customer,
         pointsToRedeem,
         loyalty,
       }),
-    [lines, appliedVoucher, customer, pointsToRedeem, loyalty],
+    [lines, customer, pointsToRedeem, loyalty],
   );
 
   const addProduct = useCallback((product, qty = 1) => {
@@ -253,9 +235,6 @@ export function PosCartProvider({ children }) {
     setCustomer(null);
     setCustomerPhone('');
     setCustomerLookupError('');
-    setDiscountCodeInput('');
-    setAppliedVoucher(null);
-    setDiscountCodeError('');
     setPointsToRedeem(0);
   }, []);
 
@@ -334,39 +313,6 @@ export function PosCartProvider({ children }) {
     }
   }, []);
 
-  const applyDiscountCode = useCallback(async () => {
-    const code = discountCodeInput.trim().toUpperCase();
-    if (!code) {
-      setAppliedVoucher(null);
-      setDiscountCodeError('');
-      return { ok: true };
-    }
-    if (!/^[A-Z0-9_-]{1,64}$/.test(code)) {
-      setAppliedVoucher(null);
-      setDiscountCodeError('Discount code format is invalid.');
-      return { ok: false };
-    }
-    setDiscountCodeBusy(true);
-    try {
-      const voucher = await apiLookupVoucher(code);
-      setAppliedVoucher(voucher);
-      setDiscountCodeError('');
-      return { ok: true, voucher };
-    } catch (error) {
-      setAppliedVoucher(null);
-      setDiscountCodeError(error.message || 'Invalid or expired discount code');
-      return { ok: false };
-    } finally {
-      setDiscountCodeBusy(false);
-    }
-  }, [discountCodeInput]);
-
-  const clearDiscountCode = useCallback(() => {
-    setDiscountCodeInput('');
-    setAppliedVoucher(null);
-    setDiscountCodeError('');
-  }, []);
-
   const loadOrderHistory = useCallback(async (range) => {
     setOrderHistoryLoading(true);
     try {
@@ -405,7 +351,6 @@ export function PosCartProvider({ children }) {
           cashReceived: paymentMethod === 'CASH' ? receivedAmount : null,
           customerPhone: customer?.phone ? normalizePhone(customer.phone) : null,
           customerName: null,
-          voucherCode: appliedVoucher?.code ?? null,
           // pointsUsed đã bị chặn trên theo tổng đơn, không phải số thô cashier gõ.
           pointsToRedeem: totals.pointsUsed,
         });
@@ -425,7 +370,7 @@ export function PosCartProvider({ children }) {
         setCheckoutBusy(false);
       }
     },
-    [lines, totals, customer, appliedVoucher, clearCart],
+    [lines, totals, customer, clearCart],
   );
 
   /**
@@ -450,7 +395,6 @@ export function PosCartProvider({ children }) {
         cashReceived: null,
         customerPhone: customer?.phone ?? null,
         customerName: null,
-        voucherCode: appliedVoucher?.code ?? null,
         pointsToRedeem: totals.pointsUsed,
       });
       return { ok: true, order };
@@ -460,7 +404,7 @@ export function PosCartProvider({ children }) {
       checkoutInFlight.current = false;
       setCheckoutBusy(false);
     }
-  }, [lines, totals, customer, appliedVoucher]);
+  }, [lines, totals, customer]);
 
   /** payOS báo PAID → đưa đơn vào lịch sử và dọn giỏ cho khách tiếp theo. */
   const finishPayOSOrder = useCallback(
@@ -482,11 +426,6 @@ export function PosCartProvider({ children }) {
       customerLookupError,
       customerBusy,
       checkoutBusy,
-      discountCodeInput,
-      setDiscountCodeInput,
-      appliedVoucher,
-      discountCodeError,
-      discountCodeBusy,
       pointsToRedeem,
       setPointsToRedeem,
       totals,
@@ -504,8 +443,6 @@ export function PosCartProvider({ children }) {
       lookupCustomerByPhone,
       selectCustomer,
       clearCustomer,
-      applyDiscountCode,
-      clearDiscountCode,
       completeCashPayment,
       createPayOSOrder,
       finishPayOSOrder,
@@ -517,10 +454,6 @@ export function PosCartProvider({ children }) {
       customerLookupError,
       customerBusy,
       checkoutBusy,
-      discountCodeInput,
-      appliedVoucher,
-      discountCodeError,
-      discountCodeBusy,
       pointsToRedeem,
       totals,
       orderHistory,
@@ -537,8 +470,6 @@ export function PosCartProvider({ children }) {
       selectCustomer,
       clearCustomer,
       setCustomerPhoneDraft,
-      applyDiscountCode,
-      clearDiscountCode,
       completeCashPayment,
       createPayOSOrder,
       finishPayOSOrder,

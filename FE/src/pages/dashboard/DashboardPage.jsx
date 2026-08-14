@@ -2,7 +2,6 @@ import { Navigate } from 'react-router-dom';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { normalizeWebRole } from '../../constants/userRoles.js';
 import Card from '../../components/ui/Card.jsx';
-import AdminDashboard from './AdminDashboard.jsx';
 import DirectorDashboard from './DirectorDashboard.jsx';
 import BranchManagerDashboard from './BranchManagerDashboard.jsx';
 import WarehouseDashboard from './WarehouseDashboard.jsx';
@@ -19,8 +18,8 @@ export default function DashboardPage() {
     return <Navigate to="/catalog/products" replace />;
   }
 
-  if (webRole === 'ADMIN' && has('ADMIN_DASHBOARD')) {
-    return <AdminDashboard />;
+  if (webRole === 'ADMIN') {
+    return <Navigate to="/users" replace />;
   }
   if (webRole === 'DIRECTOR' && has('DIRECTOR_DASHBOARD')) {
     return <DirectorDashboard />;

@@ -71,6 +71,17 @@ export default function ShiftHistoryPage() {
                     <p className="text-xs text-[var(--admin-muted)]">
                       Opened {formatDateTime(row.openedAt)} · Closed {formatDateTime(row.closedAt)}
                     </p>
+                    <p className="mt-1 text-xs text-[var(--admin-muted)]">
+                      Opening fund: {Number(row.openingFundAmount ?? 0).toLocaleString('en-US')} VND
+                      {row.openingFundReceivedFromName ? ` · From ${row.openingFundReceivedFromName}` : ''}
+                      {row.openingFundMethod ? ` · ${row.openingFundMethod === 'TRANSFER' ? 'Transfer' : 'Cash'}` : ''}
+                    </p>
+                    {row.handoverToEmployeeName ? (
+                      <p className="mt-1 text-xs text-[var(--admin-muted)]">
+                        Handed over to {row.handoverToEmployeeName}
+                        {row.actualCash != null ? ` · Actual cash ${Number(row.actualCash).toLocaleString('en-US')} VND` : ''}
+                      </p>
+                    ) : null}
                   </div>
                   <Badge tone={STATUS_TONE[row.status] || 'default'}>{row.status}</Badge>
                 </li>

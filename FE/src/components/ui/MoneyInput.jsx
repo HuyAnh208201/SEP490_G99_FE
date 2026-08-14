@@ -4,7 +4,7 @@ import { formatMoneyInput, normalizeVndInput, parseMoneyInput } from '../../lib/
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white py-2.5 pl-3 pr-10 text-sm tabular-nums focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
-export default function MoneyInput({ value, onChange, placeholder = '0', required, id, name, hint }) {
+export default function MoneyInput({ value, onChange, placeholder = '0', required, disabled, id, name, hint }) {
   const [display, setDisplay] = useState(() => formatMoneyInput(value));
 
   useEffect(() => {
@@ -36,11 +36,12 @@ export default function MoneyInput({ value, onChange, placeholder = '0', require
         inputMode="decimal"
         autoComplete="off"
         required={required}
+        disabled={disabled}
         value={display}
         onChange={handleChange}
         onBlur={handleBlur}
         placeholder={placeholder}
-        className={inputClass}
+        className={`${inputClass} disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500`}
       />
       <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-[var(--admin-subtle)]">
         ₫

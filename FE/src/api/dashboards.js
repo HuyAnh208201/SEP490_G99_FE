@@ -9,11 +9,6 @@ function unwrap(body) {
   return body.data;
 }
 
-export async function fetchAdminDashboard() {
-  const { data } = await http.get('/admin/dashboard');
-  return unwrap(data);
-}
-
 export async function fetchDirectorDashboard({ from, to } = {}) {
   const { data } = await http.get('/director/dashboard', {
     params: { from, to },
@@ -28,7 +23,7 @@ export async function fetchBranchManagerDashboard({ from, to } = {}) {
   return unwrap(data);
 }
 
-export async function fetchWarehouseDashboard() {
-  const { data } = await http.get('/warehouse/dashboard');
+export async function fetchWarehouseDashboard({ from, to } = {}) {
+  const { data } = await http.get('/warehouse/dashboard', { params: { from, to } });
   return unwrap(data);
 }

@@ -10,6 +10,7 @@ import {
   fetchReconciliationDetail,
 } from '../../api/shiftSessions.js';
 import { formatDateTime } from '../../lib/datetime.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 function formatMoney(value) {
   const n = Number(value ?? 0);
@@ -31,6 +32,7 @@ const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] px-3 py-2 text-sm outline-none transition focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[var(--admin-brand)]/15';
 
 export default function CashReconciliationReviewPage() {
+  const confirmSave = useSaveConfirmation();
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const [detail, setDetail] = useState(null);
@@ -61,6 +63,15 @@ export default function CashReconciliationReviewPage() {
       setError('Manager note is required when rejecting.');
       return;
     }
+    const confirmed = await confirmSave({
+      title: approved ? 'Confirm reconciliation approval' : 'Confirm reconciliation rejection',
+      message: approved
+        ? 'Approve this cash discrepancy and save the manager decision?'
+        : 'Reject this cash discrepancy with the entered manager note?',
+      confirmLabel: approved ? 'Yes, approve' : 'Yes, reject',
+      danger: !approved,
+    });
+    if (!confirmed) return;
     setBusy(approved ? 'approve' : 'reject');
     setError('');
     try {

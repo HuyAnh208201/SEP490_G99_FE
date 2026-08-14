@@ -1,132 +1,60 @@
-import { useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
-import { formatDateTime } from '../../../lib/datetime.js';
+import { formatDate, formatDateTime } from '../../../lib/datetime.js';
 import { formatVnd } from '../../../lib/money.js';
 import { unitLabel } from '../../../constants/productUnits.js';
-import { PO_STATUS, poStatusMeta, normalizePoStatus } from '../../../constants/purchaseOrders.js';
-import { receivePurchaseOrder, cancelPurchaseOrder } from '../../../api/purchaseOrders.js';
+import { poStatusMeta } from '../../../constants/purchaseOrders.js';
 
-export default function PurchaseOrderDetailModal({ open, onClose, order, onChanged }) {
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-
+export default function PurchaseOrderDetailModal({ open, onClose, order }) {
   if (!order) return null;
   const meta = poStatusMeta(order.status);
-  const isOrdered = normalizePoStatus(order.status) === PO_STATUS.ORDERED;
-
-  async function run(action, fn) {
-    setBusy(action);
-    setError('');
-    try {
-      await fn(order.id);
-      onChanged?.();
-      onClose();
-    } catch (err) {
-      setError(err?.message || 'Action failed');
-    } finally {
-      setBusy('');
-    }
-  }
+  const total = (order.items || []).reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0,
+  );
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`Purchase Order ${order.orderNumber || ''}`}
-      description="Supplier order to replenish central warehouse stock."
-      size="xl"
-    >
+    <Modal open={open} onClose={onClose} title={`Supplier Receipt ${order.orderNumber || ''}`} description="Immutable receiving record and central-stock update evidence." size="xl">
       <div className="space-y-5">
-        <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-4">
+        <div className="grid gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <Info label="Supplier" value={order.supplierName || '—'} />
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-              Status
-            </p>
-            <Badge tone={meta.tone} className="mt-1">
-              {meta.display}
-            </Badge>
-          </div>
-          <Info label="Created" value={formatDateTime(order.createdAt)} />
-          <Info label="Received" value={order.receivedAt ? formatDateTime(order.receivedAt) : '—'} />
-          {order.notes && <Info label="Notes" value={order.notes} />}
+          <Info label="Supplier delivery date" value={formatDate(order.supplierDeliveryDate)} />
+          <Info label="Supplier document" value={order.supplierDocumentNumber || '—'} />
+          <div><Label>Status</Label><Badge tone={meta.tone} className="mt-1">{meta.display}</Badge></div>
+          <Info label="Delivered by" value={order.deliveredByName || '—'} />
+          <Info label="Delivery phone" value={order.deliveredByPhone || '—'} />
+          <Info label="Received by" value={order.receivedByName || '—'} />
+          <Info label="Received at" value={formatDateTime(order.receivedAt)} />
+          {order.notes && <div className="sm:col-span-2 lg:col-span-4"><Info label="Notes" value={order.notes} /></div>}
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-[var(--admin-border)]">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-              <tr>
-                <th className="px-4 py-2">Product</th>
-                <th className="px-4 py-2">Unit</th>
-                <th className="px-4 py-2 text-right">Quantity</th>
-                <th className="px-4 py-2 text-right">Unit price</th>
-                <th className="px-4 py-2 text-right">Line total</th>
+            <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase text-[var(--admin-subtle)]"><tr><th className="px-4 py-2">Product</th><th className="px-4 py-2">Smallest unit / conversion</th><th className="px-4 py-2 text-right">Import qty</th><th className="px-4 py-2 text-right">Base qty</th><th className="px-4 py-2 text-right">Import price</th><th className="px-4 py-2 text-right">Total</th></tr></thead>
+            <tbody>{(order.items || []).map((item) => (
+              <tr key={item.productId} className="border-t border-[var(--admin-border)]">
+                <td className="px-4 py-2"><strong>{item.productName}</strong><div className="font-mono text-xs text-[var(--admin-muted)]">{item.productCode}</div></td>
+                <td className="px-4 py-2 text-[var(--admin-muted)]">{unitLabel(item.unit)} · 1 {item.importUnit || 'import unit'} = {item.conversionQty || 1} {unitLabel(item.unit)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{item.quantity}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{item.quantityBase ?? (Number(item.quantity) || 0) * (Number(item.conversionQty) || 1)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{item.unitPrice == null ? '—' : formatVnd(item.unitPrice)}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{formatVnd((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}</td>
               </tr>
-            </thead>
-            <tbody>
-              {(order.items || []).map((it) => (
-                <tr key={it.productId} className="border-t border-[var(--admin-border)]">
-                  <td className="px-4 py-2">
-                    <div className="font-medium text-[var(--admin-text)]">{it.productName}</div>
-                    <div className="font-mono text-xs text-[var(--admin-subtle)]">
-                      {it.productCode}
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-[var(--admin-muted)]">{unitLabel(it.unit)}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">{it.quantity}</td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {it.unitPrice != null ? formatVnd(it.unitPrice) : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-right tabular-nums">
-                    {it.unitPrice != null
-                      ? formatVnd((Number(it.quantity) || 0) * (Number(it.unitPrice) || 0))
-                      : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            ))}</tbody>
+            <tfoot><tr className="border-t bg-[#f7f9fb] font-semibold"><td className="px-4 py-2" colSpan={5}>Receipt value</td><td className="px-4 py-2 text-right">{formatVnd(total)}</td></tr></tfoot>
           </table>
         </div>
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-          {isOrdered && (
-            <>
-              <Button
-                variant="secondary"
-                loading={busy === 'cancel'}
-                onClick={() => run('cancel', cancelPurchaseOrder)}
-              >
-                Cancel order
-              </Button>
-              <Button loading={busy === 'receive'} onClick={() => run('receive', receivePurchaseOrder)}>
-                Receive into warehouse
-              </Button>
-            </>
-          )}
-        </div>
+        <div className="flex justify-end"><Button variant="secondary" onClick={onClose}>Close</Button></div>
       </div>
     </Modal>
   );
 }
 
+function Label({ children }) {
+  return <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">{children}</p>;
+}
+
 function Info({ label, value }) {
-  return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-[var(--admin-text)]">{value}</p>
-    </div>
-  );
+  return <div><Label>{label}</Label><p className="mt-1 text-sm font-medium text-[var(--admin-text)]">{value || '—'}</p></div>;
 }

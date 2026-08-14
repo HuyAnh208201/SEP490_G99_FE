@@ -4,7 +4,7 @@ export function toPosProduct(product) {
     id: product.id,
     barcode: product.barcode,
     code: product.code,
-    name: product.name,
+    name: product.name || product.productName || product.code || 'Unnamed product',
     description: product.description ?? null,
     unit: product.unit,
     price: Number(product.defaultSalePrice),
@@ -13,6 +13,7 @@ export function toPosProduct(product) {
     imageUrl: product.imageUrl ?? null,
     categoryId: product.categoryId,
     category: product.categoryName ?? 'Uncategorized',
+    refundable: product.refundable !== false,
     // products table hiện chưa có NSX/HSD — giữ null để UI chỉ hiện khi DB bổ sung sau.
     manufacturedAt: product.manufacturedAt ?? product.manufactureDate ?? null,
     expiryDate: product.expiryDate ?? product.expiredAt ?? null,

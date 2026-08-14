@@ -28,11 +28,13 @@ import {
   timeOf,
   toDdMmYyyy,
 } from './shifts/shiftGrid.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function ShiftsPage() {
+  const confirmSave = useSaveConfirmation();
   const [branchId, setBranchId] = useState(null);
   const [operatingHours, setOperatingHours] = useState('08:00 - 22:00');
   const [weekStart, setWeekStart] = useState(() => mondayOf());
@@ -168,7 +170,7 @@ export default function ShiftsPage() {
       if (shift?.status === 'PUBLISHED') return;
 
       const cashiers = (shift?.assignedEmployees || [])
-        .filter((e) => e.role === 'CASHIER')
+        .filter((e) => e.role === 'CASHIER' && e.role !== 'CUSTOMER')
         .map((e) => e.employeeId);
       const inventory = (shift?.assignedEmployees || [])
         .filter((e) => e.role === 'INVENTORY_STAFF')
@@ -217,7 +219,7 @@ export default function ShiftsPage() {
         if (cancelled) return;
 
         const assignedCashiers = (assignCtx.shift?.assignedEmployees || []).filter(
-          (e) => e.role === 'CASHIER',
+          (e) => e.role === 'CASHIER' && e.role !== 'CUSTOMER',
         );
         const assignedIs = (assignCtx.shift?.assignedEmployees || []).filter(
           (e) => e.role === 'INVENTORY_STAFF',
@@ -239,7 +241,10 @@ export default function ShiftsPage() {
           return [...map.values()];
         };
 
-        setAvailableCashiers(merge(cashiers, assignedCashiers));
+        setAvailableCashiers(merge(
+          (cashiers || []).filter((e) => e.role === 'CASHIER'),
+          assignedCashiers,
+        ));
         setAvailableIs(merge(inventory, assignedIs));
         setAvailableLoaded(true);
       } catch (err) {
@@ -285,6 +290,15 @@ export default function ShiftsPage() {
       setAssignError(`Each shift can have at most ${MAX_EMPLOYEES_PER_SHIFT} employees.`);
       return;
     }
+    const confirmed = await confirmSave({
+      title: total === 0 ? 'Confirm slot clearing' : 'Confirm shift assignments',
+      message:
+        total === 0
+          ? 'Clear all employee assignments from this shift slot?'
+          : `Save ${total} employee assignment(s) to this shift slot as a draft?`,
+      confirmLabel: total === 0 ? 'Yes, clear slot' : 'Yes, save assignments',
+    });
+    if (!confirmed) return;
     setAssignError('');
     setBusy('assign');
     try {
@@ -397,7 +411,7 @@ export default function ShiftsPage() {
       if (responseWeekStart !== weekStart) {
         applyWeekStart(responseWeekStart);
       }
-      setSetupCashiers(data?.cashiers || []);
+      setSetupCashiers((data?.cashiers || []).filter((e) => e.role === 'CASHIER'));
       setSetupInventory(data?.inventoryStaff || []);
       setAvailableCashiers(data?.cashiers || []);
       setAvailableIs(data?.inventoryStaff || []);

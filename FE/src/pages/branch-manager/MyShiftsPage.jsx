@@ -17,6 +17,7 @@ import {
   toDdMmYyyy,
   toLocalDateStr,
 } from './shifts/shiftGrid.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -30,6 +31,7 @@ function isCheckedInForUser(shift, userId) {
 }
 
 export default function MyShiftsPage() {
+  const confirmSave = useSaveConfirmation();
   const [userId, setUserId] = useState(null);
   const [branchId, setBranchId] = useState(null);
   const [operatingHours, setOperatingHours] = useState('08:00 - 22:00');
@@ -123,6 +125,12 @@ export default function MyShiftsPage() {
   }, [rows, today]);
 
   async function handleCheckIn(shift) {
+    const confirmed = await confirmSave({
+      title: 'Confirm shift check-in',
+      message: `Check in to the shift starting at ${formatDateTime(shift.startTime)}?`,
+      confirmLabel: 'Yes, check in',
+    });
+    if (!confirmed) return;
     setBusyId(shift.id);
     setError('');
     try {

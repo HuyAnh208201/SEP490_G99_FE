@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { usePermissions } from '../contexts/PermissionsContext.jsx';
 import { normalizeWebRole } from '../constants/userRoles.js';
+import { postLoginPath } from '../lib/postLoginPath.js';
 
 /** POS shell — cashiers only. */
 export default function PosRoute({ children }) {
@@ -19,7 +20,7 @@ export default function PosRoute({ children }) {
   }
 
   if (webRole !== 'CASHIER') {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={postLoginPath(user)} replace />;
   }
 
   return children;

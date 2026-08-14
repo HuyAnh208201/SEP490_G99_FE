@@ -19,12 +19,10 @@ export const ROLE_LABELS = {
 const WEB_ASSIGNABLE = [
   'ADMIN',
   'DIRECTOR',
-  'PROMOTION_DIRECTOR',
   'WAREHOUSE_MANAGER',
   'BRANCH_MANAGER',
   'INVENTORY_STAFF',
   'CASHIER',
-  'CUSTOMER',
 ];
 
 /** Map legacy / alias roles to web dashboard role. */

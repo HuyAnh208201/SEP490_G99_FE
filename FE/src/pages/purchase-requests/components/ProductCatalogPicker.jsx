@@ -167,9 +167,8 @@ export default function ProductCatalogPicker({
             onChange={(e) => onStockSortChange?.(e.target.value)}
             className={inputClass}
           >
-            <option value="">Default (name)</option>
-            <option value="desc">Stock: high to low</option>
             <option value="asc">Stock: low to high</option>
+            <option value="desc">Stock: high to low</option>
           </select>
         </label>
         <label className="flex h-[38px] items-center gap-2 rounded-lg border border-[var(--admin-border)] bg-white px-3 text-sm text-[var(--admin-text)]">
@@ -202,7 +201,7 @@ export default function ProductCatalogPicker({
           Add suggested ({addSuggestedCount})
         </Button>
         <p className="text-xs text-[var(--admin-subtle)]">
-          Adds all low-stock items to reach suggested shelf qty.
+          Adds low-stock and high sell-through items in priority order.
         </p>
       </div>
 
@@ -295,6 +294,12 @@ export default function ProductCatalogPicker({
                           {p.barcode ? ` · ${p.barcode}` : ''}
                           {p.categoryName ? ` · ${p.categoryName}` : ''}
                         </div>
+                        {p.priorityReason ? (
+                          <div className="mt-1 text-[11px] font-medium text-[#0058be]">
+                            {p.priorityReason}
+                            {p.soldLast30Days != null ? ` · Sold 30d: ${p.soldLast30Days}` : ''}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 text-[var(--admin-muted)]">{unitLabel(p.unit)}</td>
                       <td

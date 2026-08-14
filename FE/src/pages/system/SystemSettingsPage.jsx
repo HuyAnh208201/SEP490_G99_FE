@@ -9,6 +9,7 @@ import {
   updateMembershipTier,
   updateShortDateCategories,
 } from '../../api/systemSettings.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm text-[var(--admin-text)] focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
@@ -44,6 +45,7 @@ function formatRange(tier) {
 }
 
 export default function SystemSettingsPage() {
+  const confirmSave = useSaveConfirmation();
   const [tiers, setTiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -111,6 +113,12 @@ export default function SystemSettingsPage() {
   }
 
   async function handleSaveShortDate() {
+    const confirmed = await confirmSave({
+      title: 'Confirm short-date settings',
+      message: `Save short-date flags for ${selectedShortDateIds.length} categor${selectedShortDateIds.length === 1 ? 'y' : 'ies'}? This may clear central inventory for affected products.`,
+      confirmLabel: 'Yes, save settings',
+    });
+    if (!confirmed) return;
     setShortDateSaving(true);
     setShortDateMessage('');
     setError('');
@@ -130,6 +138,12 @@ export default function SystemSettingsPage() {
   async function handleSave(e) {
     e.preventDefault();
     if (!editingId) return;
+    const confirmed = await confirmSave({
+      title: 'Confirm membership tier changes',
+      message: `Save the updated rules for ${form.name.trim() || editingTier?.code || 'this tier'}?`,
+      confirmLabel: 'Yes, save tier',
+    });
+    if (!confirmed) return;
     setSaving(true);
     setError('');
     try {

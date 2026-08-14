@@ -14,12 +14,14 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import DashboardKpiGrid from '../../components/dashboard/DashboardKpiGrid.jsx';
 import DashboardQuickLinks from '../../components/dashboard/DashboardQuickLinks.jsx';
+import { formatVnd } from '../../lib/money.js';
+import { formatDateTime } from '../../lib/datetime.js';
 
 const SHORTCUTS = [
   { to: '/warehouse/incoming-requests', label: 'Incoming requests' },
   { to: '/warehouse/dispatch-planning', label: 'Dispatch planning' },
   { to: '/warehouse/dispatch', label: 'Dispatch orders' },
-  { to: '/warehouse/purchase-orders', label: 'Purchase orders' },
+  { to: '/warehouse/purchase-orders', label: 'Supplier receipts' },
   { to: '/catalog/products', label: 'Central stock' },
   { to: '/catalog/suppliers', label: 'Suppliers' },
 ];
@@ -35,11 +37,21 @@ export default function WarehouseDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [period, setPeriod] = useState('month');
+  const [anchor, setAnchor] = useState(() => new Date().toISOString().slice(0, 7));
+
+  const [year, month] = anchor.split('-').map(Number);
+  const startMonth = period === 'quarter' ? Math.floor((month - 1) / 3) * 3 : month - 1;
+  const span = period === 'quarter' ? 3 : 1;
+  const periodRange = {
+    from: new Date(Date.UTC(year, startMonth, 1)).toISOString().slice(0, 10),
+    to: new Date(Date.UTC(year, startMonth + span, 0)).toISOString().slice(0, 10),
+  };
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchWarehouseDashboard()
+    fetchWarehouseDashboard(periodRange)
       .then((payload) => {
         if (!cancelled) setData(payload);
       })
@@ -52,7 +64,7 @@ export default function WarehouseDashboard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [period, anchor]);
 
   const kpis = [
     {
@@ -89,10 +101,10 @@ export default function WarehouseDashboard() {
     },
     {
       key: 'po',
-      label: 'Open POs',
-      value: loading ? '…' : data?.openPurchaseOrders ?? '—',
+      label: 'Supplier receipts',
+      value: loading ? '…' : data?.supplierReceipts ?? '—',
       icon: 'truck',
-      hint: 'Supplier orders (ORDERED)',
+      hint: loading ? '…' : formatVnd(data?.supplierReceiptValue || 0),
     },
   ];
 
@@ -110,7 +122,21 @@ export default function WarehouseDashboard() {
     <div className="w-full space-y-5">
       <PageHeader
         title="Central warehouse"
-        description="Stock risk and fulfillment queues — no sales metrics."
+        description="Stock risk, fulfillment queues, and supplier receiving by reporting period."
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            {data?.generatedAt ? (
+              <span className="text-sm font-medium text-[var(--admin-muted)]">
+                Updated {formatDateTime(data.generatedAt)}
+              </span>
+            ) : null}
+            <select value={period} onChange={(e) => setPeriod(e.target.value)} className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm" aria-label="Report period">
+              <option value="month">Monthly</option>
+              <option value="quarter">Quarterly</option>
+            </select>
+            <input type="month" value={anchor} onChange={(e) => setAnchor(e.target.value)} className="rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm" aria-label="Report month" />
+          </div>
+        )}
       />
 
       {error ? <p className="text-sm text-amber-700">{error}</p> : null}
@@ -161,7 +187,10 @@ export default function WarehouseDashboard() {
         <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-[var(--admin-text)]">Low stock items</h2>
-            <p className="text-xs text-[var(--admin-muted)]">Central warehouse SKUs at or below reorder point.</p>
+            <p className="text-xs text-[var(--admin-muted)]">
+              Central warehouse SKUs at or below reorder point
+              {data?.generatedAt ? ` · as of ${formatDateTime(data.generatedAt)}` : ''}.
+            </p>
           </div>
           <Link to="/catalog/products" className="text-sm font-semibold text-[var(--admin-brand)] hover:underline">
             View inventory →
@@ -181,7 +210,7 @@ export default function WarehouseDashboard() {
               {(data?.lowStockItems || []).map((row) => (
                 <tr key={row.productId} className="border-t border-[var(--admin-border)]">
                   <td className="px-4 py-2.5 tabular-nums text-[var(--admin-muted)]">{row.productCode || '—'}</td>
-                  <td className="px-4 py-2.5 font-medium">{row.productName || `Product #${row.productId}`}</td>
+                  <td className="px-4 py-2.5 font-medium">{row.productName || row.productCode || '—'}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-amber-700">{row.quantity}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{row.reorderPoint}</td>
                 </tr>

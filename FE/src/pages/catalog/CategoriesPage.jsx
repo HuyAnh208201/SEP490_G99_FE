@@ -13,12 +13,14 @@ import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
 const EMPTY = { name: '', description: '', parentId: '' };
 
 export default function CategoriesPage() {
+  const confirmSave = useSaveConfirmation();
   const [allCategories, setAllCategories] = useState([]);
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -68,6 +70,14 @@ export default function CategoriesPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError('');
+    const confirmed = await confirmSave({
+      title: editingId ? 'Confirm category changes' : 'Confirm new category',
+      message: editingId
+        ? `Save the changes to ${form.name.trim() || 'this category'}?`
+        : `Create ${form.name.trim() || 'this category'} in the product catalog?`,
+      confirmLabel: editingId ? 'Yes, save changes' : 'Yes, create category',
+    });
+    if (!confirmed) return;
     setSaving(true);
     const payload = {
       name: form.name.trim(),
@@ -107,6 +117,12 @@ export default function CategoriesPage() {
 
   async function handleActivate(id) {
     setActionError('');
+    const confirmed = await confirmSave({
+      title: 'Confirm category activation',
+      message: 'Activate this category and make it available for product assignment?',
+      confirmLabel: 'Yes, activate',
+    });
+    if (!confirmed) return;
     try {
       await activateCategory(id);
       load();

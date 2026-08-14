@@ -62,6 +62,7 @@ import Pagination from '../../components/ui/Pagination.jsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 
 
@@ -183,6 +184,7 @@ function canActivateOwn(campaign, { webRole, currentUserId, canManage }) {
 
 
 export default function PromotionsPage() {
+  const confirmSave = useSaveConfirmation();
 
   const { user } = useAuth();
 
@@ -324,6 +326,20 @@ export default function PromotionsPage() {
       setDeleteTargetId(id);
       return;
     }
+
+    const actionLabel = {
+      activate: 'activate this promotion',
+      suspend: 'suspend this promotion',
+      'deactivate-branch': 'deactivate this promotion for the branch',
+      'activate-branch': 'activate this promotion for the branch',
+    }[action];
+    const confirmed = await confirmSave({
+      title: 'Confirm promotion status',
+      message: `Are you sure you want to ${actionLabel || 'update this promotion'}?`,
+      confirmLabel: 'Yes, update promotion',
+      danger: action === 'suspend' || action === 'deactivate-branch',
+    });
+    if (!confirmed) return;
 
     setActionLoading(id);
 
@@ -1033,5 +1049,4 @@ export default function PromotionsPage() {
   );
 
 }
-
 

@@ -3,6 +3,7 @@ import { createCashier, createInventoryStaff } from '../../api/branches.js';
 import Modal from '../ui/Modal.jsx';
 import Button from '../ui/Button.jsx';
 import FormField from '../ui/FormField.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const EMPTY = {
   fullName: '',
@@ -38,6 +39,7 @@ function fieldErrors(err) {
 }
 
 export default function BranchStaffModal({ open, onClose, branch, staffType, onCreated }) {
+  const confirmSave = useSaveConfirmation();
   const meta = ROLE_META[staffType];
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
@@ -62,6 +64,12 @@ export default function BranchStaffModal({ open, onClose, branch, staffType, onC
       setError('Passwords do not match.');
       return;
     }
+    const confirmed = await confirmSave({
+      title: `Confirm ${meta.title.toLowerCase()}`,
+      message: `Create the account for ${form.fullName.trim() || form.email.trim()} and assign it to ${branch.name}?`,
+      confirmLabel: `Yes, ${meta.submit.toLowerCase()}`,
+    });
+    if (!confirmed) return;
     setLoading(true);
     try {
       await meta.create({

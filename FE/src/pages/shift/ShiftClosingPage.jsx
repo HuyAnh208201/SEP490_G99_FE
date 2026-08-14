@@ -13,8 +13,10 @@ import {
   saveClosingDraft,
 } from '../../api/shiftSessions.js';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import { formatDateTime } from '../../lib/datetime.js';
 import { getAutoCloseStatus, SHIFT_AUTO_CLOSE_GRACE_MINUTES } from '../../lib/shiftAutoClose.js';
+import { shouldLoadClosingDetails, shouldRenderClosingDetails } from './shiftClosingState.js';
 
 function formatMoney(value) {
   const n = Number(value ?? 0);
@@ -54,7 +56,8 @@ function AutoCloseBanner({ session }) {
 
 export default function ShiftClosingPage() {
   const navigate = useNavigate();
-  const { refresh } = useShiftSession();
+  const { session, loading: sessionLoading, refresh } = useShiftSession();
+  const confirmSave = useSaveConfirmation();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -63,8 +66,16 @@ export default function ShiftClosingPage() {
   const [hvRows, setHvRows] = useState([]);
   const [actualCash, setActualCash] = useState('');
   const [handoverRemark, setHandoverRemark] = useState('');
+  const [handoverToEmployeeId, setHandoverToEmployeeId] = useState('');
 
   const load = useCallback(async () => {
+    if (sessionLoading) return;
+    if (!session) {
+      setData(null);
+      setError('No open shift session. Start your shift first.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -78,16 +89,29 @@ export default function ShiftClosingPage() {
       );
       setActualCash(row.actualCash != null ? String(row.actualCash) : '');
       setHandoverRemark(row.handoverRemark ?? '');
+      const candidates = row.handoverCandidates || [];
+      const preferred = row.earlyClose
+        ? candidates.find((candidate) => candidate.scheduledReplacement)
+        : candidates[0];
+      setHandoverToEmployeeId(String(row.handoverToEmployeeId ?? preferred?.employeeId ?? ''));
     } catch (err) {
       setError(err?.message || 'Failed to load closing data');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session, sessionLoading]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (shouldLoadClosingDetails({ sessionLoading, session })) {
+      load();
+      return;
+    }
+    if (!sessionLoading) {
+      setData(null);
+      setError('No open shift session. Start your shift first.');
+      setLoading(false);
+    }
+  }, [load, session, sessionLoading]);
 
   const cashDiff = useMemo(() => {
     const expected = Number(data?.expectedCash ?? 0);
@@ -104,15 +128,32 @@ export default function ShiftClosingPage() {
   const wasRejected =
     (data?.status === 'REJECTED' || data?.status === 'CLOSING') &&
     Boolean(managerRejectionNote?.trim());
+  const handoverCandidates = data?.handoverCandidates || [];
+  const hasScheduledReplacement = handoverCandidates.some(
+    (candidate) => candidate.scheduledReplacement,
+  );
+  const earlyCloseBlocked = Boolean(data?.earlyClose && !hasScheduledReplacement);
   const canCloseCashier =
     data?.verificationConfirmed &&
     data?.handoverConfirmed &&
+    handoverToEmployeeId &&
+    !earlyCloseBlocked &&
     !['COMPLETED', 'CLOSED', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED'].includes(data?.status);
 
   const shift = data?.shift;
   const isPendingApproval = data?.status === 'PENDING_APPROVAL';
 
   async function handleConfirmVerification() {
+    if (earlyCloseBlocked) {
+      setError('Early closing requires a replacement cashier scheduled for the current time.');
+      return;
+    }
+    const confirmed = await confirmSave({
+      title: 'Confirm stock verification',
+      message: `Save the actual quantities for ${hvRows.length} high-value product(s)?`,
+      confirmLabel: 'Yes, confirm verification',
+    });
+    if (!confirmed) return;
     setBusy('verify');
     setError('');
     try {
@@ -129,12 +170,19 @@ export default function ShiftClosingPage() {
   }
 
   async function handleConfirmHandover() {
+    const confirmed = await confirmSave({
+      title: 'Confirm cash handover',
+      message: `Save the handover with actual cash of ${formatMoney(actualCash)} and a difference of ${formatMoney(cashDiff)}?`,
+      confirmLabel: 'Yes, confirm handover',
+    });
+    if (!confirmed) return;
     setBusy('handover');
     setError('');
     try {
       setData(
         await confirmHandover({
           actualCash: Number(actualCash),
+          handoverToEmployeeId: Number(handoverToEmployeeId),
           remark: handoverRemark,
         }),
       );
@@ -146,6 +194,12 @@ export default function ShiftClosingPage() {
   }
 
   async function handleSaveDraft() {
+    const confirmed = await confirmSave({
+      title: 'Confirm closing draft',
+      message: 'Save the current cash count and handover notes as a draft?',
+      confirmLabel: 'Yes, save draft',
+    });
+    if (!confirmed) return;
     setBusy('draft');
     setError('');
     try {
@@ -163,6 +217,12 @@ export default function ShiftClosingPage() {
   }
 
   async function handleCloseShift() {
+    const confirmed = await confirmSave({
+      title: 'Confirm shift closing',
+      message: 'Close this shift with the verified stock and confirmed cash handover?',
+      confirmLabel: 'Yes, close shift',
+    });
+    if (!confirmed) return;
     setBusy('close');
     setError('');
     try {
@@ -195,6 +255,17 @@ export default function ShiftClosingPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {data?.earlyClose && (
+        <Card className={`p-4 text-sm ${earlyCloseBlocked ? 'border-red-200 bg-red-50 text-red-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+          <p className="font-semibold">Early shift closing</p>
+          <p className="mt-1">
+            {earlyCloseBlocked
+              ? 'A replacement cashier must be assigned to a published shift covering the current time before this shift can be handed over.'
+              : 'A scheduled replacement is available. Select that cashier below before confirming the cash handover.'}
+          </p>
+        </Card>
+      )}
+
       {isPendingApproval && (
         <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           <p className="font-semibold">Submitted for manager approval</p>
@@ -215,7 +286,7 @@ export default function ShiftClosingPage() {
 
       {loading ? (
         <p className="text-sm text-[var(--admin-muted)]">Loading…</p>
-      ) : (
+      ) : shouldRenderClosingDetails({ loading, data }) ? (
         <>
           {shift && (
             <Card className="bg-[#f7f9fb]">
@@ -333,7 +404,7 @@ export default function ShiftClosingPage() {
               </table>
             </div>
             <div className="flex justify-end">
-              <Button disabled={busy === 'verify'} onClick={handleConfirmVerification}>
+              <Button disabled={busy === 'verify' || earlyCloseBlocked} onClick={handleConfirmVerification}>
                 Confirm verification
               </Button>
             </div>
@@ -348,8 +419,23 @@ export default function ShiftClosingPage() {
             </div>
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-[var(--admin-muted)]">Incoming cashier</dt>
-                <dd className="font-medium">{data.handoverToEmployeeName ?? 'Branch manager'}</dd>
+                <dt className="text-[var(--admin-muted)]">Hand over cash to</dt>
+                <dd className="mt-1">
+                  <select
+                    value={handoverToEmployeeId}
+                    onChange={(event) => setHandoverToEmployeeId(event.target.value)}
+                    disabled={data.handoverConfirmed}
+                    className={inputClass}
+                  >
+                    <option value="">Select recipient</option>
+                    {handoverCandidates.map((candidate) => (
+                      <option key={candidate.employeeId} value={candidate.employeeId}>
+                        {candidate.employeeName} · {candidate.role === 'BRANCH_MANAGER' ? 'Branch manager' : 'Cashier'}
+                        {candidate.scheduledReplacement ? ' · Scheduled now' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </dd>
               </div>
               <div>
                 <dt className="text-[var(--admin-muted)]">Expected cash</dt>
@@ -385,7 +471,12 @@ export default function ShiftClosingPage() {
             )}
             <div className="flex justify-end gap-2">
               <Button
-                disabled={busy === 'handover' || (remarkRequired && !handoverRemark.trim())}
+                disabled={
+                  busy === 'handover' ||
+                  !handoverToEmployeeId ||
+                  earlyCloseBlocked ||
+                  (remarkRequired && !handoverRemark.trim())
+                }
                 onClick={handleConfirmHandover}
               >
                 Confirm handover
@@ -407,7 +498,7 @@ export default function ShiftClosingPage() {
             </div>
           </div>
         </>
-      )}
+      ) : null}
       </div>
     </div>
   );

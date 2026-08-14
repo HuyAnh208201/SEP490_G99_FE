@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { updateProfile, fetchMe } from '../../api/users.js';
 import { changePassword } from '../../api/password.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -30,6 +31,7 @@ const inputClass =
 
 export default function ProfilePage() {
   const { user, updateCurrentUser } = useAuth();
+  const confirmSave = useSaveConfirmation();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') === 'security' ? 'security' : 'profile';
 
@@ -123,6 +125,13 @@ export default function ProfilePage() {
       return;
     }
 
+    const confirmed = await confirmSave({
+      title: 'Confirm profile changes',
+      message: 'Save these changes to your account profile?',
+      confirmLabel: 'Yes, save profile',
+    });
+    if (!confirmed) return;
+
     setProfileLoading(true);
     try {
       const phone = normalizePhone(form.phone);
@@ -162,6 +171,13 @@ export default function ProfilePage() {
       setPasswordError(passwordErrorMessage);
       return;
     }
+
+    const confirmed = await confirmSave({
+      title: 'Confirm password change',
+      message: 'Change your account password now? You will need to use the new password next time you sign in.',
+      confirmLabel: 'Yes, update password',
+    });
+    if (!confirmed) return;
 
     setPasswordLoading(true);
     try {

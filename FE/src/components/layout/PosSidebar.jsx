@@ -12,7 +12,13 @@ const POS_NAV_GROUPS = [
         label: 'Shift',
         icon: 'clock',
         end: true,
-        matchPrefix: '/pos/shift',
+        alsoMatch: ['/pos/shift/opening', '/pos/shift/current', '/pos/shift/closing'],
+      },
+      {
+        path: '/pos/shift/history',
+        label: 'Shift history',
+        icon: 'report',
+        end: true,
       },
       {
         path: '/pos/my-shifts',

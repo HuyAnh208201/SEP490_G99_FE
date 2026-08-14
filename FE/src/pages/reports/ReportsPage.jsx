@@ -9,6 +9,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Legend,
 } from 'recharts';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -187,6 +188,7 @@ function RevenueDashboard({
             date: p.date,
             label: String(p.date).slice(5),
             revenue: Number(p.revenue ?? 0),
+            profit: Number(p.profit ?? 0),
             orderCount: Number(p.orderCount ?? 0),
           })),
         );
@@ -200,6 +202,7 @@ function RevenueDashboard({
                 id: r.id,
                 name: r.name || nameById.get(r.id) || `Branch #${r.id}`,
                 revenue: Number(r.revenue ?? 0),
+                profit: Number(r.profit ?? 0),
               }))
               .sort((a, b) => b.revenue - a.revenue)
               .slice(0, 5),
@@ -255,11 +258,30 @@ function RevenueDashboard({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           label="Total revenue"
           value={loading ? '…' : formatVnd(summary?.totalRevenue)}
           hint={periodLabel}
+        />
+        <KpiCard
+          label="Total cost (COGS)"
+          value={loading ? '…' : formatVnd(summary?.totalCogs)}
+          hint="Last supplier receipt cost"
+        />
+        <KpiCard
+          label="Profit"
+          value={loading ? '…' : formatVnd(summary?.totalProfit)}
+          hint={
+            loading
+              ? undefined
+              : `${Number(summary?.profitMarginPercent ?? 0).toFixed(1)}% margin`
+          }
+        />
+        <KpiCard
+          label="Margin"
+          value={loading ? '…' : `${Number(summary?.profitMarginPercent ?? 0).toFixed(1)}%`}
+          hint="Profit / revenue"
         />
         <KpiCard
           label="Total transactions"
@@ -269,33 +291,26 @@ function RevenueDashboard({
         {isChainScope ? (
           <KpiCard
             label="Top branch"
-            value={
-              loading
-                ? '…'
-                : summary?.topBranch?.name || '—'
-            }
+            value={loading ? '…' : summary?.topBranch?.name || '—'}
             hint={
-              summary?.topBranch ? formatVnd(summary.topBranch.revenue) : 'No revenue yet'
+              summary?.topBranch
+                ? `${formatVnd(summary.topBranch.revenue)} · profit ${formatVnd(summary.topBranch.profit)}`
+                : 'No revenue yet'
             }
           />
         ) : (
           <KpiCard
-            label="Orders"
-            value={loading ? '…' : Number(summary?.transactionCount ?? 0).toLocaleString()}
-            hint="Completed orders"
+            label="Avg. transaction value"
+            value={loading ? '…' : formatVnd(summary?.avgTransactionValue)}
+            hint="Per transaction"
           />
         )}
-        <KpiCard
-          label="Avg. transaction value"
-          value={loading ? '…' : formatVnd(summary?.avgTransactionValue)}
-          hint="Per transaction"
-        />
       </div>
 
       <div className={`grid gap-3 ${isChainScope && !applied.branchId ? 'xl:grid-cols-3' : 'xl:grid-cols-1'}`}>
         <Card className={`${isChainScope && !applied.branchId ? 'xl:col-span-2' : ''} !p-4`}>
           <div className="mb-3 flex items-baseline justify-between gap-2">
-            <h3 className="text-sm font-bold text-[var(--admin-text)]">Revenue trend</h3>
+            <h3 className="text-sm font-bold text-[var(--admin-text)]">Revenue and profit trend</h3>
             <span className="text-xs text-[var(--admin-muted)]">{periodLabel}</span>
           </div>
           <div className="h-64 w-full">
@@ -318,11 +333,21 @@ function RevenueDashboard({
                       v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${Math.round(v / 1000)}K`
                     }
                   />
-                  <Tooltip formatter={(v) => formatVnd(v)} labelFormatter={(l) => `Day ${l}`} />
+                  <Tooltip formatter={(v, name) => [formatVnd(v), name]} labelFormatter={(l) => `Day ${l}`} />
+                  <Legend />
                   <Line
                     type="monotone"
                     dataKey="revenue"
+                    name="Revenue"
                     stroke="#0058be"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    name="Profit"
+                    stroke="#0f9d58"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -359,8 +384,9 @@ function RevenueDashboard({
                       }
                     />
                     <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(v) => formatVnd(v)} />
-                    <Bar dataKey="revenue" fill="#0058be" radius={[0, 4, 4, 0]} />
+                    <Tooltip formatter={(v, name) => [formatVnd(v), name]} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#0058be" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="profit" name="Profit" fill="#0f9d58" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -382,13 +408,15 @@ function RevenueDashboard({
                 <th className="px-4 py-3">Product name</th>
                 <th className="px-4 py-3 text-right">Qty sold</th>
                 <th className="px-4 py-3 text-right">Revenue</th>
+                <th className="px-4 py-3 text-right">Cost</th>
+                <th className="px-4 py-3 text-right">Profit</th>
               </tr>
             </thead>
             <tbody>
               {loading
                 ? Array.from({ length: 3 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={4} className="px-4 py-4">
+                      <td colSpan={6} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -401,6 +429,8 @@ function RevenueDashboard({
                         {Number(p.qtySold ?? 0).toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">{formatVnd(p.revenue)}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{formatVnd(p.cogs)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{formatVnd(p.profit)}</td>
                     </tr>
                   ))}
             </tbody>

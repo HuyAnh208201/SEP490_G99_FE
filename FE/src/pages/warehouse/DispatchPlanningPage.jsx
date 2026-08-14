@@ -2,26 +2,34 @@ import { useEffect, useMemo, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import { formatDate } from '../../lib/datetime.js';
+import { formatDateTime } from '../../lib/datetime.js';
 import { listApprovedRequestsPage, createDispatchOrder } from '../../api/dispatch.js';
+import { getRequest } from '../../api/purchaseRequests.js';
 import { fetchSuppliers } from '../../api/suppliers.js';
+import IncomingRequestDetailModal from './components/IncomingRequestDetailModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function DispatchPlanningPage() {
+  const confirmSave = useSaveConfirmation();
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [routeFilter, setRouteFilter] = useState('');
   const [shippingId, setShippingId] = useState(null);
+  const [openingId, setOpeningId] = useState(null);
+  const [detail, setDetail] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   /** @type {Record<string, number[]>} */
   const [selectedSuppliersByRequest, setSelectedSuppliersByRequest] = useState({});
+  /** @type {Record<string, { name: string, phone: string }>} */
+  const [shipperByRequest, setShipperByRequest] = useState({});
 
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(listApprovedRequestsPage, {
@@ -60,14 +68,46 @@ export default function DispatchPlanningPage() {
     });
   }
 
+  function updateShipper(requestId, patch) {
+    setShipperByRequest((prev) => ({
+      ...prev,
+      [requestId]: { name: '', phone: '', ...prev[requestId], ...patch },
+    }));
+  }
+
+  async function openDetail(request) {
+    setOpeningId(request.id);
+    setActionError('');
+    try {
+      const full = await getRequest(request.id);
+      setDetail(full);
+    } catch (err) {
+      setActionError(err?.message || 'Failed to load request details');
+    } finally {
+      setOpeningId(null);
+    }
+  }
+
   async function handleShip(request, requestNumber) {
     const requestId = request.id;
     const needsSuppliers = Boolean(request.hasShortDateCategories);
     const supplierIds = selectedSuppliersByRequest[requestId] || [];
+    const shipper = shipperByRequest[requestId] || { name: '', phone: '' };
+    if (!shipper.name.trim() || !shipper.phone.trim()) {
+      setActionError('Enter the shipper name and phone before shipping.');
+      return;
+    }
     if (needsSuppliers && supplierIds.length === 0) {
       setActionError('Select at least one supplier for short-date categories before shipping.');
       return;
     }
+
+    const confirmed = await confirmSave({
+      title: 'Confirm dispatch order',
+      message: `Create a dispatch order for ${requestNumber || 'this request'}${needsSuppliers ? ` using ${supplierIds.length} selected supplier(s)` : ''}?`,
+      confirmLabel: 'Yes, create dispatch',
+    });
+    if (!confirmed) return;
 
     setShippingId(requestId);
     setActionError('');
@@ -76,11 +116,18 @@ export default function DispatchPlanningPage() {
       const order = await createDispatchOrder({
         requestId,
         supplierIds: needsSuppliers ? supplierIds : undefined,
+        shipperName: shipper.name.trim(),
+        shipperPhone: shipper.phone.trim(),
       });
       setMessage(
         `Dispatch order ${order?.dispatchNumber || ''} created for ${requestNumber || 'request'}.`,
       );
       setSelectedSuppliersByRequest((prev) => {
+        const next = { ...prev };
+        delete next[requestId];
+        return next;
+      });
+      setShipperByRequest((prev) => {
         const next = { ...prev };
         delete next[requestId];
         return next;
@@ -159,7 +206,8 @@ export default function DispatchPlanningPage() {
                 <th className="px-4 py-3">Route</th>
                 <th className="px-4 py-3">Categories</th>
                 <th className="px-4 py-3">Suppliers</th>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Requested date</th>
+                <th className="px-4 py-3">Shipper</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
@@ -167,7 +215,7 @@ export default function DispatchPlanningPage() {
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={8} className="px-4 py-4">
+                      <td colSpan={9} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -221,17 +269,43 @@ export default function DispatchPlanningPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {formatDate(r.createdAt)}
+                          {formatDateTime(r.submittedAt || r.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex min-w-[12rem] flex-col gap-1">
+                            <input
+                              value={shipperByRequest[r.id]?.name || ''}
+                              onChange={(e) => updateShipper(r.id, { name: e.target.value })}
+                              placeholder="Shipper name"
+                              className={selectClass}
+                            />
+                            <input
+                              value={shipperByRequest[r.id]?.phone || ''}
+                              onChange={(e) => updateShipper(r.id, { phone: e.target.value })}
+                              placeholder="Shipper phone"
+                              className={selectClass}
+                            />
+                          </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Button
-                            className="!px-3 !py-1 !text-xs"
-                            loading={shippingId === r.id}
-                            disabled={needsSuppliers && selected.length === 0}
-                            onClick={() => handleShip(r, r.requestNumber)}
-                          >
-                            Ship
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="secondary"
+                              className="!px-3 !py-1 !text-xs"
+                              loading={openingId === r.id}
+                              onClick={() => openDetail(r)}
+                            >
+                              View details
+                            </Button>
+                            <Button
+                              className="!px-3 !py-1 !text-xs"
+                              loading={shippingId === r.id}
+                              disabled={needsSuppliers && selected.length === 0}
+                              onClick={() => handleShip(r, r.requestNumber)}
+                            >
+                              Ship
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -247,6 +321,13 @@ export default function DispatchPlanningPage() {
         </div>
         <Pagination {...pageData} onPageChange={pageData.setPage} onSizeChange={pageData.setSize} disabled={loading} />
       </Card>
+
+      <IncomingRequestDetailModal
+        open={Boolean(detail)}
+        request={detail}
+        onClose={() => setDetail(null)}
+        onChanged={load}
+      />
     </div>
   );
 }

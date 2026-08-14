@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -6,11 +6,13 @@ import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { fetchOpeningShiftSession, startShiftSession } from '../../api/shiftSessions.js';
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
+import PreviousShiftReportSection from './components/PreviousShiftReportSection.jsx';
 
 const OPENING_FUND_AMOUNT = 2_000_000;
 
 function formatMoney(value) {
-  const n = Number(value ?? OPENING_FUND_AMOUNT);
+  const n = Number(value ?? 0);
   return `${n.toLocaleString('en-US')} VND`;
 }
 
@@ -53,59 +55,6 @@ function SectionHeader({ icon, children, badge }) {
   );
 }
 
-function InfoCell({ icon, label, value }) {
-  return (
-    <div className="flex gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-brand)]/10 text-[var(--admin-brand)]">
-        <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" aria-hidden>
-          {icon}
-        </svg>
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs text-[var(--admin-muted)]">{label}</p>
-        <p className="font-medium text-[var(--admin-text)]">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-const ICON_USER = (
-  <>
-    <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.6" />
-    <path
-      d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    />
-  </>
-);
-
-const ICON_BRANCH = (
-  <path
-    d="M12 21s6-4.5 6-10a6 6 0 1 0-12 0c0 5.5 6 10 6 10Z"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinejoin="round"
-  />
-);
-
-const ICON_SHIFT = (
-  <path
-    d="M8 7h8M8 12h8M8 17h5"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-  />
-);
-
-const ICON_CLOCK = (
-  <>
-    <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M12 8v4l2.5 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-  </>
-);
-
 const ICON_FUND = (
   <path
     d="M12 3v18M8 7h6a3 3 0 0 1 0 6H8a3 3 0 0 0 0 6h8"
@@ -118,11 +67,14 @@ const ICON_FUND = (
 export default function ShiftOpeningPage() {
   const navigate = useNavigate();
   const { refresh, setSession } = useShiftSession();
+  const confirmSave = useSaveConfirmation();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [fundConfirmed, setFundConfirmed] = useState(false);
+  const [fundSourceId, setFundSourceId] = useState('');
+  const [fundMethod, setFundMethod] = useState('CASH');
   const [busy, setBusy] = useState('');
 
   const load = useCallback(async () => {
@@ -132,6 +84,9 @@ export default function ShiftOpeningPage() {
       const row = await fetchOpeningShiftSession();
       setData(row);
       setFundConfirmed(Boolean(row?.openingConfirmed));
+      const sources = row?.openingFundSources || [];
+      setFundSourceId(String(row?.openingFundReceivedFromEmployeeId ?? sources[0]?.employeeId ?? ''));
+      setFundMethod(row?.openingFundMethod === 'TRANSFER' ? 'TRANSFER' : 'CASH');
     } catch (err) {
       setError(err?.message || 'Failed to load shift');
     } finally {
@@ -143,12 +98,34 @@ export default function ShiftOpeningPage() {
     load();
   }, [load]);
 
+  const shift = data?.shift;
+  const slotLabel = data?.currentSlotLabel;
+  const slotWindow =
+    data?.currentSlotStart && data?.currentSlotEnd
+      ? `${data.currentSlotStart.slice(0, 5)} – ${data.currentSlotEnd.slice(0, 5)}`
+      : null;
+
+  const openingFundDisplay = useMemo(() => {
+    if (data?.openingFundAmount != null) return data.openingFundAmount;
+    return data?.previousShiftReport ? 0 : OPENING_FUND_AMOUNT;
+  }, [data?.openingFundAmount, data?.previousShiftReport]);
+
   async function handleOpenShift() {
     if (!fundConfirmed) return;
+    const confirmed = await confirmSave({
+      title: 'Confirm shift opening',
+      message: `Open this cashier shift with ${formatMoney(openingFundDisplay)} received by ${fundMethod.toLowerCase()}?`,
+      confirmLabel: 'Yes, open shift',
+    });
+    if (!confirmed) return;
     setBusy('open');
     setError('');
     try {
-      const row = await startShiftSession(undefined, true);
+      const row = await startShiftSession({
+        confirmedReceived: true,
+        receivedFromEmployeeId: Number(fundSourceId),
+        fundMethod,
+      });
       setSession(row);
       await refresh();
       navigate('/pos/shift/current', { replace: true });
@@ -159,21 +136,21 @@ export default function ShiftOpeningPage() {
     }
   }
 
-  const shift = data?.shift;
-  const slotLabel = data?.currentSlotLabel;
-  const slotWindow =
-    data?.currentSlotStart && data?.currentSlotEnd
-      ? `${data.currentSlotStart.slice(0, 5)} – ${data.currentSlotEnd.slice(0, 5)}`
-      : null;
   const alreadyOpen = data?.status === 'OPEN';
   const pendingApproval = data?.status === 'PENDING_APPROVAL';
   const shiftFinished = ['COMPLETED', 'CLOSED', 'APPROVED'].includes(data?.status);
   const mustCloseFirst = ['CLOSING', 'PENDING_HANDOVER', 'REJECTED'].includes(data?.status);
   const canOpen = Boolean(
-    shift?.id && fundConfirmed && !alreadyOpen && !pendingApproval && !shiftFinished && !mustCloseFirst,
+    shift?.id &&
+      fundConfirmed &&
+      fundSourceId &&
+      fundMethod &&
+      !alreadyOpen &&
+      !pendingApproval &&
+      !shiftFinished &&
+      !mustCloseFirst,
   );
   const receiveDateSource = data?.openingFundReceivedAt ?? shift?.startTime;
-  const openingFundDisplay = data?.openingFundAmount ?? OPENING_FUND_AMOUNT;
 
   return (
     <div className="min-h-0 w-full flex-1 space-y-4 overflow-y-auto p-4 lg:p-5">
@@ -188,13 +165,6 @@ export default function ShiftOpeningPage() {
         <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Outside normal branch hours — test mode is enabled so you can still open this shift slot
           {slotLabel ? ` (${slotLabel}${slotWindow ? `, ${slotWindow}` : ''})` : ''}.
-        </Card>
-      )}
-
-      {!loading && slotLabel && !data?.outsideOperatingHours && (
-        <Card className="border-[var(--admin-border)] bg-[#f7f9fb] px-4 py-3 text-sm">
-          Current time slot: <span className="font-semibold text-[var(--admin-brand)]">{slotLabel}</span>
-          {slotWindow && <span className="text-[var(--admin-muted)]"> · {slotWindow}</span>}
         </Card>
       )}
 
@@ -234,59 +204,35 @@ export default function ShiftOpeningPage() {
       ) : (
         <>
           <Card className="px-4 py-3">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--admin-subtle)]">
-                  Current shift
-                </p>
-                <p className="mt-0.5 font-semibold text-[var(--admin-text)]">
-                  Shift #{shift.shiftNumber ?? '—'}{' '}
-                  <span className="font-normal tabular-nums text-[var(--admin-muted)]">
-                    {formatShiftTime(shift.startTime)} – {formatShiftTime(shift.endTime)}
-                  </span>
-                </p>
-              </div>
-              <span className="hidden h-8 w-px bg-[var(--admin-border)] sm:block" aria-hidden />
-              <div className="flex items-center gap-2 text-[var(--admin-text)]">
-                <span className="text-[var(--admin-brand)]">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-                    {ICON_USER}
-                  </svg>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <p className="font-semibold text-[var(--admin-text)]">
+                Shift #{shift.shiftNumber ?? '—'}
+                <span className="ml-2 font-normal tabular-nums text-[var(--admin-muted)]">
+                  {formatShiftTime(shift.startTime)} – {formatShiftTime(shift.endTime)}
                 </span>
-                {data.employeeName ?? '—'}
-              </div>
-              <div className="flex items-center gap-2 text-[var(--admin-text)]">
-                <span className="text-[var(--admin-brand)]">
-                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden>
-                    {ICON_BRANCH}
-                  </svg>
-                </span>
-                {data.branchName ?? '—'}
-              </div>
+              </p>
+              <span className="hidden h-4 w-px bg-[var(--admin-border)] sm:block" aria-hidden />
+              <span className="text-[var(--admin-text)]">{data.employeeName ?? '—'}</span>
+              <span className="text-[var(--admin-muted)]">@</span>
+              <span className="text-[var(--admin-text)]">{data.branchName ?? '—'}</span>
+              {slotLabel && (
+                <Badge tone="brand">
+                  {slotLabel}
+                  {slotWindow ? ` ${slotWindow}` : ''}
+                </Badge>
+              )}
               {alreadyOpen && <Badge tone="success">Open</Badge>}
             </div>
           </Card>
 
-          <Card className="space-y-4 p-4">
-            <SectionHeader icon={ICON_SHIFT}>Shift information</SectionHeader>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <InfoCell icon={ICON_USER} label="Cashier" value={data.employeeName ?? '—'} />
-              <InfoCell icon={ICON_BRANCH} label="Branch" value={data.branchName ?? '—'} />
-              <InfoCell
-                icon={ICON_SHIFT}
-                label="Shift number"
-                value={`Shift #${shift.shiftNumber ?? '—'}`}
-              />
-              <InfoCell icon={ICON_CLOCK} label="Start time" value={formatShiftTime(shift.startTime)} />
-            </div>
-          </Card>
+          <PreviousShiftReportSection report={data.previousShiftReport} />
 
           <Card className="space-y-4 p-4">
             <SectionHeader
               icon={ICON_FUND}
               badge={
-                <Badge tone={data.openingConfirmed || alreadyOpen ? 'success' : 'warning'}>
-                  {data.openingConfirmed || alreadyOpen
+                <Badge tone={data.openingFundStatus === 'OPENING_FUND_CONFIRMED' || alreadyOpen ? 'success' : 'warning'}>
+                  {data.openingFundStatus === 'OPENING_FUND_CONFIRMED' || alreadyOpen
                     ? 'Opening fund confirmed'
                     : 'Waiting for opening fund'}
                 </Badge>
@@ -307,11 +253,44 @@ export default function ShiftOpeningPage() {
                   {formatReceiveDate(receiveDateSource)}
                 </p>
               </div>
-              <div className="sm:col-span-2">
-                <p className="text-xs text-[var(--admin-muted)]">Received from</p>
-                <p className="mt-0.5 font-medium text-[var(--admin-text)]">
-                  {data.openingFundReceivedFromName ?? 'Branch manager'}
-                </p>
+              <label>
+                <span className="text-xs text-[var(--admin-muted)]">Received from</span>
+                <select
+                  value={fundSourceId}
+                  onChange={(event) => setFundSourceId(event.target.value)}
+                  disabled={alreadyOpen}
+                  className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)]"
+                >
+                  <option value="">Select handover person</option>
+                  {(data.openingFundSources || []).map((source) => (
+                    <option key={source.employeeId} value={source.employeeId}>
+                      {source.employeeName} · {source.role === 'BRANCH_MANAGER' ? 'Branch manager' : 'Previous cashier'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div>
+                <p className="text-xs text-[var(--admin-muted)]">Receive by</p>
+                <div className="mt-1.5 grid grid-cols-2 gap-2">
+                  {[
+                    ['CASH', 'Cash'],
+                    ['TRANSFER', 'Transfer'],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={alreadyOpen}
+                      onClick={() => setFundMethod(value)}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        fundMethod === value
+                          ? 'border-[var(--admin-brand)] bg-[var(--admin-brand)] text-white'
+                          : 'border-[var(--admin-border)] bg-white text-[var(--admin-muted)]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <label className="flex items-start gap-2 border-t border-[var(--admin-border)] pt-3 text-sm">
@@ -323,7 +302,8 @@ export default function ShiftOpeningPage() {
                 disabled={alreadyOpen}
               />
               <span className="text-[var(--admin-text)]">
-                I confirm that I have received the opening fund from the Branch Manager.
+                I confirm that I received the opening fund from the selected person by{' '}
+                {fundMethod === 'TRANSFER' ? 'bank transfer' : 'cash'}.
               </span>
             </label>
           </Card>

@@ -74,6 +74,8 @@ export async function getRecommendedProducts(branchId) {
     suggestedQty: r.suggestedQty ?? r.suggestedQuantity,
     topPackagingLabel: r.topPackagingLabel,
     topPackagingConversionQty: r.topPackagingConversionQty,
+    soldLast30Days: r.soldLast30Days ?? 0,
+    priorityReason: r.priorityReason,
   }));
 }
 
@@ -144,11 +146,6 @@ export async function cancelRequest(id) {
 
 export async function approveRequest(id, items) {
   const { data } = await http.patch(`${BASE}/${id}/approve`, toApprovePayload(items));
-  return normalizeRequestDetail(unwrap(data));
-}
-
-export async function rejectRequest(id, reason) {
-  const { data } = await http.patch(`${BASE}/${id}/reject`, { reason });
   return normalizeRequestDetail(unwrap(data));
 }
 

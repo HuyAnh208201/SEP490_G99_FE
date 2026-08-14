@@ -1,6 +1,5 @@
 import { http } from './http.js';
 import {
-  fetchAdminDashboard,
   fetchBranchManagerDashboard,
   fetchDirectorDashboard,
   fetchWarehouseDashboard,
@@ -20,10 +19,6 @@ export async function fetchModule(path) {
   const { data } = await http.get(path);
   return unwrap(data);
 }
-
-export const adminApi = {
-  dashboard: () => fetchAdminDashboard(),
-};
 
 export const directorApi = {
   dashboard: (params) => fetchDirectorDashboard(params),

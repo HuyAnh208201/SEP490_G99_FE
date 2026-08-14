@@ -1,529 +1,235 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
-import { unitLabel } from '../../../constants/productUnits.js';
 import { formatVnd } from '../../../lib/money.js';
-import {
-  listRecommendedProducts,
-  searchPurchaseProducts,
-  createPurchaseOrder,
-} from '../../../api/purchaseOrders.js';
+import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
+import { searchPurchaseProducts, createPurchaseOrder } from '../../../api/purchaseOrders.js';
 import { fetchSuppliers } from '../../../api/suppliers.js';
+import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
+function todayInput() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
-  const [recommended, setRecommended] = useState([]);
+  const confirmSave = useSaveConfirmation();
   const [suppliers, setSuppliers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
   const [supplierId, setSupplierId] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState(todayInput());
+  const [deliveredByName, setDeliveredByName] = useState('');
+  const [deliveredByPhone, setDeliveredByPhone] = useState('');
+  const [documentNumber, setDocumentNumber] = useState('');
   const [notes, setNotes] = useState('');
-  // lines: Map<productId, { productId, productCode, productName, unit, quantity, unitPrice }>
-  const [lines, setLines] = useState(() => new Map());
-
   const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [lines, setLines] = useState(() => new Map());
+  const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
-  const searchTimer = useRef(null);
-  const supplierSectionRef = useRef(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [rec, sup] = await Promise.all([listRecommendedProducts(), fetchSuppliers()]);
-      setRecommended(Array.isArray(rec) ? rec : []);
-      const supList = Array.isArray(sup) ? sup : sup?.listObjects || [];
-      setSuppliers(supList.filter((s) => (s.status || 'active').toLowerCase() === 'active'));
-    } catch (err) {
-      setError(err?.message || 'Failed to load purchase order data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const requestId = useRef(0);
 
   useEffect(() => {
     if (!open) return;
     setSupplierId('');
+    setDeliveryDate(todayInput());
+    setDeliveredByName('');
+    setDeliveredByPhone('');
+    setDocumentNumber('');
     setNotes('');
-    setLines(new Map());
     setKeyword('');
-    setResults([]);
-    load();
-  }, [open, load]);
+    setProducts([]);
+    setLines(new Map());
+    setError('');
+    setLoading(true);
+    fetchSuppliers()
+      .then((payload) => {
+        const rows = Array.isArray(payload) ? payload : payload?.listObjects || [];
+        setSuppliers(rows.filter((row) => String(row.status || 'active').toLowerCase() === 'active'));
+      })
+      .catch((err) => setError(err?.message || 'Failed to load suppliers'))
+      .finally(() => setLoading(false));
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    const term = keyword.trim();
-    if (!term) {
-      setResults([]);
-      return;
-    }
+    const current = ++requestId.current;
     setSearching(true);
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const data = await searchPurchaseProducts(term);
-        setResults(Array.isArray(data) ? data : []);
-      } catch {
-        setResults([]);
-      } finally {
-        setSearching(false);
-      }
+    const timer = setTimeout(() => {
+      searchPurchaseProducts(null, keyword.trim())
+        .then((rows) => {
+          if (current === requestId.current) setProducts(Array.isArray(rows) ? rows : []);
+        })
+        .catch((err) => {
+          if (current === requestId.current) setError(err?.message || 'Failed to load products');
+        })
+        .finally(() => {
+          if (current === requestId.current) setSearching(false);
+        });
     }, 300);
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
+    return () => clearTimeout(timer);
   }, [keyword, open]);
 
   const lineList = useMemo(() => [...lines.values()], [lines]);
-  const totalQty = useMemo(
-    () => lineList.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0),
-    [lineList],
-  );
-  const totalAmount = useMemo(
-    () =>
-      lineList.reduce(
-        (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0),
-        0,
-      ),
-    [lineList],
+  const totalQty = lineList.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
+  const totalAmount = lineList.reduce(
+    (sum, line) => sum + (Number(line.quantity) || 0) * (Number(line.unitPrice) || 0),
+    0,
   );
 
-  function addLine(product, suggestedQty) {
-    setLines((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(product.productId);
-      const qty = suggestedQty && suggestedQty > 0 ? suggestedQty : 1;
-      if (existing) {
-        next.set(product.productId, {
-          ...existing,
-          quantity: (Number(existing.quantity) || 0) + qty,
-        });
-      } else {
-        next.set(product.productId, {
-          productId: product.productId,
-          productCode: product.productCode,
-          productName: product.productName,
-          unit: product.unit || product.topPackagingLabel,
-          quantity: qty,
-          unitPrice: product.referencePrice != null ? Number(product.referencePrice) : '',
-        });
-      }
-      return next;
-    });
+  function selectSupplier(value) {
+    setSupplierId(value);
+    setError('');
   }
 
-  function addAllRecommended() {
-    setLines((prev) => {
-      const next = new Map(prev);
-      recommended.forEach((product) => {
-        if (!product.suggestedQty || product.suggestedQty <= 0) return;
-        const existing = next.get(product.productId);
-        if (existing) return;
+  function addLine(product) {
+    setLines((previous) => {
+      const next = new Map(previous);
+      if (!next.has(product.productId)) {
         next.set(product.productId, {
-          productId: product.productId,
-          productCode: product.productCode,
-          productName: product.productName,
-          unit: product.unit || product.topPackagingLabel,
-          quantity: product.suggestedQty,
-          unitPrice: product.referencePrice != null ? Number(product.referencePrice) : '',
+          ...product,
+          quantity: 1,
+          unitPrice: product.referencePrice ?? '',
         });
-      });
+      }
       return next;
     });
   }
 
   function updateLine(productId, patch) {
-    setLines((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(productId);
-      if (existing) next.set(productId, { ...existing, ...patch });
+    setLines((previous) => {
+      const next = new Map(previous);
+      next.set(productId, { ...next.get(productId), ...patch });
       return next;
     });
   }
 
-  function removeLine(productId) {
-    setLines((prev) => {
-      const next = new Map(prev);
-      next.delete(productId);
-      return next;
-    });
-  }
-
-  function focusSupplierField() {
-    supplierSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  async function handleSubmit() {
+  async function submit() {
     setError('');
-    if (!supplierId) {
-      setError('Please select a supplier before creating the purchase order.');
-      focusSupplierField();
-      return;
+    if (!supplierId) return setError('Select a supplier first.');
+    if (!deliveryDate) return setError('Enter the supplier delivery date.');
+    if (!deliveredByName.trim()) return setError('Enter the delivery person name.');
+    const items = lineList.map((line) => ({
+      productId: line.productId,
+      quantity: Number(line.quantity) || 0,
+      unitPrice: line.unitPrice === '' ? null : Number(line.unitPrice),
+    }));
+    if (!items.length || items.some((item) => item.quantity <= 0 || item.unitPrice == null || item.unitPrice < 0)) {
+      return setError('Add at least one product and enter a valid quantity and import price.');
     }
-    if (suppliers.length === 0) {
-      setError('No active suppliers available. Add a supplier in Catalog first.');
-      focusSupplierField();
-      return;
-    }
-    const items = lineList
-      .map((l) => ({
-        productId: l.productId,
-        quantity: Number(l.quantity) || 0,
-        unitPrice: l.unitPrice === '' || l.unitPrice == null ? null : Number(l.unitPrice),
-      }))
-      .filter((it) => it.quantity > 0);
-    if (!items.length) {
-      setError('Add at least one product with a quantity greater than zero.');
-      return;
-    }
+    const confirmed = await confirmSave({
+      title: 'Confirm supplier receipt',
+      message: `Receive ${items.length} product line(s), ${totalQty} import unit(s), valued at ${formatVnd(totalAmount)}? Central stock will update immediately.`,
+      confirmLabel: 'Yes, receive stock',
+    });
+    if (!confirmed) return undefined;
     setSubmitting(true);
     try {
-      const order = await createPurchaseOrder({
+      const receipt = await createPurchaseOrder({
         supplierId: Number(supplierId),
+        supplierDeliveryDate: deliveryDate,
+        deliveredByName: deliveredByName.trim(),
+        deliveredByPhone: deliveredByPhone.trim() || null,
+        supplierDocumentNumber: documentNumber.trim() || null,
         notes: notes.trim() || null,
         items,
       });
-      onCreated?.(order);
+      onCreated?.(receipt);
       onClose();
     } catch (err) {
-      setError(err?.message || 'Failed to create purchase order');
+      setError(err?.message || 'Failed to record supplier receipt');
     } finally {
       setSubmitting(false);
     }
+    return undefined;
   }
-
-  const availableRecommended = recommended.filter((r) => !lines.has(r.productId));
-  const needsSupplier = lineList.length > 0 && !supplierId;
-  const submitHint =
-    lineList.length === 0
-      ? 'Add at least one product to continue.'
-      : !supplierId
-        ? 'Select a supplier to create the purchase order.'
-        : '';
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Create Purchase Order"
-      description="Order stock from a supplier to replenish the central warehouse."
+      title="New Supplier Receipt"
+      description="Record goods that have arrived. Saving this receipt updates central stock immediately."
       size="xl"
-      footer={
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {submitHint && (
-            <p className="mr-auto text-sm text-amber-700">{submitHint}</p>
-          )}
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            loading={submitting}
-            disabled={lineList.length === 0 || submitting}
-            onClick={handleSubmit}
-          >
-            Create Purchase Order
+      footer={(
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button loading={submitting} disabled={submitting || !lineList.length} onClick={submit}>
+            Receive into warehouse
           </Button>
         </div>
-      }
+      )}
     >
-      <div className="space-y-6">
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+      <div className="space-y-5">
+        {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
-        {/* Purchase order information */}
-        <section
-          ref={supplierSectionRef}
-          className={`grid grid-cols-1 gap-4 rounded-xl border bg-[#f7f9fb]/60 p-4 sm:grid-cols-2 ${
-            needsSupplier
-              ? 'border-amber-300 ring-2 ring-amber-100'
-              : 'border-[var(--admin-border)]'
-          }`}
-        >
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-              Supplier <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={supplierId}
-              onChange={(e) => setSupplierId(e.target.value)}
-              className={`${inputClass} ${needsSupplier ? 'border-amber-400' : ''}`}
-              disabled={loading}
-            >
-              <option value="">Select a supplier…</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
+        <section className="grid gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Supplier *">
+            <select value={supplierId} onChange={(event) => selectSupplier(event.target.value)} className={inputClass} disabled={loading}>
+              <option value="">Select supplier…</option>
+              {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
             </select>
-            {!loading && suppliers.length === 0 && (
-              <p className="mt-1.5 text-xs text-red-600">
-                No active suppliers found.{' '}
-                <Link to="/catalog/suppliers" className="font-medium underline">
-                  Add a supplier
-                </Link>{' '}
-                in Catalog first.
-              </p>
-            )}
-            {needsSupplier && suppliers.length > 0 && (
-              <p className="mt-1.5 text-xs text-amber-700">
-                Required — choose which supplier will fulfill this order.
-              </p>
-            )}
+          </Field>
+          <Field label="Supplier delivery date *"><input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className={inputClass} /></Field>
+          <Field label="Delivery person *"><input value={deliveredByName} onChange={(e) => setDeliveredByName(e.target.value)} placeholder="Full name" className={inputClass} /></Field>
+          <Field label="Delivery phone"><input value={deliveredByPhone} onChange={(e) => setDeliveredByPhone(e.target.value)} placeholder="Phone number" className={inputClass} /></Field>
+          <Field label="Supplier document"><input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} placeholder="Invoice / delivery note" className={inputClass} /></Field>
+          <div className="md:col-span-2 xl:col-span-3"><Field label="Notes"><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional receiving note" className={inputClass} /></Field></div>
+        </section>
+
+        <section>
+          <div className="mb-2 flex flex-wrap items-center gap-3">
+            <div>
+              <h3 className="text-sm font-semibold">Add products</h3>
+              <p className="text-xs text-[var(--admin-muted)]">Search any active product. Supplier is who delivered, not a product catalog lock.</p>
+            </div>
+            <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Filter by SKU or name…" className={`${inputClass} ml-auto max-w-sm`} />
           </div>
-          <div>
-            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-              Notes
-            </label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional note for this order"
-              className={inputClass}
-            />
+          <div className="max-h-52 overflow-auto rounded-xl border border-[var(--admin-border)]">
+            {searching ? <Empty text="Loading products…" /> : products.length === 0 ? <Empty text="No matching products." /> : products.map((product) => (
+              <button key={product.productId} type="button" disabled={lines.has(product.productId)} onClick={() => addLine(product)} className="flex w-full items-center gap-3 border-b border-[var(--admin-border)] px-4 py-2 text-left text-sm last:border-0 hover:bg-[#f7f9fb] disabled:opacity-50">
+                <span className="min-w-0 flex-1"><strong>{product.productName}</strong><span className="ml-2 font-mono text-xs text-[var(--admin-muted)]">{product.productCode}</span></span>
+                <span className="text-xs text-[var(--admin-muted)]">Central stock: {product.currentQty ?? 0}</span>
+                <span className="font-semibold text-[#0058be]">{lines.has(product.productId) ? 'Added' : 'Add'}</span>
+              </button>
+            ))}
           </div>
         </section>
 
-        {/* Recommended products */}
         <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-[var(--admin-text)]">
-              Recommended products
-              <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
-                (order qty in import units; warehouse stock in base units)
-              </span>
-            </h3>
-            {availableRecommended.length > 0 && (
-              <Button
-                variant="secondary"
-                className="!px-3 !py-1 !text-xs"
-                onClick={addAllRecommended}
-              >
-                Add all recommended
-              </Button>
-            )}
-          </div>
+          <h3 className="mb-2 text-sm font-semibold">Receipt lines ({lineList.length})</h3>
           <div className="overflow-x-auto rounded-xl border border-[var(--admin-border)]">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                <tr>
-                  <th className="px-4 py-2">Product</th>
-                  <th className="px-4 py-2">Category</th>
-                  <th className="px-4 py-2 text-right">Current (base)</th>
-                  <th className="px-4 py-2 text-right">Required (import)</th>
-                  <th className="px-4 py-2 text-right">Suggested (import)</th>
-                  <th className="px-4 py-2 text-right">Action</th>
-                </tr>
-              </thead>
+              <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase text-[var(--admin-subtle)]"><tr><th className="px-4 py-2">Product</th><th className="px-4 py-2">Smallest unit / conversion</th><th className="px-4 py-2 text-right">Received qty</th><th className="px-4 py-2 text-right">Import price</th><th className="px-4 py-2 text-right">Total</th><th /></tr></thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6">
-                      <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
-                    </td>
+                {!lineList.length ? <tr><td colSpan={6}><Empty text="No receipt lines yet." /></td></tr> : lineList.map((line) => (
+                  <tr key={line.productId} className="border-t border-[var(--admin-border)]">
+                    <td className="px-4 py-2"><strong>{line.productName}</strong><div className="font-mono text-xs text-[var(--admin-muted)]">{line.productCode}</div></td>
+                    <td className="px-4 py-2 text-[var(--admin-muted)]">{unitLabel(line.unit)} · {line.topPackagingLabel || purchaseUnitLabel(line.importUnit || line.unit)}</td>
+                    <td className="px-4 py-2 text-right"><input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(line.productId, { quantity: e.target.value })} className="w-24 rounded-lg border px-2 py-1 text-right" /></td>
+                    <td className="px-4 py-2 text-right"><input type="number" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.productId, { unitPrice: e.target.value })} className="w-32 rounded-lg border px-2 py-1 text-right" /></td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatVnd((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0))}</td>
+                    <td className="px-4 py-2 text-right"><button type="button" className="text-xs font-semibold text-red-600" onClick={() => setLines((previous) => { const next = new Map(previous); next.delete(line.productId); return next; })}>Remove</button></td>
                   </tr>
-                ) : availableRecommended.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-[var(--admin-muted)]">
-                      No products need replenishment from suppliers.
-                    </td>
-                  </tr>
-                ) : (
-                  availableRecommended.map((r) => (
-                    <tr key={r.productId} className="border-t border-[var(--admin-border)]">
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-[var(--admin-text)]">{r.productName}</div>
-                        <div className="font-mono text-xs text-[var(--admin-subtle)]">
-                          {r.productCode}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-[var(--admin-muted)]">{r.categoryName || '—'}</td>
-                      <td className="px-4 py-2 text-right tabular-nums text-red-600">
-                        {r.currentQtyBase ?? r.currentQty}
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {r.requiredQty}
-                        {r.unit ? (
-                          <span className="ml-1 text-xs font-normal text-[var(--admin-muted)]">
-                            {r.unit}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-2 text-right font-semibold tabular-nums">
-                        {r.suggestedQty}
-                        {r.unit ? (
-                          <span className="ml-1 text-xs font-normal text-[var(--admin-muted)]">
-                            {r.unit}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <Button
-                          variant="secondary"
-                          className="!px-3 !py-1 !text-xs"
-                          onClick={() => addLine(r, r.suggestedQty)}
-                        >
-                          Add
-                        </Button>
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
+              {!!lineList.length && <tfoot><tr className="border-t bg-[#f7f9fb] font-semibold"><td className="px-4 py-2" colSpan={2}>Receipt total</td><td className="px-4 py-2 text-right">{totalQty}</td><td /><td className="px-4 py-2 text-right">{formatVnd(totalAmount)}</td><td /></tr></tfoot>}
             </table>
           </div>
         </section>
-
-        {/* Manual product search */}
-        <section>
-          <h3 className="mb-2 text-sm font-semibold text-[var(--admin-text)]">Add product manually</h3>
-          <div className="relative">
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Search by product code or name…"
-              className={inputClass}
-            />
-            {keyword.trim() && (
-              <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-[var(--admin-border)] bg-white shadow-lg">
-                {searching ? (
-                  <div className="px-4 py-3 text-sm text-[var(--admin-muted)]">Searching…</div>
-                ) : results.length === 0 ? (
-                  <div className="px-4 py-3 text-sm text-[var(--admin-muted)]">No products found.</div>
-                ) : (
-                  results.map((p) => (
-                    <button
-                      key={p.productId}
-                      type="button"
-                      onClick={() => {
-                        addLine(p, 1);
-                        setKeyword('');
-                        setResults([]);
-                      }}
-                      className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-sm hover:bg-[#f7f9fb]"
-                    >
-                      <span>
-                        <span className="font-medium text-[var(--admin-text)]">{p.productName}</span>
-                        <span className="ml-2 font-mono text-xs text-[var(--admin-subtle)]">
-                          {p.productCode}
-                        </span>
-                      </span>
-                      <span className="text-xs text-[var(--admin-muted)]">
-                        stock: {p.currentQty ?? 0}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Purchase order products (selected) */}
-        <section>
-          <h3 className="mb-2 text-sm font-semibold text-[var(--admin-text)]">
-            Purchase order products
-            <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
-              ({lineList.length} product{lineList.length === 1 ? '' : 's'})
-            </span>
-          </h3>
-          <div className="overflow-x-auto rounded-xl border border-[var(--admin-border)]">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                <tr>
-                  <th className="px-4 py-2">Product</th>
-                  <th className="px-4 py-2">Unit</th>
-                  <th className="px-4 py-2 text-right">Quantity</th>
-                  <th className="px-4 py-2 text-right">Unit price</th>
-                  <th className="px-4 py-2 text-right">Line total</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {lineList.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-sm text-[var(--admin-muted)]">
-                      No products added yet. Use the recommendations or search above.
-                    </td>
-                  </tr>
-                ) : (
-                  lineList.map((l) => (
-                    <tr key={l.productId} className="border-t border-[var(--admin-border)]">
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-[var(--admin-text)]">{l.productName}</div>
-                        <div className="font-mono text-xs text-[var(--admin-subtle)]">
-                          {l.productCode}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-[var(--admin-muted)]">{unitLabel(l.unit)}</td>
-                      <td className="px-4 py-2 text-right">
-                        <input
-                          type="number"
-                          min="1"
-                          value={l.quantity}
-                          onChange={(e) =>
-                            updateLine(l.productId, { quantity: e.target.value })
-                          }
-                          className="w-20 rounded-lg border border-[var(--admin-border)] px-2 py-1 text-right text-sm focus:border-[#0058be] focus:outline-none"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          value={l.unitPrice}
-                          onChange={(e) =>
-                            updateLine(l.productId, { unitPrice: e.target.value })
-                          }
-                          className="w-28 rounded-lg border border-[var(--admin-border)] px-2 py-1 text-right text-sm focus:border-[#0058be] focus:outline-none"
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-right tabular-nums">
-                        {formatVnd((Number(l.quantity) || 0) * (Number(l.unitPrice) || 0))}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removeLine(l.productId)}
-                          className="text-xs font-medium text-red-600 hover:underline"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-              {lineList.length > 0 && (
-                <tfoot>
-                  <tr className="border-t border-[var(--admin-border)] bg-[#f7f9fb] font-semibold">
-                    <td className="px-4 py-2" colSpan={2}>
-                      Total
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums">{totalQty}</td>
-                    <td className="px-4 py-2" />
-                    <td className="px-4 py-2 text-right tabular-nums">{formatVnd(totalAmount)}</td>
-                    <td className="px-4 py-2" />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </section>
-
       </div>
     </Modal>
   );
+}
+
+function Field({ label, children }) {
+  return <label className="block"><span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">{label}</span>{children}</label>;
+}
+
+function Empty({ text }) {
+  return <div className="px-4 py-6 text-center text-sm text-[var(--admin-muted)]">{text}</div>;
 }

@@ -5,9 +5,11 @@ import {
   deleteProduct,
   fetchProductsPage,
   generateBarcode,
+  scheduleProductSalePrice,
   updateProduct,
 } from '../../api/products.js';
 import { fetchCategories } from '../../api/categories.js';
+import { fetchSuppliers } from '../../api/suppliers.js';
 import {
   PRODUCT_UNITS,
   PURCHASE_UNITS,
@@ -29,6 +31,7 @@ import { formatVnd } from '../../lib/money.js';
 import { highValueVerificationHint, willAppearInShiftVerification } from '../../lib/highValueProducts.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -40,6 +43,7 @@ import MoneyInput from '../../components/ui/MoneyInput.jsx';
 import InventoryCountPanel from '../../components/domain/InventoryCountPanel.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
 
@@ -51,9 +55,11 @@ const EMPTY = {
   unit: 'piece',
   importUnit: 'case',
   unitsPerImportUnit: 24,
+  supplierId: '',
   referenceImportPrice: null,
   defaultSalePrice: null,
   description: '',
+  refundable: true,
   status: 'active',
   syncCodeFromBarcode: true,
 };
@@ -106,10 +112,12 @@ function displayStockUnitLabel(product, stockUnitMode) {
 export default function ProductsPage() {
   const { has, role } = usePermissions();
   const { getCategories, invalidate } = useReferenceData();
+  const confirmSave = useSaveConfirmation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const canManage = canManageProducts(role, { has });
   const isWm = isWarehouseViewRole(role);
+  const canSchedulePrice = has('SET_RETAIL_PRICE');
   const isCentral = isCentralCatalogRole(role);
   const showScan = showBarcodeWorkflow(role);
   const showBranchStock = showBranchStockColumn(role);
@@ -119,6 +127,7 @@ export default function ProductsPage() {
 
   const barcodeRef = useRef(null);
   const [categories, setCategories] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -133,6 +142,11 @@ export default function ProductsPage() {
   const [formError, setFormError] = useState('');
   const [countOpen, setCountOpen] = useState(searchParams.get('count') === '1');
   const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [priceTarget, setPriceTarget] = useState(null);
+  const [scheduledPrice, setScheduledPrice] = useState(null);
+  const [effectiveDate, setEffectiveDate] = useState('');
+  const [priceSaving, setPriceSaving] = useState(false);
+  const [priceError, setPriceError] = useState('');
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(fetchProductsPage, {
     search: debouncedQuery,
@@ -149,6 +163,16 @@ export default function ProductsPage() {
       .then((cats) => setCategories(Array.isArray(cats) ? cats : []))
       .catch(() => setCategories([]));
   }, [getCategories]);
+
+  useEffect(() => {
+    if (!isCentral && !isWm) return;
+    fetchSuppliers()
+      .then((payload) => {
+        const rows = Array.isArray(payload) ? payload : payload?.listObjects || [];
+        setSuppliers(rows.filter((row) => String(row.status || 'active').toLowerCase() === 'active'));
+      })
+      .catch(() => setSuppliers([]));
+  }, [isCentral, isWm]);
 
   useEffect(() => {
     if (searchParams.get('count') === '1') {
@@ -208,9 +232,11 @@ export default function ProductsPage() {
       unit: normalizeUnitValue(product.unit || 'piece'),
       importUnit: normalizeUnitValue(product.importUnit || 'case'),
       unitsPerImportUnit: product.unitsPerImportUnit ?? 24,
+      supplierId: product.supplierId ?? '',
       referenceImportPrice: product.referenceImportPrice ?? null,
       defaultSalePrice: product.defaultSalePrice ?? null,
       description: product.description || '',
+      refundable: product.refundable !== false,
       status: product.status || 'active',
       syncCodeFromBarcode: false,
     });
@@ -259,6 +285,15 @@ export default function ProductsPage() {
       return;
     }
 
+    const confirmed = await confirmSave({
+      title: editingId ? 'Confirm product changes' : 'Confirm new product',
+      message: editingId
+        ? `Save the changes to ${form.name.trim() || 'this product'}?`
+        : `Create ${form.name.trim() || 'this product'} in the shared product catalog?`,
+      confirmLabel: editingId ? 'Yes, save changes' : 'Yes, create product',
+    });
+    if (!confirmed) return;
+
     setSaving(true);
     const payload = {
       name: form.name.trim(),
@@ -267,9 +302,11 @@ export default function ProductsPage() {
       unit: normalizeUnitValue(form.unit),
       importUnit: normalizeUnitValue(form.importUnit),
       unitsPerImportUnit: Number(form.unitsPerImportUnit) || null,
+      supplierId: form.supplierId ? Number(form.supplierId) : null,
       referenceImportPrice: form.referenceImportPrice,
       defaultSalePrice: form.defaultSalePrice,
       description: form.description.trim() || null,
+      refundable: form.refundable !== false,
     };
 
     try {
@@ -312,6 +349,33 @@ export default function ProductsPage() {
     }
   }
 
+  function openPriceSchedule(product) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setPriceTarget(product);
+    setScheduledPrice(product.scheduledSalePrice ?? product.defaultSalePrice ?? null);
+    setEffectiveDate(tomorrow.toISOString().slice(0, 10));
+    setPriceError('');
+  }
+
+  async function saveScheduledPrice() {
+    if (!priceTarget || scheduledPrice == null || !effectiveDate) return;
+    setPriceSaving(true);
+    setPriceError('');
+    try {
+      await scheduleProductSalePrice(priceTarget.id, {
+        price: Number(scheduledPrice),
+        effectiveDate,
+      });
+      setPriceTarget(null);
+      load();
+    } catch (err) {
+      setPriceError(fieldErrors(err));
+    } finally {
+      setPriceSaving(false);
+    }
+  }
+
   const selectClass =
     'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
@@ -319,11 +383,10 @@ export default function ProductsPage() {
   const filterSelectClass =
     'rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
   const colSpan =
-    7 +
+    8 +
     (showBranchStock ? 1 : 0) +
     (showWarehouseStock ? 2 : 0) +
-    (canManage || isWm ? 1 : 0) +
-    (canManage ? 1 : 0);
+    (canManage || isWm ? 1 : 0);
 
   return (
     <div className="w-full">
@@ -513,6 +576,14 @@ export default function ProductsPage() {
                     />
                   </FormField>
                 </div>
+                {isCentral && (
+                  <FormField label="Primary supplier" hint="Supplier receipts only list products assigned to the selected supplier.">
+                    <select value={form.supplierId} onChange={(e) => patchForm({ supplierId: e.target.value })} className={selectClass}>
+                      <option value="">Not assigned</option>
+                      {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+                    </select>
+                  </FormField>
+                )}
               </section>
 
               <section className="space-y-3 rounded-xl border border-[var(--admin-border)] p-4">
@@ -532,7 +603,9 @@ export default function ProductsPage() {
                       required
                       value={form.defaultSalePrice}
                       onChange={(v) => patchForm({ defaultSalePrice: v })}
+                      disabled={Boolean(editingId)}
                     />
+                    {editingId && <p className="mt-1 text-xs text-[var(--admin-muted)]">Existing retail prices cannot change during the day. Warehouse Manager schedules a future effective date.</p>}
                   </FormField>
                 </div>
                 <div
@@ -550,6 +623,25 @@ export default function ProductsPage() {
                     set the retail price above the threshold, and make sure the branch has stock on hand.
                   </p>
                 </div>
+              </section>
+
+              <section className="rounded-xl border border-[var(--admin-border)] p-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.refundable !== false}
+                    onChange={(e) => patchForm({ refundable: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--admin-border)] text-[#0058be] focus:ring-[#0058be]/30"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-[var(--admin-text)]">
+                      Refundable at POS
+                    </span>
+                    <span className="mt-1 block text-xs leading-relaxed text-[var(--admin-muted)]">
+                      A non-refundable product prevents the cashier from refunding the whole order.
+                    </span>
+                  </span>
+                </label>
               </section>
 
               {editingId && (
@@ -665,29 +757,29 @@ export default function ProductsPage() {
               className="min-w-[220px] flex-1 max-w-sm rounded-lg border border-[var(--admin-border)] px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
             />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-full text-left text-sm">
+          <div className="w-full">
+            <table className="w-full text-left text-sm">
               <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                 <tr>
-                  <th className="px-4 py-3">SKU</th>
-                  <th className="px-4 py-3">Barcode</th>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Category</th>
-                  {showBranchStock && <th className="px-4 py-3 text-right">Branch stock</th>}
-                  {showWarehouseStock && <th className="px-4 py-3 text-right">In stock</th>}
-                  {showWarehouseStock && <th className="px-4 py-3 text-right">Reorder</th>}
-                  <th className="whitespace-nowrap px-4 py-3">Retail</th>
-                  <th className="px-4 py-3">Unit</th>
-                  {(canManage || isWm) && <th className="px-4 py-3">Import unit</th>}
-                  <th className="px-4 py-3">Status</th>
-                  {canManage && <th className="px-4 py-3 text-right">Actions</th>}
+                  <th className="px-2 py-2">SKU</th>
+                  <th className="px-2 py-2">Barcode</th>
+                  <th className="px-2 py-2">Name</th>
+                  <th className="px-2 py-2">Category</th>
+                  {showBranchStock && <th className="px-2 py-2 text-right">Branch stock</th>}
+                  {showWarehouseStock && <th className="px-2 py-2 text-right">In stock</th>}
+                  {showWarehouseStock && <th className="px-2 py-2 text-right">Reorder</th>}
+                  <th className="px-2 py-2">Retail</th>
+                  <th className="px-2 py-2">Unit</th>
+                  <th className="px-2 py-2">Refund</th>
+                  <th className="px-2 py-2">Status</th>
+                  {(canManage || isWm) && <th className="px-2 py-2 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading
                   ? Array.from({ length: 4 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={colSpan} className="px-4 py-4">
+                        <td colSpan={colSpan} className="px-2 py-3">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
@@ -700,49 +792,63 @@ export default function ProductsPage() {
                         key={p.id}
                         className="border-t border-[var(--admin-border)] hover:bg-[#f7f9fb]/80"
                       >
-                        <td className="px-4 py-3 font-mono text-xs font-semibold text-[#0058be]">
+                        <td className="px-2 py-2 font-mono text-xs font-semibold text-[#0058be]">
                           {p.code}
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-[var(--admin-muted)]">
+                        <td className="truncate px-2 py-2 font-mono text-xs text-[var(--admin-muted)]">
                           {p.barcode || '—'}
                         </td>
-                        <td className="px-4 py-3 font-medium">{p.name}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">
-                          {p.categoryName || '—'}
+                        <td className="px-2 py-2 font-medium">
+                          <span className="line-clamp-2">{p.name}</span>
+                        </td>
+                        <td className="px-2 py-2 text-[var(--admin-muted)]">
+                          <span className="line-clamp-2">{p.categoryName || '—'}</span>
                           {p.scope === 'BRANCH' && (
                             <span className="ml-1 text-[10px] uppercase text-amber-700">branch</span>
                           )}
                         </td>
                         {showBranchStock && (
-                          <td className={`px-4 py-3 text-right tabular-nums font-semibold ${branchLow ? 'text-amber-600' : ''}`}>
+                          <td className={`px-2 py-2 text-right tabular-nums font-semibold ${branchLow ? 'text-amber-600' : ''}`}>
                             {displayStockQty(p.branchStock, p, stockUnitMode)}
                           </td>
                         )}
                         {showWarehouseStock && (
-                          <td className="px-4 py-3 text-right tabular-nums">
+                          <td className="px-2 py-2 text-right tabular-nums">
                             <span className={p.lowStock ? 'font-semibold text-amber-600' : ''}>
                               {displayStockQty(p.warehouseStock, p, stockUnitMode)}
                             </span>
                           </td>
                         )}
                         {showWarehouseStock && (
-                          <td className="px-4 py-3 text-right tabular-nums text-[var(--admin-muted)]">
+                          <td className="px-2 py-2 text-right tabular-nums text-[var(--admin-muted)]">
                             {p.warehouseReorderPoint ?? '—'}
                           </td>
                         )}
-                        <td className="whitespace-nowrap px-4 py-3 tabular-nums">
+                        <td className="px-2 py-2 tabular-nums">
                           {formatVnd(p.defaultSalePrice)}
+                          {p.scheduledSalePrice != null && (
+                            <div className="mt-1 text-[10px] font-medium text-amber-700">
+                              {formatVnd(p.scheduledSalePrice)} from {p.scheduledSalePriceEffectiveDate}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3">{stockUnit}</td>
-                        {(canManage || isWm) && (
-                          <td className="px-4 py-3 text-[var(--admin-muted)]">
-                            {p.topPackagingLabel ||
-                              (p.importUnit
-                                ? `${purchaseUnitLabel(p.importUnit)} (${p.unitsPerImportUnit || '—'}/${purchaseUnitLabel(p.importUnit)})`
-                                : '—')}
-                          </td>
-                        )}
-                        <td className="px-4 py-3">
+                        <td className="px-2 py-2">
+                          <div>{stockUnit}</div>
+                          {(canManage || isWm) && (
+                            <div className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-[var(--admin-muted)]">
+                              {p.topPackagingLabel ||
+                                (p.importUnit
+                                  ? `${purchaseUnitLabel(p.importUnit)} (${p.unitsPerImportUnit || '—'}/${purchaseUnitLabel(p.importUnit)})`
+                                  : '—')}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-2">
+                          <Badge tone={p.refundable === false ? 'warning' : 'success'}>
+                            {p.refundable === false ? 'Non-refundable' : 'Refundable'}
+                          </Badge>
+                        </td>
+                        <td className="px-2 py-2">
                           <Badge tone={p.status === 'active' ? 'success' : 'danger'}>
                             {p.status || '—'}
                           </Badge>
@@ -752,23 +858,24 @@ export default function ProductsPage() {
                             </Badge>
                           ) : null}
                         </td>
-                        {canManage && (
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                className="!px-2 !py-1"
-                                onClick={() => startEdit(p)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                className="!px-2 !py-1 !text-red-600"
-                                onClick={() => handleDelete(p.id)}
-                              >
-                                Delete
-                              </Button>
+                        {(canManage || isWm) && (
+                          <td className="px-2 py-2 text-right">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {canSchedulePrice && (
+                                <Button variant="ghost" className="!px-2 !py-1" onClick={() => openPriceSchedule(p)}>
+                                  Schedule price
+                                </Button>
+                              )}
+                              {canManage && (
+                                <>
+                                  <Button variant="ghost" className="!px-2 !py-1" onClick={() => startEdit(p)}>
+                                    Edit
+                                  </Button>
+                                  <Button variant="ghost" className="!px-2 !py-1 !text-red-600" onClick={() => handleDelete(p.id)}>
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         )}
@@ -797,6 +904,32 @@ export default function ProductsPage() {
         confirmLabel="Confirm"
         danger
       />
+      <Modal
+        open={Boolean(priceTarget)}
+        onClose={() => setPriceTarget(null)}
+        title="Schedule retail price"
+        description="The new price starts at the beginning of the selected future date; it never changes mid-day."
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setPriceTarget(null)}>Cancel</Button>
+            <Button loading={priceSaving} onClick={saveScheduledPrice}>Schedule price</Button>
+          </div>
+        )}
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg bg-[#f7f9fb] p-3 text-sm">
+            <strong>{priceTarget?.name}</strong>
+            <p className="mt-1 text-[var(--admin-muted)]">Current retail price: {formatVnd(priceTarget?.defaultSalePrice)}</p>
+          </div>
+          <FormField label="New retail price" required>
+            <MoneyInput required value={scheduledPrice} onChange={setScheduledPrice} />
+          </FormField>
+          <FormField label="Effective date" required>
+            <input type="date" value={effectiveDate} min={new Date(Date.now() + 86400000).toISOString().slice(0, 10)} onChange={(e) => setEffectiveDate(e.target.value)} className={selectClass} />
+          </FormField>
+          {priceError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{priceError}</div>}
+        </div>
+      </Modal>
     </div>
   );
 }

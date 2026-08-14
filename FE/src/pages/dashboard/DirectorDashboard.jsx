@@ -60,18 +60,31 @@ export default function DirectorDashboard() {
       trend: momTrend(data?.momPercent),
     },
     {
+      key: 'profit',
+      label: 'Chain profit',
+      value: loading ? '…' : formatVnd(data?.totalProfit),
+      icon: 'cash',
+      hint: loading
+        ? undefined
+        : `${Number(data?.profitMarginPercent ?? 0).toFixed(1)}% margin · cost ${formatVnd(data?.totalCogs)}`,
+    },
+    {
       key: 'best',
       label: 'Best branch',
       value: loading ? '…' : data?.bestBranch?.name || '—',
       icon: 'store',
-      hint: data?.bestBranch ? formatVnd(data.bestBranch.revenue) : 'No revenue in period',
+      hint: data?.bestBranch
+        ? `${formatVnd(data.bestBranch.revenue)} · profit ${formatVnd(data.bestBranch.profit)}`
+        : 'No revenue in period',
     },
     {
       key: 'weak',
       label: 'Weakest branch',
       value: loading ? '…' : data?.weakestBranch?.name || '—',
       icon: 'store',
-      hint: data?.weakestBranch ? formatVnd(data.weakestBranch.revenue) : undefined,
+      hint: data?.weakestBranch
+        ? `${formatVnd(data.weakestBranch.revenue)} · profit ${formatVnd(data.weakestBranch.profit)}`
+        : undefined,
     },
     {
       key: 'promos',
@@ -140,6 +153,7 @@ export default function DirectorDashboard() {
                   <th className="px-4 py-2">Branch</th>
                   <th className="px-4 py-2 text-right">Orders</th>
                   <th className="px-4 py-2 text-right">Revenue</th>
+                  <th className="px-4 py-2 text-right">Profit</th>
                   <th className="px-4 py-2 text-right">Share</th>
                 </tr>
               </thead>
@@ -147,7 +161,7 @@ export default function DirectorDashboard() {
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i} className="border-t border-[var(--admin-border)]">
-                        <td colSpan={4} className="px-4 py-3">
+                        <td colSpan={5} className="px-4 py-3">
                           <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                         </td>
                       </tr>
@@ -157,6 +171,7 @@ export default function DirectorDashboard() {
                         <td className="px-4 py-2.5 font-medium">{row.branchName}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums">{row.orderCount}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums">{formatVnd(row.revenue)}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{formatVnd(row.profit)}</td>
                         <td className="px-4 py-2.5 text-right tabular-nums">
                           {row.shareOfChainPercent != null ? `${row.shareOfChainPercent}%` : '—'}
                         </td>

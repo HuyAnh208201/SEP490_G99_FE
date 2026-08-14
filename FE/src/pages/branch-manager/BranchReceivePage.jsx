@@ -12,10 +12,12 @@ import { formatDateTime } from '../../lib/datetime.js';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 
 const RECEIVABLE = new Set([PR_STATUS.APPROVED, PR_STATUS.IN_TRANSIT]);
 
 export default function BranchReceivePage() {
+  const confirmSave = useSaveConfirmation();
   const [branchId, setBranchId] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,12 @@ export default function BranchReceivePage() {
   );
 
   async function quickReceive(request) {
+    const confirmed = await confirmSave({
+      title: 'Confirm goods receipt',
+      message: `Confirm receipt of every item in ${request.code || 'this request'} and update branch stock?`,
+      confirmLabel: 'Yes, receive goods',
+    });
+    if (!confirmed) return;
     await receiveRequest(request.id);
     await load();
   }

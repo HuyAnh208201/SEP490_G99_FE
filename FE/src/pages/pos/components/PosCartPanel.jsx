@@ -33,13 +33,6 @@ export default function PosCartPanel({
   lines,
   totals,
   customer,
-  appliedVoucher,
-  discountCodeInput,
-  discountCodeError,
-  discountCodeBusy,
-  setDiscountCodeInput,
-  applyDiscountCode,
-  clearDiscountCode,
   updateQty,
   removeLine,
   customerPhone = '',
@@ -102,7 +95,7 @@ export default function PosCartPanel({
       ? Math.min(
           customer.points,
           Math.floor(
-            Math.max(0, totals.subtotalAfterPromo - totals.codeDiscount) / loyalty.pointValueVnd,
+          Math.max(0, totals.subtotalAfterPromo) / loyalty.pointValueVnd,
           ),
         )
       : 0;
@@ -377,50 +370,11 @@ export default function PosCartPanel({
       </div>
 
       <div className="shrink-0 space-y-3 border-t border-[var(--admin-border)] bg-[#fbfcfe] p-4">
-        {!readOnly && (
-          <>
-            <div className="flex gap-2">
-              <input
-                value={discountCodeInput}
-                onChange={(event) => setDiscountCodeInput(event.target.value.toUpperCase())}
-                placeholder="Discount code"
-                className="min-w-0 flex-1 rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-xs uppercase outline-none focus:border-[var(--admin-brand)] focus:ring-2 focus:ring-[#0058be]/15"
-              />
-              {appliedVoucher ? (
-                <button type="button" onClick={clearDiscountCode} className="rounded-lg border border-[var(--admin-danger)]/30 px-3 text-xs font-semibold text-[var(--admin-danger)] transition hover:bg-[var(--admin-danger-bg)]">
-                  Remove
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={discountCodeBusy || !discountCodeInput.trim()}
-                  onClick={applyDiscountCode}
-                  className="rounded-lg border border-[var(--admin-brand)] px-3 text-xs font-semibold text-[var(--admin-brand)] transition hover:bg-[#0058be]/8 disabled:opacity-40"
-                >
-                  Apply
-                </button>
-              )}
-            </div>
-            {discountCodeError && <p className="text-xs text-[var(--admin-danger)]">{discountCodeError}</p>}
-          </>
-        )}
-        {appliedVoucher && (
-          <p className="text-xs font-medium text-[var(--admin-success)]">
-            {appliedVoucher.code} applied · {appliedVoucher.name}
-          </p>
-        )}
-
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between text-[var(--admin-muted)]">
             <span>Subtotal</span>
             <span>{formatVnd(totals.subtotalAfterPromo)}</span>
           </div>
-          {totals.codeDiscount > 0 && (
-            <div className="flex justify-between text-[var(--admin-success)]">
-              <span>Discount</span>
-              <span>− {formatVnd(totals.codeDiscount)}</span>
-            </div>
-          )}
           {totals.pointsDiscount > 0 && (
             <div className="flex justify-between text-[var(--admin-success)]">
               <span>{totals.pointsUsed} redeemed points</span>

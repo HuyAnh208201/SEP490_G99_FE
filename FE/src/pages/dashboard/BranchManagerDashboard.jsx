@@ -15,6 +15,7 @@ import Card from '../../components/ui/Card.jsx';
 import ReportPeriodFilters from '../../components/domain/ReportPeriodFilters.jsx';
 import DashboardKpiGrid from '../../components/dashboard/DashboardKpiGrid.jsx';
 import { formatVnd } from '../../lib/money.js';
+import { formatDateTime } from '../../lib/datetime.js';
 import { rangeForPeriod, toDateInput } from '../../lib/reportPeriods.js';
 
 function ActionLink({ to, label, count, hint }) {
@@ -69,7 +70,9 @@ export default function BranchManagerDashboard() {
       label: 'Today revenue',
       value: loading ? '…' : formatVnd(data?.todayRevenue),
       icon: 'cash',
-      hint: loading ? undefined : `${data?.todayTransactions ?? 0} transactions`,
+      hint: loading
+        ? undefined
+        : `${data?.todayTransactions ?? 0} transactions · profit ${formatVnd(data?.todayProfit)}`,
     },
     {
       key: 'period',
@@ -86,23 +89,26 @@ export default function BranchManagerDashboard() {
             },
     },
     {
+      key: 'profit',
+      label: 'Period profit',
+      value: loading ? '…' : formatVnd(data?.periodProfit),
+      icon: 'cash',
+      hint: loading
+        ? undefined
+        : `${Number(data?.profitMarginPercent ?? 0).toFixed(1)}% margin · cost ${formatVnd(data?.periodCogs)}`,
+    },
+    {
       key: 'atv',
       label: 'Avg transaction',
       value: loading ? '…' : formatVnd(data?.avgTransactionValue),
       icon: 'cash',
-    },
-    {
-      key: 'staff',
-      label: 'Branch staff',
-      value: loading ? '…' : data?.staffCount ?? '—',
-      icon: 'staff',
-      hint: `${data?.publishedShifts ?? 0} published shifts`,
     },
   ];
 
   const trendData = (data?.trend || []).map((p) => ({
     date: String(p.date || '').slice(5),
     revenue: Number(p.revenue || 0),
+    profit: Number(p.profit || 0),
   }));
 
   return (
@@ -110,6 +116,13 @@ export default function BranchManagerDashboard() {
       <PageHeader
         title={data?.branchName ? `${data.branchName} operations` : 'Branch operations'}
         description="Today’s results and the queues that need your action."
+        actions={
+          data?.generatedAt ? (
+            <span className="text-sm font-medium text-[var(--admin-muted)]">
+              Updated {formatDateTime(data.generatedAt)}
+            </span>
+          ) : null
+        }
       />
 
       <Card className="!p-4">
@@ -151,8 +164,9 @@ export default function BranchManagerDashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} width={56} />
-                    <Tooltip formatter={(v) => formatVnd(v)} />
-                    <Line type="monotone" dataKey="revenue" stroke="#0058be" strokeWidth={2} dot={false} />
+                    <Tooltip formatter={(v, name) => [formatVnd(v), name]} />
+                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#0058be" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="profit" name="Profit" stroke="#0f9d58" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -173,19 +187,21 @@ export default function BranchManagerDashboard() {
                   <th className="px-4 py-2">Product</th>
                   <th className="px-4 py-2 text-right">Qty</th>
                   <th className="px-4 py-2 text-right">Revenue</th>
+                  <th className="px-4 py-2 text-right">Profit</th>
                 </tr>
               </thead>
               <tbody>
                 {(data?.topProducts || []).map((p) => (
                   <tr key={p.productId} className="border-t border-[var(--admin-border)]">
-                    <td className="px-4 py-2">{p.productName || `Product #${p.productId}`}</td>
+                    <td className="px-4 py-2">{p.productName || p.productCode || '—'}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{p.qtySold}</td>
                     <td className="px-4 py-2 text-right tabular-nums">{formatVnd(p.revenue)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{formatVnd(p.profit)}</td>
                   </tr>
                 ))}
                 {!loading && !(data?.topProducts || []).length ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-[var(--admin-muted)]">
+                    <td colSpan={4} className="px-4 py-8 text-center text-[var(--admin-muted)]">
                       No product sales yet.
                     </td>
                   </tr>
@@ -204,11 +220,6 @@ export default function BranchManagerDashboard() {
               label="Open import requests"
               count={loading ? '…' : data?.pendingImports ?? 0}
               hint="Pending through in-transit"
-            />
-            <ActionLink
-              to="/branch-manager/refunds"
-              label="Pending refunds"
-              count={loading ? '…' : data?.pendingRefunds ?? 0}
             />
             <ActionLink
               to="/branch-manager/cash-reconciliation"

@@ -56,7 +56,9 @@ export async function login({ username, password }) {
     throw wrapped;
   }
 
-  // Lấy hồ sơ user — gửi kèm token vì interceptor chưa đọc được từ localStorage tại thời điểm này.
+  // Persist before /auth/me so the interceptor cannot reuse a previous session token.
+  localStorage.setItem('chainstore_token', token);
+
   let user = null;
   try {
     const { data: meBody } = await http.get('/auth/me', {
@@ -64,7 +66,6 @@ export async function login({ username, password }) {
     });
     user = toProfile(meBody?.data);
   } catch {
-    // Không chặn đăng nhập nếu /me lỗi — vẫn cho vào với token hợp lệ.
     user = { name: username, username };
   }
 
