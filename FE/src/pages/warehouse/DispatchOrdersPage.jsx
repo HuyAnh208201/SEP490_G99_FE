@@ -10,7 +10,7 @@ import {
   isWarehouseEditableStatus,
   normalizeDispatchStatus,
 } from '../../constants/dispatch.js';
-import { listDispatchOrdersPage, updateDispatchStatus } from '../../api/dispatch.js';
+import { listDispatchOrdersPage, updateDispatchStatus, getDispatchOrder } from '../../api/dispatch.js';
 import DispatchOrderDetailModal from './components/DispatchOrderDetailModal.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
@@ -26,6 +26,7 @@ export default function DispatchOrdersPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [detail, setDetail] = useState(null);
+  const [openingId, setOpeningId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [draftStatus, setDraftStatus] = useState({});
 
@@ -44,6 +45,19 @@ export default function DispatchOrdersPage() {
   }, [rows]);
 
   const filteredRows = rows;
+
+  async function openDetail(order) {
+    setOpeningId(order.id);
+    setActionError('');
+    try {
+      const full = await getDispatchOrder(order.id);
+      setDetail(full);
+    } catch (err) {
+      setActionError(err?.message || 'Failed to load dispatch details');
+    } finally {
+      setOpeningId(null);
+    }
+  }
 
   async function applyStatus(order) {
     const next = draftStatus[order.id];
@@ -163,7 +177,8 @@ export default function DispatchOrdersPage() {
                             <Button
                               variant="secondary"
                               className="!px-3 !py-1 !text-xs"
-                              onClick={() => setDetail(r)}
+                              loading={openingId === r.id}
+                              onClick={() => openDetail(r)}
                             >
                               View Details
                             </Button>

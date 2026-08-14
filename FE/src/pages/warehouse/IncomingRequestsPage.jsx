@@ -7,6 +7,7 @@ import { formatDate, formatDateTime } from '../../lib/datetime.js';
 import {
   WM_INCOMING_STATUS_OPTIONS,
   statusMeta,
+  canApproveRequest,
 } from '../../constants/purchaseRequests.js';
 import {
   listRequestsPage,
@@ -17,11 +18,14 @@ import IncomingRequestDetailModal from './components/IncomingRequestDetailModal.
 import Pagination from '../../components/ui/Pagination.jsx';
 import useDebouncedValue from '../../hooks/useDebouncedValue.js';
 import useServerPage from '../../hooks/useServerPage.js';
+import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 
 const selectClass =
   'rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 export default function IncomingRequestsPage() {
+  const { has } = usePermissions();
+  const canApprove = canApproveRequest(has);
   const [branches, setBranches] = useState([]);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
@@ -58,8 +62,18 @@ export default function IncomingRequestsPage() {
     <div className="w-full">
       <PageHeader
         title="Incoming Requests"
-        description="Review pending requests, track awaiting-stock, and see approved requests ready to ship."
+        description={
+          canApprove
+            ? 'Review pending requests, track awaiting-stock, and see approved requests ready to ship.'
+            : 'View branch import requests. Approval is limited to Warehouse Manager accounts.'
+        }
       />
+
+      {!canApprove && (
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          View-only mode: only Warehouse Managers can approve pending import requests.
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

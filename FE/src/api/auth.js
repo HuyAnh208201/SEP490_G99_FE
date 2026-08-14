@@ -12,7 +12,7 @@ function resolveAuthError(err, fallback) {
   }
   // Vite proxy returns bare 500 when BE on :4313 is down — axios message is useless.
   if ((status === 500 || status === 502 || status === 503 || status === 504) && (!serverMessage || axiosGeneric)) {
-    return 'Backend is not running on port 4313. Start BE: cd SEB490_G99_BE/BE && mvnw.cmd spring-boot:run';
+    return 'Backend is not running on port 4313. Start BE: cd BE && mvnw.cmd spring-boot:run';
   }
   return serverMessage || (!axiosGeneric && err?.message) || fallback;
 }
