@@ -82,7 +82,7 @@ export function canCreateRequest(has) {
   return typeof has === 'function' && has('CREATE_IMPORT_REQUEST');
 }
 
-/** Central warehouse / Admin / Director: approves requests. */
+/** Warehouse Manager only: approves central import requests. */
 export function canApproveRequest(has) {
   return typeof has === 'function' && has('APPROVE_IMPORT_REQUEST');
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Button from '../../components/ui/Button.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -20,8 +20,6 @@ export default function DispatchPlanningPage() {
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
   const [message, setMessage] = useState('');
-  const [areaFilter, setAreaFilter] = useState('');
-  const [routeFilter, setRouteFilter] = useState('');
   const [shippingId, setShippingId] = useState(null);
   const [openingId, setOpeningId] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -34,8 +32,6 @@ export default function DispatchPlanningPage() {
   const debouncedQuery = useDebouncedValue(query);
   const pageData = useServerPage(listApprovedRequestsPage, {
     search: debouncedQuery,
-    area: areaFilter,
-    route: routeFilter,
   });
   const { items: rows, loading, reload: load } = pageData;
   const error = actionError || pageData.error;
@@ -48,15 +44,6 @@ export default function DispatchPlanningPage() {
       })
       .catch(() => setSuppliers([]));
   }, []);
-
-  const areas = useMemo(
-    () => [...new Set(rows.map((r) => r.area).filter(Boolean))],
-    [rows],
-  );
-  const routes = useMemo(
-    () => [...new Set(rows.map((r) => r.route).filter(Boolean))],
-    [rows],
-  );
 
   function toggleSupplier(requestId, supplierId) {
     setSelectedSuppliersByRequest((prev) => {
@@ -160,18 +147,6 @@ export default function DispatchPlanningPage() {
 
       <Card className="!p-0 overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-[var(--admin-border)] px-4 py-3">
-          <select
-            value={routeFilter}
-            onChange={(e) => setRouteFilter(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All routes</option>
-            {routes.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
           <input
             type="search"
             value={query}
@@ -179,18 +154,6 @@ export default function DispatchPlanningPage() {
             placeholder="Search requests…"
             className={selectClass}
           />
-          <select
-            value={areaFilter}
-            onChange={(e) => setAreaFilter(e.target.value)}
-            className={selectClass}
-          >
-            <option value="">All areas</option>
-            {areas.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
             <strong>{rows.length}</strong> ready to ship
           </span>
@@ -202,8 +165,6 @@ export default function DispatchPlanningPage() {
               <tr>
                 <th className="px-4 py-3">Request ID</th>
                 <th className="px-4 py-3">Store</th>
-                <th className="px-4 py-3">Delivery Area</th>
-                <th className="px-4 py-3">Route</th>
                 <th className="px-4 py-3">Categories</th>
                 <th className="px-4 py-3">Suppliers</th>
                 <th className="px-4 py-3">Requested date</th>
@@ -215,7 +176,7 @@ export default function DispatchPlanningPage() {
               {loading
                 ? Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} className="border-t border-[var(--admin-border)]">
-                      <td colSpan={9} className="px-4 py-4">
+                      <td colSpan={7} className="px-4 py-4">
                         <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                       </td>
                     </tr>
@@ -232,8 +193,6 @@ export default function DispatchPlanningPage() {
                           {r.requestNumber}
                         </td>
                         <td className="px-4 py-3 font-medium">{r.branchName}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.area || '—'}</td>
-                        <td className="px-4 py-3 text-[var(--admin-muted)]">{r.route || '—'}</td>
                         <td className="px-4 py-3 text-[var(--admin-muted)]">
                           {(r.categories || []).join(', ') || '—'}
                           {needsSuppliers ? (
