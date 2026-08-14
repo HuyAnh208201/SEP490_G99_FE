@@ -61,6 +61,8 @@ export default function DispatchOrderDetailModal({ open, onClose, order, onChang
     >
       <div className="space-y-5">
         <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-3">
+          <Info label="Delivery area" value={order.deliveryArea || '—'} />
+          <Info label="Route" value={order.route || '—'} />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               Status

@@ -64,10 +64,10 @@ export default function CashReconciliationReviewPage() {
       return;
     }
     const confirmed = await confirmSave({
-      title: approved ? 'Confirm discrepancy approval' : 'Confirm discrepancy rejection',
+      title: approved ? 'Confirm reconciliation approval' : 'Confirm reconciliation rejection',
       message: approved
-        ? 'Approve this shift discrepancy and save the manager decision?'
-        : 'Reject this shift discrepancy with the entered manager note?',
+        ? 'Approve this cash discrepancy and save the manager decision?'
+        : 'Reject this cash discrepancy with the entered manager note?',
       confirmLabel: approved ? 'Yes, approve' : 'Yes, reject',
       danger: !approved,
     });
@@ -95,8 +95,8 @@ export default function CashReconciliationReviewPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Review shift discrepancy"
-        description="Verify cash and product variances, then approve or reject the closing."
+        title="Review cash discrepancy"
+        description="Verify shift closing details and approve or reject the cash difference."
         actions={
           <Link
             to="/branch-manager/cash-reconciliation"
@@ -220,104 +220,6 @@ export default function CashReconciliationReviewPage() {
                 <dd className="text-lg font-semibold">{tx.cancelledOrders ?? 0}</dd>
               </div>
             </dl>
-          </Section>
-
-          <Section title="High-value count (this shift)">
-            <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                  <tr>
-                    <th className="px-3 py-2">Product</th>
-                    <th className="px-3 py-2">Category</th>
-                    <th className="px-3 py-2 text-right">Expected</th>
-                    <th className="px-3 py-2 text-right">Actual</th>
-                    <th className="px-3 py-2 text-right">Diff</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detail.highValueItems || []).length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-3 py-6 text-center text-[var(--admin-muted)]">
-                        No high-value counts recorded for this shift.
-                      </td>
-                    </tr>
-                  ) : (
-                    detail.highValueItems.map((row) => (
-                      <tr key={row.productId} className="border-t border-[var(--admin-border)]">
-                        <td className="px-3 py-2">{row.productName || '—'}</td>
-                        <td className="px-3 py-2 text-[var(--admin-muted)]">{row.categoryName || '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{row.expectedQty ?? '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{row.actualQty ?? '—'}</td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums ${
-                            Number(row.difference ?? 0) < 0
-                              ? 'font-semibold text-red-600'
-                              : Number(row.difference ?? 0) > 0
-                                ? 'font-semibold text-emerald-600'
-                                : ''
-                          }`}
-                        >
-                          {row.difference ?? '—'}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Section>
-
-          <Section title="Product variance vs previous shift">
-            <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                  <tr>
-                    <th className="px-3 py-2">Product</th>
-                    <th className="px-3 py-2">Category</th>
-                    <th className="px-3 py-2 text-right">Prev. actual</th>
-                    <th className="px-3 py-2 text-right">This expected</th>
-                    <th className="px-3 py-2 text-right">This actual</th>
-                    <th className="px-3 py-2 text-right">Variance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(detail.previousShiftProductVariance || []).length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-6 text-center text-[var(--admin-muted)]">
-                        No previous-shift product variance available.
-                      </td>
-                    </tr>
-                  ) : (
-                    detail.previousShiftProductVariance.map((row) => (
-                      <tr key={row.productId} className="border-t border-[var(--admin-border)]">
-                        <td className="px-3 py-2">{row.productName || '—'}</td>
-                        <td className="px-3 py-2 text-[var(--admin-muted)]">{row.categoryName || '—'}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.previousActualQty ?? '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.currentExpectedQty ?? '—'}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {row.currentActualQty ?? '—'}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums ${
-                            Number(row.variance ?? 0) < 0
-                              ? 'font-semibold text-red-600'
-                              : Number(row.variance ?? 0) > 0
-                                ? 'font-semibold text-emerald-600'
-                                : ''
-                          }`}
-                        >
-                          {row.variance ?? '—'}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           </Section>
 
           <Section title="Manager review">

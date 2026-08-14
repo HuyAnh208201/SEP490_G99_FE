@@ -169,7 +169,7 @@ export const NAV_GROUPS = [
       },
       {
         path: '/branch-manager/cash-reconciliation',
-        label: 'Shift Discrepancy Review',
+        label: 'Cash Reconciliation',
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },

@@ -49,8 +49,8 @@ export default function CashReconciliationListPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Shift Discrepancy Review"
-        description="Review cashier shift closings with cash or product differences (pending approval)."
+        title="Cash Reconciliation"
+        description="Review cashier shift closings with a cash difference (pending approval)."
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -59,7 +59,7 @@ export default function CashReconciliationListPage() {
           <p className="p-6 text-sm text-[var(--admin-muted)]">Loading…</p>
         ) : allRows.length === 0 ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">
-            No shifts are waiting for discrepancy review.
+            No shifts are waiting for cash reconciliation.
           </p>
         ) : (
           <div className="overflow-x-auto">

@@ -3,25 +3,18 @@ import Modal from '../../../components/ui/Modal.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import { formatDate, formatDateTime } from '../../../lib/datetime.js';
-import {
-  PR_STATUS,
-  statusMeta,
-  normalizeStatus,
-  canApproveRequest,
-} from '../../../constants/purchaseRequests.js';
+import { PR_STATUS, statusMeta, normalizeStatus } from '../../../constants/purchaseRequests.js';
 import { approveRequest } from '../../../api/purchaseRequests.js';
 import { unitLabel } from '../../../constants/productUnits.js';
 import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
-import { usePermissions } from '../../../contexts/PermissionsContext.jsx';
 
 /**
- * Incoming request detail for central warehouse.
- * Approve + editable approved qty are WM-only; Admin/Director are view-only.
+ * Chi tiết yêu cầu nhập hàng cho KHO TỔNG (màn 2.2).
+ * Hiển thị tồn kho tổng theo từng sản phẩm để biết còn/hết hàng, cho phép duyệt.
+ * Khi duyệt: BE tự quyết định trạng thái APPROVED (đủ hàng) hoặc AWAITING_STOCK (thiếu).
  */
 export default function IncomingRequestDetailModal({ open, onClose, request, onChanged }) {
   const confirmSave = useSaveConfirmation();
-  const { has } = usePermissions();
-  const canApprove = canApproveRequest(has);
   const [approvedQty, setApprovedQty] = useState({});
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -38,10 +31,9 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
   }, [request]);
 
   const isPending = request && normalizeStatus(request.status) === PR_STATUS.PENDING;
-  const canEditApprove = isPending && canApprove;
 
   /**
-   * Products short on central stock for the current approved qty. Approved qty is
+   * Danh sách sản phẩm thiếu tồn kho tổng theo SL duyệt hiện tại. Approved qty is
    * entered in TOP packaging units (e.g. cases); warehouse stock is tracked in BASE
    * units, so it must be converted via topPackagingConversionQty before comparing.
    */
@@ -94,11 +86,9 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
       onClose={onClose}
       title={`Request ${request.code}`}
       description={
-        canEditApprove
+        isPending
           ? 'Review branch request against central warehouse stock, then approve.'
-          : isPending
-            ? 'View-only: only the Warehouse Manager can approve pending requests.'
-            : 'Request line items and central warehouse stock.'
+          : 'Request line items and central warehouse stock.'
       }
       size="xl"
     >
@@ -125,7 +115,7 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
           </p>
         )}
 
-        {canEditApprove && (
+        {isPending && (
           <div
             className={`rounded-lg border px-3 py-2 text-sm ${
               shortages.length
@@ -147,12 +137,6 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                 planning.
               </>
             )}
-          </div>
-        )}
-
-        {isPending && !canApprove && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            This request is pending. Approval is limited to Warehouse Manager accounts.
           </div>
         )}
 
@@ -215,7 +199,7 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                       )}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
-                      {canEditApprove ? (
+                      {isPending ? (
                         <input
                           type="number"
                           min={0}
@@ -230,16 +214,8 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
                           }`}
                         />
                       ) : (
-                        <span
-                          className={
-                            it.approvedQuantity == null && !isPending
-                              ? 'text-[var(--admin-subtle)]'
-                              : ''
-                          }
-                        >
-                          {isPending
-                            ? (approvedQty[it.id] ?? it.requestedQuantity ?? '—')
-                            : (it.approvedQuantity ?? '—')}
+                        <span className={it.approvedQuantity == null ? 'text-[var(--admin-subtle)]' : ''}>
+                          {it.approvedQuantity ?? '—'}
                         </span>
                       )}
                     </td>
@@ -260,7 +236,7 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          {canEditApprove && (
+          {isPending && (
             <Button loading={busy === 'approve'} onClick={handleApprove}>
               Approve
             </Button>
