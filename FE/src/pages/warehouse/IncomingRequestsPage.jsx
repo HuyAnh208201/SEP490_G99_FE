@@ -5,7 +5,6 @@ import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { formatDate, formatDateTime } from '../../lib/datetime.js';
 import {
-  PR_STATUS,
   WM_INCOMING_STATUS_OPTIONS,
   statusMeta,
 } from '../../constants/purchaseRequests.js';
@@ -26,7 +25,7 @@ export default function IncomingRequestsPage() {
   const [branches, setBranches] = useState([]);
   const [actionError, setActionError] = useState('');
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState(PR_STATUS.PENDING);
+  const [statusFilter, setStatusFilter] = useState('');
   const [branchFilter, setBranchFilter] = useState('');
   const [detail, setDetail] = useState(null);
   const [openingId, setOpeningId] = useState(null);
@@ -59,7 +58,7 @@ export default function IncomingRequestsPage() {
     <div className="w-full">
       <PageHeader
         title="Incoming Requests"
-        description="Review pending branch import requests and approve when warehouse inventory is sufficient."
+        description="Review pending requests, track awaiting-stock, and see approved requests ready to ship."
       />
 
       {error && (
@@ -89,7 +88,7 @@ export default function IncomingRequestsPage() {
             className={selectClass}
           >
             {WM_INCOMING_STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+              <option key={o.value || '__all__'} value={o.value}>
                 {o.label}
               </option>
             ))}
@@ -98,7 +97,7 @@ export default function IncomingRequestsPage() {
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search requests…" className={selectClass} />
 
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
-            <strong>{pageData.totalRecords}</strong> pending review
+            <strong>{pageData.totalRecords}</strong> {pageData.totalRecords === 1 ? 'request' : 'requests'}
           </span>
         </div>
 
