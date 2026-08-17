@@ -324,7 +324,7 @@ CREATE UNIQUE INDEX `campaign_branches_index_3` ON `campaign_branches` (`campaig
 
 ALTER TABLE `users` ADD FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`);
 ALTER TABLE `users` ADD FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
-ALTER TABLE `password_reset_tokens` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
+ALTER TABLE `password_reset_tokens` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 ALTER TABLE `branches` ADD FOREIGN KEY (`manager_id`) REFERENCES `users` (`id`);
 ALTER TABLE `categories` ADD FOREIGN KEY (`parent_id`) REFERENCES `categories` (`id`);
 ALTER TABLE `products` ADD FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`);

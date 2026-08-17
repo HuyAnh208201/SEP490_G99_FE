@@ -26,7 +26,7 @@ const EMPTY = {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+  'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm text-[var(--admin-text)] focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 function emailToUsername(email) {
   const local = email.split('@')[0] || '';
@@ -46,12 +46,18 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
   const [lockedBranchName, setLockedBranchName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [userNameEdited, setUserNameEdited] = useState(false);
 
-  const roles = useMemo(() => {
+  const baseRoles = useMemo(() => {
     let list = getAssignableRoles(actorRole);
     if (webRole === 'BRANCH_MANAGER') {
       list = list.filter((r) => r === 'CASHIER' || r === 'INVENTORY_STAFF');
     }
+    return list;
+  }, [actorRole, webRole]);
+
+  const roles = useMemo(() => {
+    let list = baseRoles;
     if (roleSlots) {
       list = list.filter((r) => {
         if (r === 'ADMIN') return roleSlots.adminAvailable;
@@ -61,17 +67,19 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
       });
     }
     return list;
-  }, [actorRole, webRole, roleSlots]);
+  }, [baseRoles, roleSlots]);
 
   useEffect(() => {
     if (!open) return;
     setStep('details');
     setError('');
+    setUserNameEdited(false);
+    setRoleSlots(null);
     const resolvedBranchId =
       webRole === 'BRANCH_MANAGER' && actorBranchId ? String(actorBranchId) : '';
     setForm({
       ...EMPTY,
-      role: roles[0] || 'CASHIER',
+      role: baseRoles[0] || 'CASHIER',
       branchId: resolvedBranchId,
     });
     if (webRole === 'BRANCH_MANAGER' && resolvedBranchId) {
@@ -94,13 +102,28 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
     fetchCriticalRoleSlots()
       .then((slots) => setRoleSlots(slots))
       .catch(() => setRoleSlots(null));
-  }, [open, roles, webRole, actorBranchId]);
+  }, [open, baseRoles, webRole, actorBranchId]);
+
+  useEffect(() => {
+    if (!open || !roles.length) return;
+    setForm((current) => {
+      if (roles.includes(current.role)) return current;
+      const nextRole = roles[0];
+      return {
+        ...current,
+        role: nextRole,
+        branchId: requiresBranch(nextRole) ? current.branchId : '',
+      };
+    });
+  }, [open, roles]);
 
   function patch(updates) {
     setForm((f) => {
       const next = { ...f, ...updates };
       if (updates.email !== undefined) {
-        next.userName = emailToUsername(updates.email);
+        if (!userNameEdited) {
+          next.userName = emailToUsername(updates.email);
+        }
       }
       return next;
     });
@@ -228,7 +251,10 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
             <FormField label="Username" hint="Auto-generated from email; used at sign-in.">
               <input
                 value={form.userName}
-                onChange={(e) => patch({ userName: e.target.value })}
+                onChange={(e) => {
+                  setUserNameEdited(true);
+                  patch({ userName: e.target.value });
+                }}
                 className={`${inputClass} font-mono text-sm`}
               />
             </FormField>
