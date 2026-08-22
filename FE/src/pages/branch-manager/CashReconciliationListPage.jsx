@@ -50,7 +50,7 @@ export default function CashReconciliationListPage() {
     <div className="space-y-6">
       <PageHeader
         title="Shift Discrepancy Review"
-        description="Review cashier shift closings with cash or product differences (pending approval)."
+        description="Review cashier shift closings with cash or high-value product count differences (pending approval)."
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -72,6 +72,7 @@ export default function CashReconciliationListPage() {
                   <th className="px-4 py-3 font-semibold">Expected cash</th>
                   <th className="px-4 py-3 font-semibold">Actual cash</th>
                   <th className="px-4 py-3 font-semibold">Difference</th>
+                  <th className="px-4 py-3 font-semibold">Product issues</th>
                   <th className="px-4 py-3 font-semibold">Closed time</th>
                 </tr>
               </thead>
@@ -91,6 +92,15 @@ export default function CashReconciliationListPage() {
                     <td className="px-4 py-3">{formatMoney(row.actualCash)}</td>
                     <td className={`px-4 py-3 ${differenceClass(row.difference)}`}>
                       {formatMoney(row.difference)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {row.hasProductDiscrepancy ? (
+                        <span className="font-semibold text-amber-700">
+                          {row.productDiscrepancyCount ?? '—'} item(s)
+                        </span>
+                      ) : (
+                        <span className="text-[var(--admin-muted)]">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-[var(--admin-muted)]">
                       {formatDateTime(row.closedAt)}

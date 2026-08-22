@@ -342,7 +342,7 @@ export function PosCartProvider({ children }) {
       setCheckoutBusy(true);
 
       try {
-        // Một request duy nhất: server ghi đơn, trừ kho, chốt điểm và khoá voucher
+        // Single request: server writes order, deducts stock, and settles points
         // trong cùng transaction. Hỏng bất kỳ đâu thì không có gì được ghi và giỏ
         // vẫn nguyên để cashier thử lại.
         const order = await apiCheckout({

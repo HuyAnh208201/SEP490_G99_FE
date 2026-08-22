@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchMe } from '../../api/users.js';
 import { fetchBranchById } from '../../api/branches.js';
 import {
@@ -41,6 +41,7 @@ export default function ShiftsPage() {
   const [weekStartInput, setWeekStartInput] = useState(() => toDdMmYyyy(mondayOf()));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState('');
@@ -66,6 +67,7 @@ export default function ShiftsPage() {
   /** @type {[Record<string, object>, Function]} */
   const [setupSlots, setSetupSlots] = useState({});
   const [activeSetupKey, setActiveSetupKey] = useState(null);
+  const loadGenerationRef = useRef(0);
 
   const slots = useMemo(() => deriveShiftSlots(operatingHours), [operatingHours]);
   const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
@@ -74,6 +76,7 @@ export default function ShiftsPage() {
     const normalized = mondayOf(next);
     setWeekStart(normalized);
     setWeekStartInput(toDdMmYyyy(normalized));
+    setInfo('');
   }, []);
 
   const applySchedule = useCallback((data) => {
@@ -87,16 +90,23 @@ export default function ShiftsPage() {
 
   const load = useCallback(async () => {
     if (!branchId) return;
-    setLoading(true);
+    const requestedWeek = weekStart;
+    const generation = ++loadGenerationRef.current;
+    setRefreshing(true);
     setError('');
     try {
-      const data = await fetchWeeklySchedule(branchId, weekStart);
+      const data = await fetchWeeklySchedule(branchId, requestedWeek);
+      if (generation !== loadGenerationRef.current) return;
       applySchedule(data);
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       setError(err?.message || 'Failed to load shifts');
       setRows([]);
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [applySchedule, branchId, weekStart]);
 
@@ -163,6 +173,11 @@ export default function ShiftsPage() {
     }
     return { empty, incomplete, ready, published, total: slots.length * weekDays.length };
   }, [grid, slots, weekDays]);
+
+  const [displayStats, setDisplayStats] = useState(weekStats);
+  useEffect(() => {
+    if (!refreshing) setDisplayStats(weekStats);
+  }, [refreshing, weekStats]);
 
   const openAssign = useCallback(
     (dayDate, slot) => {
@@ -633,10 +648,11 @@ export default function ShiftsPage() {
 
       <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--admin-muted)]">
         <span className="rounded-md border border-[var(--admin-border)] bg-[#f7f9fb] px-2.5 py-1 font-medium text-[var(--admin-text)]">
-          {weekStats.ready}/{weekStats.total} ready to publish
-          {weekStats.published > 0 ? ` · ${weekStats.published} published` : ''}
-          {weekStats.incomplete > 0 ? ` · ${weekStats.incomplete} incomplete` : ''}
-          {weekStats.empty > 0 ? ` · ${weekStats.empty} empty` : ''}
+          {displayStats.ready}/{displayStats.total} ready to publish
+          {displayStats.published > 0 ? ` · ${displayStats.published} published` : ''}
+          {displayStats.incomplete > 0 ? ` · ${displayStats.incomplete} incomplete` : ''}
+          {displayStats.empty > 0 ? ` · ${displayStats.empty} empty` : ''}
+          {refreshing ? ' · Updating…' : ''}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--admin-border)] bg-white" />
@@ -667,6 +683,7 @@ export default function ShiftsPage() {
 
       <ScheduleGrid
         loading={loading}
+        refreshing={refreshing}
         slots={slots}
         weekDays={weekDays}
         grid={grid}

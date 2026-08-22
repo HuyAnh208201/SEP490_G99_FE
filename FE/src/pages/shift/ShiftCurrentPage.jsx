@@ -75,8 +75,8 @@ export default function ShiftCurrentPage() {
           <Card className="border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">Submitted for manager approval</p>
             <p className="mt-1">
-              Your closing was submitted with a cash difference. The branch manager must approve or
-              reject before you can open a new shift.
+              Your closing was submitted with a cash or product count difference. The branch manager
+              must approve or reject before you can open a new shift.
             </p>
           </Card>
         )}

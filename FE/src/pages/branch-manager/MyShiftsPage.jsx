@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchMe } from '../../api/users.js';
 import { checkInShift, fetchMyWeeklySchedule } from '../../api/shifts.js';
 import Button from '../../components/ui/Button.jsx';
@@ -39,8 +39,10 @@ export default function MyShiftsPage() {
   const [weekStartInput, setWeekStartInput] = useState(() => toDdMmYyyy(mondayOf()));
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
+  const loadGenerationRef = useRef(0);
 
   const slots = useMemo(() => deriveShiftSlots(operatingHours), [operatingHours]);
   const weekDays = useMemo(() => buildWeekDays(weekStart), [weekStart]);
@@ -64,16 +66,22 @@ export default function MyShiftsPage() {
   }, []);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const generation = ++loadGenerationRef.current;
+    setRefreshing(true);
     setError('');
     try {
       const data = await fetchMyWeeklySchedule(weekStart);
+      if (generation !== loadGenerationRef.current) return;
       applySchedule(data);
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       setError(err?.message || 'Failed to load schedule');
       setRows([]);
     } finally {
-      setLoading(false);
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [applySchedule, weekStart]);
 
@@ -182,6 +190,7 @@ export default function MyShiftsPage() {
 
       <ScheduleGrid
         loading={loading}
+        refreshing={refreshing}
         slots={slots}
         weekDays={weekDays}
         grid={grid}

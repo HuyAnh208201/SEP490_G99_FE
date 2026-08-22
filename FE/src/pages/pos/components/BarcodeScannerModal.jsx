@@ -1,8 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  BarcodeDetector,
+  prepareZXingModule,
+  setZXingModuleOverrides,
+} from 'barcode-detector/ponyfill';
+import zxingReaderWasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
 import Modal from '../../../components/ui/Modal.jsx';
 
-const PRODUCT_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e'];
+const PRODUCT_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'];
 const CUSTOMER_QR_FORMATS = ['qr_code'];
+
+let wasmPrepared = false;
+
+async function ensureBarcodeDecoderReady(formats) {
+  setZXingModuleOverrides({
+    locateFile: (path, prefix) =>
+      path.endsWith('.wasm') ? zxingReaderWasmUrl : `${prefix}${path}`,
+  });
+  if (!wasmPrepared) {
+    await prepareZXingModule({ fireImmediately: true });
+    wasmPrepared = true;
+  }
+  return new BarcodeDetector({ formats });
+}
 
 export default function BarcodeScannerModal({
   open,
@@ -17,7 +37,12 @@ export default function BarcodeScannerModal({
   const frameRef = useRef(0);
   const detectingRef = useRef(false);
   const acceptedRef = useRef(false);
+  const onDetectedRef = useRef(onDetected);
   const [status, setStatus] = useState('');
+
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, [onDetected]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -33,22 +58,21 @@ export default function BarcodeScannerModal({
       try {
         setStatus('Opening camera…');
         acceptedRef.current = false;
-        const [module, stream] = await Promise.all([
-          import('barcode-detector/ponyfill'),
-          navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' } },
-            audio: false,
-          }),
-        ]);
-        const { BarcodeDetector, setZXingModuleOverrides } = module;
-
-        // Mặc định thư viện tải zxing_reader.wasm từ CDN jsdelivr. Nếu tải hụt thì
-        // detect() ném lỗi ở mọi frame và camera chạy hoài không nhận ra mã.
-        // Trỏ về file tự host trong public/ để không phụ thuộc CDN.
-        setZXingModuleOverrides?.({
-          locateFile: (path, prefix) =>
-            path.endsWith('.wasm') ? '/zxing_reader.wasm' : `${prefix}${path}`,
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
         });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        setStatus('Starting barcode decoder…');
+        const detector = await ensureBarcodeDecoderReady(formats);
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -58,7 +82,6 @@ export default function BarcodeScannerModal({
         const video = videoRef.current;
         video.srcObject = stream;
         await video.play();
-        const detector = new BarcodeDetector({ formats });
         setStatus(hint);
 
         let failures = 0;
@@ -73,14 +96,10 @@ export default function BarcodeScannerModal({
               if (value) {
                 acceptedRef.current = true;
                 stopCamera();
-                // Tắt camera là khung hình đen ngay. Phải báo đang gọi API,
-                // không thì người dùng tưởng máy treo.
                 setStatus(`Read ${value} — looking up…`);
-                await onDetected(value);
+                await onDetectedRef.current(value);
               }
             } catch (error) {
-              // Vài frame lỗi lúc autofocus là bình thường; lỗi lặp lại liên tục nghĩa là
-              // bộ giải mã hỏng thật (thường do wasm) — phải báo chứ không nuốt im lặng.
               failures += 1;
               if (failures >= 8) {
                 setStatus(`Unable to start the barcode decoder: ${error?.message || error}`);
@@ -94,7 +113,11 @@ export default function BarcodeScannerModal({
         frameRef.current = requestAnimationFrame(detect);
       } catch (error) {
         const denied = error?.name === 'NotAllowedError';
-        setStatus(denied ? 'Camera permission was denied.' : 'Unable to open the camera.');
+        setStatus(
+          denied
+            ? 'Camera permission was denied.'
+            : `Unable to open the scanner: ${error?.message || error}`,
+        );
       }
     }
 
@@ -103,7 +126,7 @@ export default function BarcodeScannerModal({
       cancelled = true;
       stopCamera();
     };
-  }, [open, onDetected]); // formats/hint are read when opening; avoid restarting camera mid-scan
+  }, [open, formats, hint]);
 
 
   return (

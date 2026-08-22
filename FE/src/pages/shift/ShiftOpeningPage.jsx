@@ -8,6 +8,7 @@ import { fetchOpeningShiftSession, startShiftSession } from '../../api/shiftSess
 import { useShiftSession } from '../../contexts/ShiftSessionContext.jsx';
 import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
 import PreviousShiftReportSection from './components/PreviousShiftReportSection.jsx';
+import { formatDateTime } from '../../lib/datetime.js';
 
 const OPENING_FUND_AMOUNT = 2_000_000;
 
@@ -98,6 +99,13 @@ export default function ShiftOpeningPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (loading || !data) return;
+    if (data.status === 'OPEN' || data.joinedExistingShift) {
+      navigate('/pos', { replace: true });
+    }
+  }, [loading, data, navigate]);
+
   const shift = data?.shift;
   const slotLabel = data?.currentSlotLabel;
   const slotWindow =
@@ -170,7 +178,16 @@ export default function ShiftOpeningPage() {
 
       {!loading && shiftFinished && (
         <Card className="border-[var(--admin-brand-soft)] bg-[var(--admin-brand)]/5 p-4 text-sm text-[var(--admin-text)]">
-          This shift is already completed. Wait for the next published shift before opening again.
+          <p>
+            This shift is already completed
+            {data?.closedAt ? ` (closed ${formatDateTime(data.closedAt)})` : ''}. You cannot open the same shift
+            slot again.
+          </p>
+          <p className="mt-2 text-[var(--admin-muted)]">
+            Wait for your next published shift, or check Shift history. If you were testing by changing your PC clock,
+            move the clock back before the shift end time and reload this page — the system can reset auto-closed
+            sessions automatically.
+          </p>
         </Card>
       )}
 
@@ -225,7 +242,9 @@ export default function ShiftOpeningPage() {
             </div>
           </Card>
 
-          <PreviousShiftReportSection report={data.previousShiftReport} />
+          {!shiftFinished ? (
+            <PreviousShiftReportSection report={data.previousShiftReport} />
+          ) : null}
 
           <Card className="space-y-4 p-4">
             <SectionHeader

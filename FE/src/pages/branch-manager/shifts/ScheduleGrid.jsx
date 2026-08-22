@@ -16,8 +16,19 @@ function isMine(staff, currentUserId) {
   return staff.some((e) => Number(e.employeeId) === id);
 }
 
+function SkeletonCell() {
+  return (
+    <div className="min-h-[4.5rem] animate-pulse rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] px-2 py-2">
+      <div className="mb-2 h-3 w-12 rounded bg-[var(--admin-border)]" />
+      <div className="mb-1 h-2.5 w-full rounded bg-[var(--admin-border)]/80" />
+      <div className="h-2.5 w-4/5 rounded bg-[var(--admin-border)]/60" />
+    </div>
+  );
+}
+
 function ScheduleGrid({
   loading,
+  refreshing = false,
   slots,
   weekDays,
   grid,
@@ -27,9 +38,15 @@ function ScheduleGrid({
   readOnly = false,
   currentUserId = null,
 }) {
+  const showSkeleton = (loading || refreshing) && slots.length > 0;
+  const colSpan = weekDays.length + 1;
+
   return (
     <Card className="!p-0 overflow-hidden">
-      <div className="w-full overflow-x-auto">
+      <div
+        className={`w-full overflow-x-auto transition-opacity duration-150 ${refreshing ? 'opacity-70' : ''}`}
+        aria-busy={refreshing || undefined}
+      >
         <table className="min-w-full w-full border-collapse text-left text-sm">
           <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
             <tr>
@@ -45,15 +62,37 @@ function ScheduleGrid({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {showSkeleton ? (
+              slots.map((slot) => (
+                <tr key={slot.key} className="border-t border-[var(--admin-border)] align-top">
+                  <td className="sticky left-0 z-10 bg-white px-3 py-2 text-xs font-semibold text-[var(--admin-text)]">
+                    <div>{slot.label}</div>
+                    {(slot.isFirst || slot.isLast) && (
+                      <div className="mt-0.5 font-normal text-[var(--admin-subtle)]">
+                        {slot.isFirst && slot.isLast
+                          ? 'Open + close (IS)'
+                          : slot.isFirst
+                            ? 'Open (IS)'
+                            : 'Close (IS)'}
+                      </div>
+                    )}
+                  </td>
+                  {weekDays.map((day) => (
+                    <td key={day.date} className="border-l border-[var(--admin-border)] p-1.5">
+                      <SkeletonCell />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : loading ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-[var(--admin-muted)]">
+                <td colSpan={colSpan} className="px-4 py-10 text-center text-[var(--admin-muted)]">
                   Loading schedule…
                 </td>
               </tr>
             ) : slots.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-[var(--admin-muted)]">
+                <td colSpan={colSpan} className="px-4 py-10 text-center text-[var(--admin-muted)]">
                   No slots for this branch&apos;s operating hours.
                 </td>
               </tr>

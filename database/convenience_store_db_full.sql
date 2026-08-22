@@ -240,17 +240,6 @@ CREATE TABLE `voucher_catalog` (
   `status` varchar(255) DEFAULT 'active'
 );
 
-CREATE TABLE `vouchers` (
-  `id` int PRIMARY KEY AUTO_INCREMENT,
-  `code` varchar(255) UNIQUE NOT NULL,
-  `voucher_catalog_id` int,
-  `campaign_id` int,
-  `customer_id` int,
-  `status` varchar(255) DEFAULT 'active',
-  `expires_at` timestamp NULL,
-  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE `shifts` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `branch_id` int NOT NULL,
@@ -301,7 +290,6 @@ CREATE TABLE `order_discounts` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `order_id` int NOT NULL,
   `campaign_id` int,
-  `voucher_id` int,
   `discount_amount` decimal(15,2) NOT NULL
 );
 
@@ -357,9 +345,6 @@ ALTER TABLE `customers` ADD FOREIGN KEY (`user_id`) REFERENCES `users` (`id`);
 ALTER TABLE `customers` ADD FOREIGN KEY (`tier_id`) REFERENCES `membership_tiers` (`id`);
 ALTER TABLE `point_transactions` ADD FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`);
 ALTER TABLE `point_transactions` ADD FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`);
-ALTER TABLE `vouchers` ADD FOREIGN KEY (`voucher_catalog_id`) REFERENCES `voucher_catalog` (`id`);
-ALTER TABLE `vouchers` ADD FOREIGN KEY (`campaign_id`) REFERENCES `campaigns` (`id`);
-ALTER TABLE `vouchers` ADD FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`);
 ALTER TABLE `shifts` ADD FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
 ALTER TABLE `shifts` ADD FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
 ALTER TABLE `shifts` ADD FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`);
@@ -374,7 +359,6 @@ ALTER TABLE `order_items` ADD FOREIGN KEY (`product_id`) REFERENCES `products` (
 ALTER TABLE `order_items` ADD FOREIGN KEY (`batch_id`) REFERENCES `product_batches` (`id`);
 ALTER TABLE `order_discounts` ADD FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`);
 ALTER TABLE `order_discounts` ADD FOREIGN KEY (`campaign_id`) REFERENCES `campaigns` (`id`);
-ALTER TABLE `order_discounts` ADD FOREIGN KEY (`voucher_id`) REFERENCES `vouchers` (`id`);
 ALTER TABLE `payments` ADD FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`);
 
 -- ============================ SEED DATA ============================
@@ -568,10 +552,6 @@ INSERT INTO campaign_branches (campaign_id, branch_id) VALUES
 (1, 1),
 (1, 2);
 
-INSERT INTO vouchers (id, code, voucher_catalog_id, campaign_id, customer_id, status, expires_at) VALUES
-(1, 'VC10000-CUS1', 1, NULL, 1, 'active', DATE_ADD(NOW(), INTERVAL 30 DAY)),
-(2, 'VC5P-CUS2', 2, NULL, 2, 'active', DATE_ADD(NOW(), INTERVAL 30 DAY));
-
 -- ---- YÊU CẦU NHẬP HÀNG (đủ 6 trạng thái để test 2 màn) ----
 INSERT INTO purchase_requests (id, branch_id, created_by, reason, status, approved_by, reject_reason, created_at, approved_at) VALUES
 (1, 1, 3, 'Bổ sung hàng bán chạy cuối tuần', 'approved', 2, NULL, '2026-06-20 08:00:00', '2026-06-20 10:00:00'),
@@ -636,8 +616,8 @@ INSERT INTO order_items (order_id, product_id, batch_id, quantity, unit_price, l
 (1, 3, 3, 1, 6000, 6000),
 (1, 5, NULL, 1, 6000, 6000);
 
-INSERT INTO order_discounts (order_id, campaign_id, voucher_id, discount_amount) VALUES
-(1, 1, NULL, 3000);
+INSERT INTO order_discounts (order_id, campaign_id, discount_amount) VALUES
+(1, 1, 3000);
 
 INSERT INTO payments (order_id, method, amount, cash_received, change_amount, transaction_ref, status) VALUES
 (1, 'cash', 22000, 50000, 28000, NULL, 'success');
