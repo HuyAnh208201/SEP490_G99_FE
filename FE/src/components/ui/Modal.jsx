@@ -10,7 +10,7 @@ export default function Modal({
   open,
   onClose,
   title,
-  description,
+  description: _description,
   children,
   size = 'md',
   footer,
@@ -56,9 +56,6 @@ export default function Modal({
               <h2 id="modal-title" className="text-lg font-semibold text-[var(--admin-text)]">
                 {title}
               </h2>
-              {description && (
-                <p className="mt-1 text-sm text-[var(--admin-muted)]">{description}</p>
-              )}
             </div>
             <button
               type="button"

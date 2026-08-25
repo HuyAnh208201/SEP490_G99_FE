@@ -1,4 +1,5 @@
 import { http } from './http.js';
+import { unwrapPage } from './pagination.js';
 
 function unwrap(body) {
   if (!body?.success) {
@@ -70,9 +71,19 @@ export async function closeInventoryShift(payload) {
   return unwrap(data);
 }
 
-export async function fetchShiftSessionHistory() {
-  const { data } = await http.get('/shift-sessions/history');
-  return unwrap(data);
+export async function fetchShiftSessionHistory(params = {}) {
+  const { data } = await http.get('/shift-sessions/history', {
+    params: {
+      page: params.page ?? 1,
+      size: params.size ?? 20,
+    },
+  });
+  return unwrapPage(data);
+}
+
+export async function fetchShiftSessionHistoryList() {
+  const page = await fetchShiftSessionHistory({ page: 1, size: 100 });
+  return page.items || [];
 }
 
 export async function fetchBranchShiftMonitor() {
@@ -82,6 +93,36 @@ export async function fetchBranchShiftMonitor() {
 
 export async function fetchPendingReconciliation() {
   const { data } = await http.get('/shift-sessions/reconciliation/pending');
+  return unwrap(data);
+}
+
+export async function fetchReconciliationList({ discrepancy = 'with', status } = {}) {
+  const { data } = await http.get('/shift-sessions/reconciliation', {
+    params: {
+      discrepancy,
+      ...(status ? { status } : {}),
+    },
+  });
+  return unwrap(data);
+}
+
+export async function fetchBranchAttendance({ from, to } = {}) {
+  const { data } = await http.get('/shift-sessions/branch/attendance', {
+    params: {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+  return unwrap(data);
+}
+
+export async function fetchBranchRefunds({ from, to } = {}) {
+  const { data } = await http.get('/shift-sessions/branch/refunds', {
+    params: {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
   return unwrap(data);
 }
 

@@ -6,29 +6,17 @@ import { PosCartProvider } from '../../contexts/PosCartContext.jsx';
 import { usePosClock } from '../../hooks/usePosClock.js';
 import PosSidebar from '../../components/layout/PosSidebar.jsx';
 import PosTopBar from '../../components/layout/PosTopBar.jsx';
-import PosHelpDialog from './components/PosHelpDialog.jsx';
 
 export default function PosLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { session } = useShiftSession();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const { now, online } = usePosClock();
 
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    function onKeyDown(event) {
-      if (event.key !== 'F1') return;
-      event.preventDefault();
-      setHelpOpen(true);
-    }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
 
   const onWorkPage =
     !location.pathname.startsWith('/pos/shift') &&
@@ -64,15 +52,12 @@ export default function PosLayout() {
             onEndShift={() => navigate('/pos/shift/closing')}
             online={online}
             now={now}
-            onHelpOpen={() => setHelpOpen(true)}
           />
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <Outlet />
           </main>
         </div>
       </div>
-
-      <PosHelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
     </PosCartProvider>
   );
 }

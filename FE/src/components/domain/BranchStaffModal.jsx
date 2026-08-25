@@ -111,7 +111,7 @@ export default function BranchStaffModal({ open, onClose, branch, staffType, onC
             className={inputClass}
           />
         </FormField>
-        <FormField label="Phone" required hint="10 digits, starts with 0">
+        <FormField label="Phone" required>
           <input
             required
             pattern="0[0-9]{9}"
@@ -123,7 +123,6 @@ export default function BranchStaffModal({ open, onClose, branch, staffType, onC
         <FormField
           label="Password"
           required
-          hint="Min 8 chars with upper, lower, digit, and special character."
         >
           <input
             required

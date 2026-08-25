@@ -472,8 +472,6 @@ export default function PromotionsPage() {
 
         title="Promotions & campaigns"
 
-        description="Discount campaigns with chain-wide or branch-specific scope."
-
         actions={
 
           canCreate ? (
@@ -499,20 +497,6 @@ export default function PromotionsPage() {
         }
 
       />
-
-
-
-      {webRole === 'BRANCH_MANAGER' && canManage && (
-
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-
-          You can create promotions for your branch. Chain-wide campaigns from directors and
-
-          administrators can be deactivated for your branch but not deleted.
-
-        </div>
-
-      )}
 
 
 
@@ -951,7 +935,7 @@ export default function PromotionsPage() {
 
               {items.length === 0
 
-                ? 'No campaigns yet. Create your first promotion to get started.'
+                ? 'No campaigns found.'
 
                 : 'No campaigns match your filters.'}
 

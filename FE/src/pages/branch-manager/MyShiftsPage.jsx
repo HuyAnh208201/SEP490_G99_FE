@@ -30,6 +30,20 @@ function isCheckedInForUser(shift, userId) {
   );
 }
 
+function checkInWindow(shift, now = new Date()) {
+  if (!shift?.startTime) return { open: true, reason: '' };
+  const start = new Date(shift.startTime);
+  const end = shift.endTime ? new Date(shift.endTime) : null;
+  const openAt = new Date(start.getTime() - 30 * 60 * 1000);
+  if (now < openAt) {
+    return { open: false, reason: 'Opens 30 minutes before start' };
+  }
+  if (end && now > end) {
+    return { open: false, reason: 'Shift ended' };
+  }
+  return { open: true, reason: '' };
+}
+
 export default function MyShiftsPage() {
   const confirmSave = useSaveConfirmation();
   const [userId, setUserId] = useState(null);
@@ -155,7 +169,6 @@ export default function MyShiftsPage() {
     <div className="h-full w-full space-y-4 overflow-y-auto p-3 lg:p-4">
       <PageHeader
         title="My schedule"
-        description="Your published shifts for the week — check in when your shift starts."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => applyWeekStart(addDays(weekStart, -7))}>
@@ -203,9 +216,6 @@ export default function MyShiftsPage() {
       <Card className="overflow-hidden">
         <div className="border-b border-[var(--admin-border)] px-4 py-3">
           <p className="text-sm font-semibold text-[var(--admin-text)]">Today&apos;s check-in</p>
-          <p className="text-xs text-[var(--admin-muted)]">
-            Check in to your published shift for today ({today}).
-          </p>
         </div>
         {todayShifts.length === 0 ? (
           <p className="p-4 text-sm text-[var(--admin-muted)]">No published shift assigned to you today.</p>
@@ -213,6 +223,8 @@ export default function MyShiftsPage() {
           <ul className="divide-y divide-[var(--admin-border)]">
             {todayShifts.map((shift) => {
               const checkedIn = isCheckedInForUser(shift, userId);
+              const windowState = checkInWindow(shift);
+              const canCheckIn = !checkedIn && windowState.open;
               return (
                 <li
                   key={shift.id}
@@ -222,12 +234,21 @@ export default function MyShiftsPage() {
                     <p className="text-sm font-semibold text-[var(--admin-text)]">
                       {formatDateTime(shift.startTime)} → {formatDateTime(shift.endTime)}
                     </p>
+                    {!checkedIn && !windowState.open ? (
+                      <p className="mt-0.5 text-xs text-[var(--admin-muted)]">{windowState.reason}</p>
+                    ) : null}
                   </div>
                   <Button
-                    disabled={checkedIn || busyId === shift.id}
+                    disabled={!canCheckIn || busyId === shift.id}
                     onClick={() => handleCheckIn(shift)}
                   >
-                    {checkedIn ? 'Checked in' : busyId === shift.id ? 'Checking in…' : 'Check in'}
+                    {checkedIn
+                      ? 'Checked in'
+                      : busyId === shift.id
+                        ? 'Checking in…'
+                        : windowState.open
+                          ? 'Check in'
+                          : windowState.reason || 'Unavailable'}
                   </Button>
                 </li>
               );

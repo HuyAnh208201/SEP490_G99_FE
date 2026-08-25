@@ -49,7 +49,6 @@ export default function PaymentConfirmDialog({
       open={open}
       onClose={busy ? undefined : onClose}
       title="Review payment"
-      description="Confirm the products and amounts before creating the transaction."
       size="lg"
       layer={70}
     >
@@ -108,7 +107,7 @@ export default function PaymentConfirmDialog({
           onClick={onClose}
           className="rounded-xl border border-[var(--admin-border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--admin-muted)] transition hover:bg-[#f7f9fb] disabled:opacity-45"
         >
-          No, go back <kbd className="ml-1 text-[10px]">N</kbd>
+          No, go back
         </button>
         <button
           type="button"
@@ -116,7 +115,7 @@ export default function PaymentConfirmDialog({
           onClick={onConfirm}
           className="rounded-xl bg-[var(--admin-brand)] px-4 py-3 text-sm font-bold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {busy ? 'Processing...' : 'Yes, pay'} <kbd className="ml-1 rounded bg-white/20 px-1 text-[10px]">Y</kbd>
+          {busy ? 'Processing...' : 'Yes, pay'}
         </button>
       </div>
     </Modal>

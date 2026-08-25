@@ -20,13 +20,12 @@ import OrderTrackingPage from './pages/inventory-staff/OrderTrackingPage.jsx';
 import ReceiveShipmentPage from './pages/inventory-staff/ReceiveShipmentPage.jsx';
 import ReceivingHistoryPage from './pages/inventory-staff/ReceivingHistoryPage.jsx';
 import InventoryCountPage from './pages/inventory-staff/InventoryCountPage.jsx';
-import CountHistoryPage from './pages/inventory-staff/CountHistoryPage.jsx';
 import PurchaseRequestsPage from './pages/purchase-requests/PurchaseRequestsPage.jsx';
 import PurchaseRequestFormPage from './pages/purchase-requests/PurchaseRequestFormPage.jsx';
 import ConsolidatedPage from './pages/purchase-requests/ConsolidatedPage.jsx';
 import SupplyImportLayout from './pages/purchase-requests/SupplyImportLayout.jsx';
-import CashReconciliationListPage from './pages/branch-manager/CashReconciliationListPage.jsx';
 import CashReconciliationReviewPage from './pages/branch-manager/CashReconciliationReviewPage.jsx';
+import BranchAuditPage from './pages/branch-manager/BranchAuditPage.jsx';
 import MyShiftsPage from './pages/branch-manager/MyShiftsPage.jsx';
 import ShiftsPage from './pages/branch-manager/ShiftsPage.jsx';
 import ReportsPage from './pages/reports/ReportsPage.jsx';
@@ -277,11 +276,7 @@ export default function App() {
         />
         <Route
           path="/inventory/count-history"
-          element={
-            <PermissionRoute permission="INVENTORY_COUNT">
-              <CountHistoryPage />
-            </PermissionRoute>
-          }
+          element={<Navigate to="/branch-manager/audit?tab=inventory-counts" replace />}
         />
 
         <Route path="/branch-manager" element={<Navigate to="/reports" replace />} />
@@ -307,12 +302,16 @@ export default function App() {
           }
         />
         <Route
-          path="/branch-manager/cash-reconciliation"
+          path="/branch-manager/audit"
           element={
             <PermissionRoute permission="APPROVE_CASH_DISCREPANCY">
-              <CashReconciliationListPage />
+              <BranchAuditPage />
             </PermissionRoute>
           }
+        />
+        <Route
+          path="/branch-manager/cash-reconciliation"
+          element={<Navigate to="/branch-manager/audit?tab=discrepancies" replace />}
         />
         <Route
           path="/branch-manager/cash-reconciliation/:sessionId"
@@ -324,7 +323,7 @@ export default function App() {
         />
         <Route
           path="/branch-manager/cash-discrepancy"
-          element={<Navigate to="/branch-manager/cash-reconciliation" replace />}
+          element={<Navigate to="/branch-manager/audit?tab=discrepancies" replace />}
         />
         <Route
           path="/branch-manager/supply-receipts"

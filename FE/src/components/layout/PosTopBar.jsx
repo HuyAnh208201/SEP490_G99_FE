@@ -20,7 +20,6 @@ export default function PosTopBar({
   onEndShift,
   online,
   now,
-  onHelpOpen,
 }) {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -88,16 +87,6 @@ export default function PosTopBar({
             }).format(now)}
           </span>
         )}
-
-        <button
-          type="button"
-          onClick={onHelpOpen}
-          title="Quick guide (F1)"
-          aria-label="Open POS help"
-          className="hidden h-9 w-9 items-center justify-center rounded-lg border border-[var(--admin-border)] text-sm font-bold text-[var(--admin-muted)] transition hover:bg-[#f0f4f8] hover:text-[var(--admin-brand)] md:flex"
-        >
-          ?
-        </button>
 
         <span className="hidden rounded-full bg-[#0058be]/10 px-3 py-1 text-xs font-semibold text-[var(--admin-brand)] sm:inline">
           {roleLabel}

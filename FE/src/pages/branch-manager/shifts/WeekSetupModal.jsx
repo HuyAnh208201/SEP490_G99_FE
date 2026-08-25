@@ -273,10 +273,7 @@ export default function WeekSetupModal({
                         </p>
                       </>
                     ) : (
-                      <FormField
-                        label="Opening cash"
-                        hint="Cash float placed in the drawer to start the day. Leave blank to use the branch default. Later slots of the day inherit the previous shift's counted cash."
-                      >
+                      <FormField label="Opening cash">
                         <MoneyInput
                           value={activeSetupSlot.openingCash}
                           onChange={(value) => onOpeningCashChange(activeSetupSlot.key, value)}

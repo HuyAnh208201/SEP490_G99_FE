@@ -33,6 +33,9 @@ export default function PosNewOrderPage() {
     customerBusy,
     pointsToRedeem,
     setPointsToRedeem,
+    campaignId,
+    applyCampaign,
+    clearCampaign,
     loyalty,
     totals,
     paymentOpen,
@@ -73,7 +76,10 @@ export default function PosNewOrderPage() {
     localStorage.setItem('pos_relay_mode', relayMode ? '1' : '0');
   }, [relayMode]);
 
-  const dismissPaymentSuccess = useCallback(() => setPaymentSuccess(null), []);
+  const dismissPaymentSuccess = useCallback(() => {
+    setPaymentSuccess(null);
+    setScanMessage('');
+  }, []);
 
   useEffect(() => {
     const completedInvoice = location.state?.completedInvoice;
@@ -82,6 +88,7 @@ export default function PosNewOrderPage() {
     if (!completedInvoice && !shouldOpenPayment) return;
 
     if (completedInvoice) {
+      setScanMessage('');
       setPaymentSuccess({
         invoice: completedInvoice,
         change: location.state?.change ?? null,
@@ -258,6 +265,12 @@ export default function PosNewOrderPage() {
         const feed = await fetchScanEvents(cursor);
         if (!active) return;
         for (const event of feed.events ?? []) {
+          if (event.errorMessage || event.success === false) {
+            setScanMessage(
+              `Phone barcode ${event.barcode}: ${event.errorMessage || 'could not be processed.'}`,
+            );
+            continue;
+          }
           try {
             const product = toPosProduct(await scanBarcode(event.barcode));
             const result = addProduct(product, 1);
@@ -401,6 +414,7 @@ export default function PosNewOrderPage() {
     }
     setPaymentReview(null);
     setPaymentOpen(false);
+    setScanMessage('');
     let receiptOpened = false;
     try {
       const pdf = await openReceiptPdf(result.order, reserved);
@@ -439,7 +453,7 @@ export default function PosNewOrderPage() {
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--admin-border)] px-4 py-3">
               <div>
                 <h1 className="text-base font-bold text-[var(--admin-text)]">Current order</h1>
-                <p className="text-xs text-[var(--admin-subtle)]">{totals.itemCount} items · select a row to use quantity shortcuts</p>
+                <p className="text-xs text-[var(--admin-subtle)]">{totals.itemCount} items</p>
               </div>
               <span className="shrink-0 whitespace-nowrap text-lg font-extrabold text-[var(--admin-brand)]">{formatVnd(totals.total)}</span>
             </div>
@@ -470,6 +484,9 @@ export default function PosNewOrderPage() {
             pointsToRedeem={pointsToRedeem}
             setPointsToRedeem={setPointsToRedeem}
             loyalty={loyalty}
+            campaignId={campaignId}
+            onApplyCampaign={applyCampaign}
+            onClearCampaign={clearCampaign}
             onClearCart={() => setConfirmClear(true)}
             paymentOpen={paymentOpen}
             onPaymentOpenChange={setPaymentOpen}
@@ -594,7 +611,7 @@ export default function PosNewOrderPage() {
         onDetected={handleCustomerQrDetected}
         formats={CUSTOMER_QR_FORMATS}
         title="Scan customer QR"
-        hint="Point the camera at the customer app QR code."
+        hint={undefined}
       />
     </>
   );

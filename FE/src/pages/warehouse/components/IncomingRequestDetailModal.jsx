@@ -93,13 +93,6 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
       open={open}
       onClose={onClose}
       title={`Request ${request.code}`}
-      description={
-        canEditApprove
-          ? 'Review branch request against central warehouse stock, then approve.'
-          : isPending
-            ? 'View-only: only the Warehouse Manager can approve pending requests.'
-            : 'Request line items and central warehouse stock.'
-      }
       size="xl"
     >
       <div className="space-y-5">
@@ -125,49 +118,11 @@ export default function IncomingRequestDetailModal({ open, onClose, request, onC
           </p>
         )}
 
-        {canEditApprove && (
-          <div
-            className={`rounded-lg border px-3 py-2 text-sm ${
-              shortages.length
-                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            }`}
-          >
-            {shortages.length ? (
-              <>
-                <span className="font-semibold">Insufficient central stock.</span>{' '}
-                Approving will set status to <strong>AWAITING STOCK</strong> — a purchase order to
-                the supplier is required before dispatch. ({shortages.length} product
-                {shortages.length > 1 ? 's' : ''} short)
-              </>
-            ) : (
-              <>
-                <span className="font-semibold">Central stock is sufficient.</span>{' '}
-                Approving will set status to <strong>APPROVED</strong> and move to dispatch
-                planning.
-              </>
-            )}
-          </div>
-        )}
-
-        {isPending && !canApprove && (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            This request is pending. Approval is limited to Warehouse Manager accounts.
-          </div>
-        )}
-
-        {normalizeStatus(request.status) === PR_STATUS.AWAITING_STOCK && (
+        {canEditApprove && shortages.length > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            <span className="font-semibold">Awaiting warehouse stock.</span> Record a supplier
-            receipt for the short products. When stock is sufficient, this request moves to{' '}
-            <strong>APPROVED</strong> automatically and appears on Ship Orders.
-          </div>
-        )}
-
-        {normalizeStatus(request.status) === PR_STATUS.APPROVED && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            <span className="font-semibold">Ready to ship.</span> This request is approved and
-            available on Ship Orders.
+            <span className="font-semibold">Insufficient central stock.</span>{' '}
+            ({shortages.length} product
+            {shortages.length > 1 ? 's' : ''} short)
           </div>
         )}
 

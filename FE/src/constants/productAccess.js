@@ -20,7 +20,9 @@ export function isWarehouseViewRole(role) {
 
 export function canManageProducts(role, permissions) {
   const web = normalizeWebRole(role);
-  if (web === 'WAREHOUSE_MANAGER') return false;
+  if (web === 'WAREHOUSE_MANAGER' || web === 'BRANCH_MANAGER' || web === 'INVENTORY_STAFF') {
+    return false;
+  }
   return permissions?.has?.('PRODUCT_MANAGEMENT');
 }
 

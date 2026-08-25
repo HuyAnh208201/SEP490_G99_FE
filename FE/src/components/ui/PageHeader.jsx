@@ -1,4 +1,4 @@
-export default function PageHeader({ title, description, actions, badge }) {
+export default function PageHeader({ title, actions, badge }) {
   return (
     <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
       <div>
@@ -8,9 +8,6 @@ export default function PageHeader({ title, description, actions, badge }) {
           </h1>
           {badge}
         </div>
-        {description && (
-          <p className="mt-1 max-w-3xl text-sm text-[var(--admin-muted)]">{description}</p>
-        )}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

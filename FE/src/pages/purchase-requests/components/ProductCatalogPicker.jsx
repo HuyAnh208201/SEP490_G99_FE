@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Button from '../../../components/ui/Button.jsx';
 import { unitLabel } from '../../../constants/productUnits.js';
+import { formatVnd } from '../../../lib/money.js';
 import AddQtyModal from './AddQtyModal.jsx';
 
 const inputClass =
@@ -200,9 +201,6 @@ export default function ProductCatalogPicker({
         >
           Add suggested ({addSuggestedCount})
         </Button>
-        <p className="text-xs text-[var(--admin-subtle)]">
-          Adds low-stock and high sell-through items in priority order.
-        </p>
       </div>
 
       {addSuggestedError ? (
@@ -231,10 +229,19 @@ export default function ProductCatalogPicker({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--admin-border)]">
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="min-w-full text-left text-sm">
+          <table className="w-full min-w-full table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-10" />
+              <col />
+              <col className="w-[6.5rem]" />
+              <col className="w-[7.5rem]" />
+              <col className="w-[5.5rem]" />
+              <col className="w-[5.5rem]" />
+              <col className="w-[5.5rem]" />
+            </colgroup>
             <thead className="sticky top-0 bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
               <tr>
-                <th className="w-10 px-3 py-2.5">
+                <th className="px-3 py-2.5">
                   <input
                     type="checkbox"
                     checked={allAvailableSelected}
@@ -246,6 +253,7 @@ export default function ProductCatalogPicker({
                 </th>
                 <th className="px-3 py-2.5">Product</th>
                 <th className="px-3 py-2.5">Unit</th>
+                <th className="px-3 py-2.5 text-right">Cost</th>
                 <th className="px-3 py-2.5 text-right">In stock</th>
                 <th className="px-3 py-2.5 text-right">Suggested</th>
                 <th className="px-3 py-2.5 text-right">Action</th>
@@ -254,13 +262,13 @@ export default function ProductCatalogPicker({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6">
+                  <td colSpan={7} className="px-3 py-6">
                     <div className="h-4 animate-pulse rounded bg-[#eceef0]" />
                   </td>
                 </tr>
               ) : available.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-sm text-[var(--admin-muted)]">
+                  <td colSpan={7} className="px-3 py-8 text-center text-sm text-[var(--admin-muted)]">
                     {emptyMessage}
                   </td>
                 </tr>
@@ -270,6 +278,7 @@ export default function ProductCatalogPicker({
                   const hasStock = p.currentStock != null && p.currentStock !== '';
                   const stock = hasStock ? Number(p.currentStock) : null;
                   const suggested = resolveSuggestedQty(p);
+                  const cost = Number(p.unitCost ?? p.referenceImportPrice);
                   const low =
                     p.lowStock ||
                     (suggested != null && suggested > 0);
@@ -287,21 +296,24 @@ export default function ProductCatalogPicker({
                           className="rounded border-[var(--admin-border)] text-[#0058be]"
                         />
                       </td>
-                      <td className="px-3 py-2">
-                        <div className="font-medium text-[var(--admin-text)]">{p.name}</div>
-                        <div className="font-mono text-xs text-[var(--admin-subtle)]">
+                      <td className="min-w-0 px-3 py-2">
+                        <div className="truncate font-medium text-[var(--admin-text)]">{p.name}</div>
+                        <div className="truncate font-mono text-xs text-[var(--admin-subtle)]">
                           {p.code}
                           {p.barcode ? ` · ${p.barcode}` : ''}
                           {p.categoryName ? ` · ${p.categoryName}` : ''}
                         </div>
                         {p.priorityReason ? (
-                          <div className="mt-1 text-[11px] font-medium text-[#0058be]">
+                          <div className="mt-1 truncate text-[11px] font-medium text-[#0058be]">
                             {p.priorityReason}
                             {p.soldLast30Days != null ? ` · Sold 30d: ${p.soldLast30Days}` : ''}
                           </div>
                         ) : null}
                       </td>
                       <td className="px-3 py-2 text-[var(--admin-muted)]">{unitLabel(p.unit)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-[var(--admin-muted)]">
+                        {Number.isFinite(cost) && cost > 0 ? formatVnd(cost) : '—'}
+                      </td>
                       <td
                         className={`px-3 py-2 text-right tabular-nums font-semibold ${
                           !hasStock
@@ -320,7 +332,7 @@ export default function ProductCatalogPicker({
                         <button
                           type="button"
                           onClick={() => setPendingProduct(p)}
-                          className="text-xs font-semibold text-[#0058be] hover:underline"
+                          className="inline-flex items-center justify-center rounded-md border border-[var(--admin-border)] bg-white px-2 py-1 text-xs font-semibold text-[#0058be] hover:border-[#0058be]/40 hover:bg-[#f0f6ff]"
                         >
                           + Add
                         </button>

@@ -13,12 +13,16 @@ import {
   submitRequest,
 } from '../../../api/purchaseRequests.js';
 import { purchaseUnitLabel, unitLabel } from '../../../constants/productUnits.js';
+import { formatVnd, importUnitCost, lineImportCost } from '../../../lib/money.js';
 import useDebouncedValue from '../../../hooks/useDebouncedValue.js';
 import ProductCatalogPicker from './ProductCatalogPicker.jsx';
 import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
 
 const inputClass =
   'w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2.5 text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
+
+const qtyInputClass =
+  'w-full min-w-0 rounded-lg border border-[var(--admin-border)] bg-white px-2.5 py-2 text-right text-sm tabular-nums focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20';
 
 const PAGE_SIZE = 20;
 
@@ -29,7 +33,7 @@ function normId(id) {
 
 /**
  * Create / edit purchase request (mainly Branch Manager).
- * Catalog | Request lines side-by-side; Add suggested from low-stock API.
+ * Catalog above request lines; costs use TOP packaging (import unit) math.
  */
 export default function RequestFormModal({ editing, branchId, createdBy, onClose, onSaved }) {
   const confirmSave = useSaveConfirmation();
@@ -74,6 +78,11 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
           productName: it.productName,
           productCode: it.productCode,
           unit: it.unit,
+          retailUnit: it.unit,
+          unitsPerImportUnit: it.unitsPerImportUnit ?? it.topPackagingConversionQty ?? 1,
+          topPackagingLabel: it.topPackagingLabel,
+          unitCost: it.unitCost ?? it.referenceImportPrice ?? null,
+          referenceImportPrice: it.referenceImportPrice ?? it.unitCost ?? null,
           requestedQuantity: it.requestedQuantity,
         })),
       );
@@ -227,6 +236,14 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
     return map;
   }, [recommended]);
 
+  const catalogByProductId = useMemo(() => {
+    const map = new Map();
+    for (const p of products) {
+      map.set(normId(p.id), p);
+    }
+    return map;
+  }, [products]);
+
   const catalogProducts = useMemo(
     () =>
       products.map((p) => {
@@ -242,6 +259,9 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
           priorityReason: rec.priorityReason,
           topPackagingLabel: p.topPackagingLabel || rec.topPackagingLabel,
           unitsPerImportUnit: p.unitsPerImportUnit || rec.topPackagingConversionQty,
+          unitCost: p.unitCost ?? p.referenceImportPrice ?? rec.unitCost ?? rec.referenceImportPrice ?? null,
+          referenceImportPrice:
+            p.referenceImportPrice ?? p.unitCost ?? rec.referenceImportPrice ?? rec.unitCost ?? null,
         };
       }),
     [products, suggestedByProductId],
@@ -259,14 +279,29 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
         .filter((p) => !existing.has(normId(p.id ?? p.productId)))
         .map((p) => {
           const id = normId(p.id ?? p.productId);
+          const fromCatalog = catalogByProductId.get(id);
+          const baseCost =
+            p.unitCost ??
+            p.referenceImportPrice ??
+            fromCatalog?.unitCost ??
+            fromCatalog?.referenceImportPrice ??
+            null;
+          const conversion =
+            p.unitsPerImportUnit ??
+            p.topPackagingConversionQty ??
+            fromCatalog?.unitsPerImportUnit ??
+            fromCatalog?.topPackagingConversionQty ??
+            1;
           return {
             productId: id,
             productName: p.name ?? p.productName,
             productCode: p.code ?? p.productCode,
             unit: p.importUnit || p.unit,
-            retailUnit: p.unit,
-            unitsPerImportUnit: p.unitsPerImportUnit,
-            topPackagingLabel: p.topPackagingLabel,
+            retailUnit: p.unit ?? fromCatalog?.unit,
+            unitsPerImportUnit: conversion,
+            topPackagingLabel: p.topPackagingLabel || fromCatalog?.topPackagingLabel,
+            unitCost: baseCost,
+            referenceImportPrice: baseCost,
             requestedQuantity: p.requestedQty ?? (qtyResolver ? qtyResolver(p) : 1),
           };
         });
@@ -274,17 +309,34 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
     });
   }
 
+  const grandTotal = useMemo(
+    () => lines.reduce((sum, line) => sum + lineImportCost(line, line.requestedQuantity), 0),
+    [lines],
+  );
+
   function addSuggested() {
     addProducts(
-      addableSuggested.map((r) => ({
-        id: r.productId,
-        name: r.name,
-        code: r.code,
-        unit: r.unit,
-        topPackagingLabel: r.topPackagingLabel,
-        unitsPerImportUnit: r.topPackagingConversionQty,
-        suggestedQty: r.suggestedQty,
-      })),
+      addableSuggested.map((r) => {
+        const fromCatalog = catalogByProductId.get(normId(r.productId));
+        const baseCost =
+          r.unitCost ??
+          r.referenceImportPrice ??
+          fromCatalog?.unitCost ??
+          fromCatalog?.referenceImportPrice ??
+          null;
+        return {
+          id: r.productId,
+          name: r.name,
+          code: r.code,
+          unit: r.unit,
+          topPackagingLabel: r.topPackagingLabel || fromCatalog?.topPackagingLabel,
+          unitsPerImportUnit:
+            r.topPackagingConversionQty ?? fromCatalog?.unitsPerImportUnit ?? 1,
+          unitCost: baseCost,
+          referenceImportPrice: baseCost,
+          suggestedQty: r.suggestedQty,
+        };
+      }),
       (p) => p.suggestedQty || 1,
     );
   }
@@ -410,10 +462,10 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
           </div>
         )}
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2" style={{ minHeight: '28rem' }}>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="min-h-0 min-w-0">
             <p className="mb-2 text-sm font-semibold text-[var(--admin-text)]">Product catalog</p>
-            <div className="h-[min(58vh,520px)]">
+            <div className="h-[min(42vh,380px)]">
               <ProductCatalogPicker
                 products={catalogProducts}
                 excludedIds={addedIds}
@@ -444,69 +496,93 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
           </div>
 
           <div className="flex min-h-0 min-w-0 flex-col">
-            <p className="mb-2 text-sm font-semibold text-[var(--admin-text)]">
-              Request lines
-              <span className="ml-2 text-xs font-normal text-[var(--admin-muted)]">
-                Adjust quantities before submit
-              </span>
-            </p>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-[var(--admin-text)]">Request lines</p>
+              <Badge tone="default">{lines.length} products</Badge>
+            </div>
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[var(--admin-border)]">
               <div className="min-h-0 flex-1 overflow-auto">
-                <table className="min-w-full text-left text-sm">
+                <table className="w-full min-w-full table-fixed text-left text-sm">
+                  <colgroup>
+                    <col />
+                    <col className="w-[10rem]" />
+                    <col className="w-[8.5rem]" />
+                    <col className="w-[7.5rem]" />
+                    <col className="w-[8.5rem]" />
+                    <col className="w-[2.75rem]" />
+                  </colgroup>
                   <thead className="sticky top-0 bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                     <tr>
                       <th className="px-3 py-2.5">Product</th>
                       <th className="px-3 py-2.5">Import unit</th>
+                      <th className="px-3 py-2.5 text-right">Unit cost</th>
                       <th className="px-3 py-2.5 text-right">Qty</th>
-                      <th className="px-3 py-2.5" />
+                      <th className="px-3 py-2.5 text-right">Line cost</th>
+                      <th className="px-2 py-2.5" />
                     </tr>
                   </thead>
                   <tbody>
-                    {lines.map((l) => (
-                      <tr key={l.productId} className="border-t border-[var(--admin-border)]">
-                        <td className="px-3 py-2">
-                          <div className="font-medium text-[var(--admin-text)]">{l.productName}</div>
-                          <div className="font-mono text-xs text-[var(--admin-subtle)]">
-                            {l.productCode}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-[var(--admin-muted)]">
-                          {l.topPackagingLabel || purchaseUnitLabel(l.unit)}
-                          {l.unitsPerImportUnit ? (
-                            <span className="block text-[10px] text-[var(--admin-subtle)]">
-                              = {l.unitsPerImportUnit} {unitLabel(l.retailUnit || l.unit)}
+                    {lines.map((l) => {
+                      const packCost = importUnitCost(l);
+                      return (
+                        <tr key={l.productId} className="border-t border-[var(--admin-border)]">
+                          <td className="min-w-0 px-3 py-2.5">
+                            <div className="truncate font-medium text-[var(--admin-text)]">
+                              {l.productName}
+                            </div>
+                            <div className="font-mono text-xs text-[var(--admin-subtle)]">
+                              {l.productCode}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-[var(--admin-muted)]">
+                            <span className="block leading-snug">
+                              {l.topPackagingLabel || purchaseUnitLabel(l.unit)}
                             </span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <input
-                            type="number"
-                            min={1}
-                            value={l.requestedQuantity}
-                            onChange={(e) => updateQty(l.productId, e.target.value)}
-                            className="w-20 rounded-lg border border-[var(--admin-border)] px-2 py-1 text-right text-sm focus:border-[#0058be] focus:outline-none focus:ring-2 focus:ring-[#0058be]/20"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removeLine(l.productId)}
-                            className="rounded-md p-1 text-[var(--admin-subtle)] hover:bg-red-50 hover:text-red-600"
-                            aria-label="Remove"
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="h-4 w-4"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.8"
+                            {l.unitsPerImportUnit ? (
+                              <span className="block text-[10px] leading-snug text-[var(--admin-subtle)]">
+                                = {l.unitsPerImportUnit} {unitLabel(l.retailUnit || l.unit)}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums text-[var(--admin-muted)]">
+                            {packCost != null ? formatVnd(packCost) : '—'}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="number"
+                              min={1}
+                              value={l.requestedQuantity}
+                              onChange={(e) => updateQty(l.productId, e.target.value)}
+                              className={qtyInputClass}
+                              aria-label={`Quantity for ${l.productName}`}
+                            />
+                          </td>
+                          <td className="px-3 py-2.5 text-right tabular-nums font-semibold text-[var(--admin-text)]">
+                            {packCost != null
+                              ? formatVnd(lineImportCost(l, l.requestedQuantity))
+                              : '—'}
+                          </td>
+                          <td className="px-2 py-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeLine(l.productId)}
+                              className="inline-flex rounded-md p-1.5 text-[var(--admin-subtle)] hover:bg-red-50 hover:text-red-600"
+                              aria-label="Remove"
                             >
-                              <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                              >
+                                <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {lines.length === 0 && (
@@ -526,15 +602,22 @@ export default function RequestFormModal({ editing, branchId, createdBy, onClose
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            rows={3}
+            rows={2}
             placeholder="e.g. Restock fast-moving items for the weekend"
             className={inputClass}
           />
         </label>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--admin-border)] pt-4">
-          <Badge tone="default">{lines.length} products</Badge>
-          <div className="flex gap-2">
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--admin-border)] bg-white px-1 pt-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+              Est. import total
+            </p>
+            <p className="text-xl font-bold tabular-nums tracking-tight text-[var(--admin-text)]">
+              {formatVnd(grandTotal)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>

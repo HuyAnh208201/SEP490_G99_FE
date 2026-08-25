@@ -59,10 +59,7 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="mx-auto max-w-lg">
-      <PageHeader
-        title="Change password"
-        description="Update your account password. The new password must be at least 6 characters."
-      />
+      <PageHeader title="Change password" />
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
@@ -81,7 +78,6 @@ export default function ChangePasswordPage() {
             autoComplete="new-password"
             required
             minLength={6}
-            hint="At least 6 characters"
           />
 
           <PasswordInput

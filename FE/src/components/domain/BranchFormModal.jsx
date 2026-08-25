@@ -132,7 +132,7 @@ export default function BranchFormModal({ open, onClose, onSaved, editing }) {
           locationError={addressError}
         />
 
-        <FormField label="Phone" required hint="10 digits, starts with 0 — store hotline.">
+        <FormField label="Phone" required>
           <input
             required
             pattern="0[0-9]{9}"

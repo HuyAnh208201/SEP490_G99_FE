@@ -139,6 +139,34 @@ function KpiCard({ label, value, hint }) {
   );
 }
 
+function mergeCompareTrends(rowsA, rowsB) {
+  const byDate = new Map();
+  for (const p of rowsA || []) {
+    byDate.set(p.date, {
+      date: p.date,
+      label: String(p.date).slice(5),
+      revenueA: Number(p.revenue ?? 0),
+      profitA: Number(p.profit ?? 0),
+      revenueB: 0,
+      profitB: 0,
+    });
+  }
+  for (const p of rowsB || []) {
+    const existing = byDate.get(p.date) || {
+      date: p.date,
+      label: String(p.date).slice(5),
+      revenueA: 0,
+      profitA: 0,
+      revenueB: 0,
+      profitB: 0,
+    };
+    existing.revenueB = Number(p.revenue ?? 0);
+    existing.profitB = Number(p.profit ?? 0);
+    byDate.set(p.date, existing);
+  }
+  return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
 function RevenueDashboard({
   isChainScope,
   from,
@@ -151,16 +179,26 @@ function RevenueDashboard({
   onToChange,
   branchId,
   onBranchChange,
+  compareBranchId,
+  onCompareBranchChange,
   branches,
   applied,
   onApply,
 }) {
   const [summary, setSummary] = useState(null);
+  const [compareSummary, setCompareSummary] = useState(null);
   const [trend, setTrend] = useState([]);
   const [byBranch, setByBranch] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const isComparing = Boolean(isChainScope && applied.branchId && applied.compareBranchId);
+
+  const branchName = useCallback(
+    (id) => branches.find((b) => b.id === id)?.name || `Branch #${id}`,
+    [branches],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -168,9 +206,44 @@ function RevenueDashboard({
       setLoading(true);
       setError('');
       try {
-        const params = {
+        const baseParams = {
           from: applied.from,
           to: applied.to,
+        };
+
+        if (isComparing) {
+          const paramsA = { ...baseParams, branchId: applied.branchId };
+          const paramsB = { ...baseParams, branchId: applied.compareBranchId };
+          const [sumA, sumB, trendA, trendB, products] = await Promise.all([
+            fetchReportSummary(paramsA),
+            fetchReportSummary(paramsB),
+            fetchReportTrend(paramsA),
+            fetchReportTrend(paramsB),
+            fetchTopProducts({ ...paramsA, limit: 5 }),
+          ]);
+          if (cancelled) return;
+          setSummary(sumA);
+          setCompareSummary(sumB);
+          setTrend(mergeCompareTrends(trendA, trendB));
+          setTopProducts(products || []);
+          setByBranch([
+            {
+              name: branchName(applied.branchId),
+              revenue: Number(sumA?.totalRevenue ?? 0),
+              profit: Number(sumA?.totalProfit ?? 0),
+            },
+            {
+              name: branchName(applied.compareBranchId),
+              revenue: Number(sumB?.totalRevenue ?? 0),
+              profit: Number(sumB?.totalProfit ?? 0),
+            },
+          ]);
+          return;
+        }
+
+        setCompareSummary(null);
+        const params = {
+          ...baseParams,
           branchId: applied.branchId || undefined,
         };
         const [sum, trendRows, products, branchRevenue] = await Promise.all([
@@ -220,13 +293,61 @@ function RevenueDashboard({
     return () => {
       cancelled = true;
     };
-  }, [applied.key, applied.from, applied.to, applied.branchId, isChainScope, branches]);
+  }, [
+    applied.key,
+    applied.from,
+    applied.to,
+    applied.branchId,
+    applied.compareBranchId,
+    isChainScope,
+    isComparing,
+    branches,
+    branchName,
+  ]);
 
   const periodLabel = `${applied.from || '…'} → ${applied.to || '…'}`;
 
   const selectedBranchName = applied.branchId
-    ? branches.find((b) => b.id === applied.branchId)?.name || 'Branch'
+    ? branchName(applied.branchId)
     : 'All branches';
+
+  const compareBranchName = applied.compareBranchId
+    ? branchName(applied.compareBranchId)
+    : null;
+
+  const scopeLabel = isChainScope
+    ? isComparing
+      ? `Scope · ${selectedBranchName} vs ${compareBranchName}`
+      : `Scope · ${selectedBranchName}`
+    : 'Scope · Your branch';
+
+  const showBranchBarChart = isChainScope && (isComparing || !applied.branchId);
+  const branchAName = isComparing ? branchName(applied.branchId) : '';
+  const branchBName = isComparing ? branchName(applied.compareBranchId) : '';
+
+  const compareBranchSelect =
+    isChainScope && onCompareBranchChange ? (
+      <label className="flex min-w-[180px] flex-col gap-1 text-sm">
+        <span className="font-medium text-[var(--admin-muted)]">Compare branch</span>
+        <select
+          value={compareBranchId || ''}
+          onChange={(e) =>
+            onCompareBranchChange(e.target.value ? Number(e.target.value) : '')
+          }
+          className={inputClass}
+          disabled={!branchId}
+        >
+          <option value="">{branchId ? 'None' : 'Select a branch first'}</option>
+          {(branches || [])
+            .filter((b) => b.id !== branchId)
+            .map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+        </select>
+      </label>
+    ) : null;
 
   return (
     <div className="space-y-4">
@@ -245,11 +366,10 @@ function RevenueDashboard({
           onBranchChange={onBranchChange}
           branches={branches}
           isChainScope={isChainScope}
+          extraFilters={compareBranchSelect}
           applyLabel="Apply filters"
         />
-        <p className="mt-2 text-xs text-[var(--admin-muted)]">
-          {isChainScope ? `Scope · ${selectedBranchName}` : 'Scope · Your branch'}
-        </p>
+        <p className="mt-2 text-xs text-[var(--admin-muted)]">{scopeLabel}</p>
       </Card>
 
       {error && (
@@ -267,7 +387,6 @@ function RevenueDashboard({
         <KpiCard
           label="Total cost (COGS)"
           value={loading ? '…' : formatVnd(summary?.totalCogs)}
-          hint="Last supplier receipt cost"
         />
         <KpiCard
           label="Profit"
@@ -281,34 +400,43 @@ function RevenueDashboard({
         <KpiCard
           label="Margin"
           value={loading ? '…' : `${Number(summary?.profitMarginPercent ?? 0).toFixed(1)}%`}
-          hint="Profit / revenue"
         />
         <KpiCard
           label="Total transactions"
           value={loading ? '…' : Number(summary?.transactionCount ?? 0).toLocaleString()}
-          hint={isChainScope ? 'Across selected scope' : 'At your branch'}
         />
         {isChainScope ? (
-          <KpiCard
-            label="Top branch"
-            value={loading ? '…' : summary?.topBranch?.name || '—'}
-            hint={
-              summary?.topBranch
-                ? `${formatVnd(summary.topBranch.revenue)} · profit ${formatVnd(summary.topBranch.profit)}`
-                : 'No revenue yet'
-            }
-          />
+          isComparing ? (
+            <KpiCard
+              label={`Compare · ${compareBranchName}`}
+              value={loading ? '…' : formatVnd(compareSummary?.totalRevenue)}
+              hint={
+                loading
+                  ? undefined
+                  : `Profit ${formatVnd(compareSummary?.totalProfit)} · ${Number(compareSummary?.profitMarginPercent ?? 0).toFixed(1)}% margin`
+              }
+            />
+          ) : (
+            <KpiCard
+              label="Top branch"
+              value={loading ? '…' : summary?.topBranch?.name || '—'}
+              hint={
+                summary?.topBranch
+                  ? `${formatVnd(summary.topBranch.revenue)} · profit ${formatVnd(summary.topBranch.profit)}`
+                  : 'No revenue yet'
+              }
+            />
+          )
         ) : (
           <KpiCard
             label="Avg. transaction value"
             value={loading ? '…' : formatVnd(summary?.avgTransactionValue)}
-            hint="Per transaction"
           />
         )}
       </div>
 
-      <div className={`grid gap-3 ${isChainScope && !applied.branchId ? 'xl:grid-cols-3' : 'xl:grid-cols-1'}`}>
-        <Card className={`${isChainScope && !applied.branchId ? 'xl:col-span-2' : ''} !p-4`}>
+      <div className={`grid gap-3 ${showBranchBarChart ? 'xl:grid-cols-3' : 'xl:grid-cols-1'}`}>
+        <Card className={`${showBranchBarChart ? 'xl:col-span-2' : ''} !p-4`}>
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h3 className="text-sm font-bold text-[var(--admin-text)]">Revenue and profit trend</h3>
             <span className="text-xs text-[var(--admin-muted)]">{periodLabel}</span>
@@ -335,33 +463,78 @@ function RevenueDashboard({
                   />
                   <Tooltip formatter={(v, name) => [formatVnd(v), name]} labelFormatter={(l) => `Day ${l}`} />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Revenue"
-                    stroke="#0058be"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="profit"
-                    name="Profit"
-                    stroke="#0f9d58"
-                    strokeWidth={2}
-                    dot={false}
-                  />
+                  {isComparing ? (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="revenueA"
+                        name={`Revenue (${branchAName})`}
+                        stroke="#0058be"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="revenueB"
+                        name={`Revenue (${branchBName})`}
+                        stroke="#60a5fa"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="profitA"
+                        name={`Profit (${branchAName})`}
+                        stroke="#0f9d58"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="profitB"
+                        name={`Profit (${branchBName})`}
+                        stroke="#6ee7b7"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        dot={false}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="revenue"
+                        name="Revenue"
+                        stroke="#0058be"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="profit"
+                        name="Profit"
+                        stroke="#0f9d58"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </>
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             )}
           </div>
         </Card>
 
-        {isChainScope && !applied.branchId && (
+        {showBranchBarChart && (
           <Card className="!p-4">
             <div className="mb-3 flex items-baseline justify-between gap-2">
-              <h3 className="text-sm font-bold text-[var(--admin-text)]">Revenue by branch</h3>
-              <span className="text-xs text-[var(--admin-muted)]">Top 5</span>
+              <h3 className="text-sm font-bold text-[var(--admin-text)]">
+                {isComparing ? 'Branch comparison' : 'Revenue by branch'}
+              </h3>
+              <span className="text-xs text-[var(--admin-muted)]">
+                {isComparing ? 'Side by side' : 'Top 5'}
+              </span>
             </div>
             <div className="h-64 w-full">
               {loading ? (
@@ -372,6 +545,23 @@ function RevenueDashboard({
                 <div className="flex h-full items-center justify-center text-sm text-[var(--admin-muted)]">
                   No branch revenue yet.
                 </div>
+              ) : isComparing ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={byBranch} margin={{ left: 8, right: 8, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v) =>
+                        v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : `${Math.round(v / 1000)}K`
+                      }
+                    />
+                    <Tooltip formatter={(v, name) => [formatVnd(v), name]} />
+                    <Legend />
+                    <Bar dataKey="revenue" name="Revenue" fill="#0058be" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="profit" name="Profit" fill="#0f9d58" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={byBranch} layout="vertical" margin={{ left: 8, right: 8 }}>
@@ -459,6 +649,7 @@ export default function ReportsPage() {
   const [from, setFrom] = useState(initialRange.from);
   const [to, setTo] = useState(initialRange.to);
   const [branchId, setBranchId] = useState('');
+  const [compareBranchId, setCompareBranchId] = useState('');
   const [branches, setBranches] = useState([]);
   const [invoiceStatus, setInvoiceStatus] = useState('');
   const [pointType, setPointType] = useState('');
@@ -467,6 +658,7 @@ export default function ReportsPage() {
     from: initialRange.from,
     to: initialRange.to,
     branchId: '',
+    compareBranchId: '',
     invoiceStatus: '',
     pointType: '',
     cashDiff: '',
@@ -490,11 +682,19 @@ export default function ReportsPage() {
     };
   }, [isChainScope]);
 
+  function handleBranchChange(nextId) {
+    setBranchId(nextId);
+    if (!nextId || nextId === compareBranchId) {
+      setCompareBranchId('');
+    }
+  }
+
   function commitApplied(nextFrom = from, nextTo = to) {
     setApplied((prev) => ({
       from: nextFrom,
       to: nextTo,
       branchId,
+      compareBranchId: branchId && compareBranchId ? compareBranchId : '',
       invoiceStatus,
       pointType,
       cashDiff,
@@ -514,6 +714,7 @@ export default function ReportsPage() {
           from: range.from,
           to: range.to,
           branchId,
+          compareBranchId: branchId && compareBranchId ? compareBranchId : '',
           invoiceStatus,
           pointType,
           cashDiff,
@@ -572,9 +773,6 @@ export default function ReportsPage() {
       : rawRows;
 
   const title = isBm ? 'Branch Performance' : 'Revenue Dashboard';
-  const description = isBm
-    ? 'Monitor operational performance and branch KPIs for your branch.'
-    : 'Review visual reports across the chain — revenue, invoices, cash and loyalty.';
 
   const tabExtraFilters =
     activeTab === 'invoices' ? (
@@ -626,7 +824,7 @@ export default function ReportsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <PageHeader title={title} description={description} />
+      <PageHeader title={title} />
 
       <div className="flex flex-wrap gap-2">
         {TABS.map((tab) => {
@@ -660,7 +858,9 @@ export default function ReportsPage() {
           onFromChange={setFrom}
           onToChange={setTo}
           branchId={branchId}
-          onBranchChange={setBranchId}
+          onBranchChange={handleBranchChange}
+          compareBranchId={compareBranchId}
+          onCompareBranchChange={setCompareBranchId}
           branches={branches}
           applied={applied}
           onApply={(nextFrom, nextTo) => {
@@ -687,7 +887,7 @@ export default function ReportsPage() {
                 commitApplied(nextFrom ?? from, nextTo ?? to);
               }}
               branchId={branchId}
-              onBranchChange={setBranchId}
+              onBranchChange={handleBranchChange}
               branches={branches}
               isChainScope={isChainScope}
               extraFilters={tabExtraFilters}

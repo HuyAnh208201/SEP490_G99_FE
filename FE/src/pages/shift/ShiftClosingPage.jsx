@@ -149,53 +149,47 @@ export default function ShiftClosingPage() {
 
   const shift = data?.shift;
   const isPendingApproval = data?.status === 'PENDING_APPROVAL';
-  const productVariance = data?.previousShiftProductVariance || [];
 
-  async function handleConfirmVerification() {
+  async function handleConfirmClosingDetails() {
     if (earlyCloseBlocked) {
       setError('Early closing requires a replacement cashier scheduled for the current time.');
       return;
     }
+    if (!handoverToEmployeeId) {
+      setError('Select who will receive the cash handover.');
+      return;
+    }
+    if (remarkRequired && !handoverRemark.trim()) {
+      setError('An explanation is required when a cash difference exists.');
+      return;
+    }
     const confirmed = await confirmSave({
-      title: 'Confirm stock verification',
-      message: `Save the actual quantities for ${hvRows.length} high-value product(s)?`,
-      confirmLabel: 'Yes, confirm verification',
+      title: 'Confirm closing details',
+      message: `Save high-value counts and cash handover (${formatMoney(actualCash)}, difference ${formatMoney(cashDiff)})?`,
+      confirmLabel: 'Yes, confirm',
     });
     if (!confirmed) return;
-    setBusy('verify');
+    setBusy('confirm');
     setError('');
     try {
       const items = hvRows.map((row) => ({
         productId: row.productId,
         actualQty: Number(row.actualQty ?? 0),
       }));
-      setData(await confirmVerification(items));
+      await confirmVerification(items);
+      const updated = await confirmHandover({
+        actualCash: Number(actualCash),
+        handoverToEmployeeId: Number(handoverToEmployeeId),
+        remark: handoverRemark,
+      });
+      setData(updated);
     } catch (err) {
-      setError(err?.message || 'Verification failed');
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function handleConfirmHandover() {
-    const confirmed = await confirmSave({
-      title: 'Confirm cash handover',
-      message: `Save the handover with actual cash of ${formatMoney(actualCash)} and a difference of ${formatMoney(cashDiff)}?`,
-      confirmLabel: 'Yes, confirm handover',
-    });
-    if (!confirmed) return;
-    setBusy('handover');
-    setError('');
-    try {
-      setData(
-        await confirmHandover({
-          actualCash: Number(actualCash),
-          handoverToEmployeeId: Number(handoverToEmployeeId),
-          remark: handoverRemark,
-        }),
-      );
-    } catch (err) {
-      setError(err?.message || 'Handover failed');
+      setError(err?.message || 'Could not confirm closing details');
+      try {
+        setData(await fetchClosingShiftSession());
+      } catch {
+        /* keep previous snapshot */
+      }
     } finally {
       setBusy('');
     }
@@ -253,11 +247,8 @@ export default function ShiftClosingPage() {
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-4xl space-y-6 p-4 lg:p-6">
-        <PageHeader
-          title="Shift Closing"
-          description="Count cash first, then review shift summary and product variances before handover."
-        />
+      <div className="w-full space-y-4 p-3 lg:p-4">
+        <PageHeader title="Shift Closing" />
 
         <AutoCloseBanner session={data} />
 
@@ -275,7 +266,7 @@ export default function ShiftClosingPage() {
             <p className="mt-1">
               {earlyCloseBlocked
                 ? 'A replacement cashier must be assigned to a published shift covering the current time before this shift can be handed over.'
-                : 'A scheduled replacement is available. Select that cashier in Cash below before confirming the handover.'}
+                : 'Select the scheduled replacement cashier under Cash before confirming.'}
             </p>
           </Card>
         )}
@@ -302,26 +293,46 @@ export default function ShiftClosingPage() {
           <p className="text-sm text-[var(--admin-muted)]">Loading…</p>
         ) : shouldRenderClosingDetails({ loading, data }) ? (
           <>
+            {shift && (
+              <Card className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-[var(--admin-text)]">Shift summary</h2>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge tone={data.verificationConfirmed ? 'success' : 'warning'}>
+                      {data.verificationConfirmed ? 'Stock verified' : 'Stock pending'}
+                    </Badge>
+                    <Badge tone={data.handoverConfirmed ? 'success' : 'warning'}>
+                      {data.handoverConfirmed ? 'Handover confirmed' : 'Handover pending'}
+                    </Badge>
+                  </div>
+                </div>
+                <p className="font-semibold text-[var(--admin-text)]">
+                  Shift #{shift.shiftNumber} · {formatDateTime(shift.startTime)} →{' '}
+                  {formatDateTime(shift.endTime)}
+                </p>
+                <p className="text-sm text-[var(--admin-muted)]">
+                  {data.employeeName} · {data.branchName}
+                </p>
+                <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-[var(--admin-muted)]">Opening fund</dt>
+                    <dd className="font-semibold">{formatMoney(data.openingFundAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--admin-muted)]">Cash sales</dt>
+                    <dd className="font-semibold">{formatMoney(data.cashSales)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--admin-muted)]">Refunds</dt>
+                    <dd className="font-semibold">{formatMoney(data.refundAmount)}</dd>
+                  </div>
+                </dl>
+              </Card>
+            )}
+
             <Card className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-semibold text-[var(--admin-text)]">Cash</h2>
-                <Badge tone={data.handoverConfirmed ? 'success' : 'warning'}>
-                  {data.handoverConfirmed ? 'Handover confirmed' : 'Waiting for handover'}
-                </Badge>
-              </div>
-              <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <dt className="text-[var(--admin-muted)]">Opening fund</dt>
-                  <dd className="font-semibold">{formatMoney(data.openingFundAmount)}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--admin-muted)]">Cash sales</dt>
-                  <dd className="font-semibold">{formatMoney(data.cashSales)}</dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--admin-muted)]">Refund amount</dt>
-                  <dd className="font-semibold">{formatMoney(data.refundAmount)}</dd>
-                </div>
+              <h2 className="text-sm font-semibold text-[var(--admin-text)]">Cash</h2>
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-[var(--admin-muted)]">Expected cash</dt>
                   <dd className="font-semibold">{formatMoney(data.expectedCash)}</dd>
@@ -348,7 +359,7 @@ export default function ShiftClosingPage() {
                   <select
                     value={handoverToEmployeeId}
                     onChange={(event) => setHandoverToEmployeeId(event.target.value)}
-                    disabled={data.handoverConfirmed}
+                    disabled={data.handoverConfirmed && data.verificationConfirmed}
                     className={inputClass}
                   >
                     <option value="">Select recipient</option>
@@ -378,56 +389,18 @@ export default function ShiftClosingPage() {
                 </span>
                 <textarea
                   className={inputClass}
-                  rows={3}
-                  placeholder="Explain the reason for the cash difference…"
+                  rows={2}
+                  placeholder="Explain the cash difference…"
                   value={handoverRemark}
                   onChange={(e) => setHandoverRemark(e.target.value)}
                 />
               </label>
-              {remarkRequired && (
-                <p className="text-xs text-amber-700">
-                  An explanation is required when a cash difference exists.
-                </p>
-              )}
-              <div className="flex justify-end">
-                <Button
-                  disabled={
-                    busy === 'handover' ||
-                    !handoverToEmployeeId ||
-                    earlyCloseBlocked ||
-                    (remarkRequired && !handoverRemark.trim())
-                  }
-                  onClick={handleConfirmHandover}
-                >
-                  Confirm handover
-                </Button>
-              </div>
             </Card>
 
-            {shift && (
-              <Card className="bg-[#f7f9fb]">
-                <h2 className="mb-2 text-sm font-semibold text-[var(--admin-text)]">Shift summary</h2>
-                <p className="font-semibold text-[var(--admin-text)]">
-                  Shift #{shift.shiftNumber} · {formatDateTime(shift.startTime)} →{' '}
-                  {formatDateTime(shift.endTime)}
-                </p>
-                <p className="text-sm text-[var(--admin-muted)]">
-                  {data.employeeName} · {data.branchName}
-                </p>
-              </Card>
-            )}
-
             <Card className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-[var(--admin-text)]">
-                  High-value count (this shift)
-                </h2>
-                <Badge tone={data.verificationConfirmed ? 'success' : 'warning'}>
-                  {data.verificationConfirmed ? 'Verified' : 'Pending verification'}
-                </Badge>
-              </div>
+              <h2 className="text-sm font-semibold text-[var(--admin-text)]">High-value products</h2>
               <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-                <table className="min-w-full text-left text-sm">
+                <table className="min-w-full w-full text-left text-sm">
                   <thead className="bg-[var(--admin-brand)] text-white">
                     <tr>
                       <th className="px-3 py-2 font-medium">Product</th>
@@ -444,10 +417,7 @@ export default function ShiftClosingPage() {
                           colSpan={5}
                           className="px-3 py-6 text-center text-sm text-[var(--admin-muted)]"
                         >
-                          No high-value items in branch stock yet. Create products in risk categories
-                          (high-value tobacco, cosmetics &amp; beauty, prepaid / service cards,
-                          premium alcohol), set retail price ≥ 300,000 VND, stock them at the branch,
-                          then reopen Shift Closing.
+                          No high-value items in branch stock for this count.
                         </td>
                       </tr>
                     ) : (
@@ -483,85 +453,31 @@ export default function ShiftClosingPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="flex justify-end">
-                <Button
-                  disabled={busy === 'verify' || earlyCloseBlocked}
-                  onClick={handleConfirmVerification}
-                >
-                  Confirm verification
-                </Button>
-              </div>
             </Card>
 
-            <Card className="space-y-4">
-              <h2 className="text-sm font-semibold text-[var(--admin-text)]">
-                Product variance vs previous shift
-              </h2>
-              <p className="text-xs text-[var(--admin-muted)]">
-                Compare previous shift counted qty with this shift expected/actual high-value stock.
-              </p>
-              <div className="overflow-x-auto rounded-lg border border-[var(--admin-border)]">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
-                    <tr>
-                      <th className="px-3 py-2">Product</th>
-                      <th className="px-3 py-2">Category</th>
-                      <th className="px-3 py-2 text-right">Prev. actual</th>
-                      <th className="px-3 py-2 text-right">This expected</th>
-                      <th className="px-3 py-2 text-right">This actual</th>
-                      <th className="px-3 py-2 text-right">Variance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productVariance.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-3 py-6 text-center text-sm text-[var(--admin-muted)]"
-                        >
-                          No previous closed cashier shift with high-value counts is available for
-                          this branch.
-                        </td>
-                      </tr>
-                    ) : (
-                      productVariance.map((row) => (
-                        <tr key={row.productId} className="border-t border-[var(--admin-border)]">
-                          <td className="px-3 py-2">{row.productName || '—'}</td>
-                          <td className="px-3 py-2 text-[var(--admin-muted)]">
-                            {row.categoryName || '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {row.previousActualQty ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {row.currentExpectedQty ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {row.currentActualQty ?? '—'}
-                          </td>
-                          <td className={`px-3 py-2 text-right tabular-nums ${varianceClass(row.variance)}`}>
-                            {row.variance ?? '—'}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--admin-border)] pt-4">
-              <p className="text-xs text-[var(--admin-muted)]">
-                Complete verification and cash handover to close the shift.
-              </p>
-              <div className="flex gap-2">
-                <Button variant="secondary" disabled={busy === 'draft'} onClick={handleSaveDraft}>
-                  Save draft
-                </Button>
-                <Button disabled={busy === 'close' || !canCloseCashier} onClick={handleCloseShift}>
-                  Close shift
-                </Button>
-              </div>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--admin-border)] pt-4">
+              <Button variant="secondary" disabled={busy === 'draft'} onClick={handleSaveDraft}>
+                Save draft
+              </Button>
+              <Button
+                disabled={
+                  busy === 'confirm' ||
+                  earlyCloseBlocked ||
+                  !handoverToEmployeeId ||
+                  (remarkRequired && !handoverRemark.trim()) ||
+                  (data.verificationConfirmed && data.handoverConfirmed)
+                }
+                onClick={handleConfirmClosingDetails}
+              >
+                {data.verificationConfirmed && data.handoverConfirmed
+                  ? 'Details confirmed'
+                  : busy === 'confirm'
+                    ? 'Confirming…'
+                    : 'Confirm details'}
+              </Button>
+              <Button disabled={busy === 'close' || !canCloseCashier} onClick={handleCloseShift}>
+                Close shift
+              </Button>
             </div>
           </>
         ) : null}

@@ -22,6 +22,7 @@ export async function checkout({
   customerPhone,
   customerName,
   pointsToRedeem,
+  campaignId,
 }) {
   const { data } = await http.post('/pos/orders', {
     lines,
@@ -30,8 +31,17 @@ export async function checkout({
     customerPhone: customerPhone || null,
     customerName: customerName || null,
     pointsToRedeem: pointsToRedeem ?? 0,
+    campaignId: campaignId ?? null,
   });
   return unwrap(data);
+}
+
+/** Active campaigns for the cashier branch with eligibility vs current subtotal. */
+export async function fetchApplicablePromotions(subtotal) {
+  const { data } = await http.get('/pos/orders/applicable-promotions', {
+    params: { subtotal: subtotal ?? 0 },
+  });
+  return unwrap(data) ?? [];
 }
 
 /** Return orders from the cashier's current shift. */

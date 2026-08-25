@@ -302,7 +302,7 @@ export default function BranchAssignStaffModal({ open, onClose, branch, staffTyp
                   />
                 </FormField>
               </div>
-              <FormField label="Phone" required hint="0912345678 or +84912345678">
+              <FormField label="Phone" required>
                 <input
                   required
                   pattern={PHONE_PATTERN}
@@ -311,16 +311,13 @@ export default function BranchAssignStaffModal({ open, onClose, branch, staffTyp
                   className={inputClass}
                 />
               </FormField>
-              <FormField label="Username" hint="Auto-generated from email.">
+              <FormField label="Username">
                 <input
                   value={newForm.userName}
                   onChange={(e) => patchNew({ userName: e.target.value })}
                   className={`${inputClass} font-mono text-sm`}
                 />
               </FormField>
-              <p className="text-xs text-[var(--admin-muted)]">
-                A temporary password will be emailed. Same flow as Team &amp; accounts.
-              </p>
             </form>
           )}
 

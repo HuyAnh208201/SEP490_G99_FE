@@ -122,12 +122,6 @@ export const NAV_GROUPS = [
     label: 'Inventory staff',
     items: [
       {
-        path: '/inventory/count-history',
-        label: 'Count History',
-        icon: 'report',
-        permissions: ['INVENTORY_COUNT'],
-      },
-      {
         path: '/inventory/order-tracking',
         label: 'Order Tracking',
         icon: 'dispatch',
@@ -168,8 +162,8 @@ export const NAV_GROUPS = [
         permissions: ['SHIFT_MANAGEMENT'],
       },
       {
-        path: '/branch-manager/cash-reconciliation',
-        label: 'Shift Discrepancy Review',
+        path: '/branch-manager/audit',
+        label: 'Branch Audit',
         icon: 'cash',
         permissions: ['APPROVE_CASH_DISCREPANCY'],
       },

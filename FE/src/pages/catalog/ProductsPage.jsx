@@ -28,7 +28,6 @@ import {
   showWarehouseStockColumn,
 } from '../../constants/productAccess.js';
 import { formatVnd } from '../../lib/money.js';
-import { highValueVerificationHint, willAppearInShiftVerification } from '../../lib/highValueProducts.js';
 import { usePermissions } from '../../contexts/PermissionsContext.jsx';
 import { useReferenceData } from '../../contexts/ReferenceDataContext.jsx';
 import { useSaveConfirmation } from '../../contexts/SaveConfirmationContext.jsx';
@@ -74,19 +73,6 @@ function fieldErrors(err) {
 function suggestSku(barcode) {
   if (!barcode) return '';
   return barcode.length >= 8 ? barcode : `SP-${barcode}`;
-}
-
-function pageDescription(role, canManage, isWm) {
-  if (isWm) {
-    return 'Central warehouse stock monitoring — read-only product catalog with in-stock quantities.';
-  }
-  if (showBarcodeWorkflow(role)) {
-    return 'Branch product catalog with barcode scanning, branch stock levels, and inventory count.';
-  }
-  if (canManage) {
-    return 'Central product catalog administration — SKU codes, pricing, and global catalog scope.';
-  }
-  return 'Browse the product catalog.';
 }
 
 /** Display ledger BASE qty as base retail units or floor TOP purchase units. */
@@ -141,6 +127,7 @@ export default function ProductsPage() {
   const [generatingBarcode, setGeneratingBarcode] = useState(false);
   const [formError, setFormError] = useState('');
   const [countOpen, setCountOpen] = useState(searchParams.get('count') === '1');
+  const [countSuccess, setCountSuccess] = useState('');
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [priceTarget, setPriceTarget] = useState(null);
   const [scheduledPrice, setScheduledPrice] = useState(null);
@@ -179,22 +166,13 @@ export default function ProductsPage() {
       setCountOpen(true);
       setSearchParams({}, { replace: true });
     }
+    if (searchParams.get('countSubmitted') === '1') {
+      setCountSuccess('Inventory count submitted. Branch stock has been updated.');
+      setSearchParams({}, { replace: true });
+    }
   }, [searchParams, setSearchParams]);
 
   const filtered = items;
-
-  const selectedCategoryName = useMemo(
-    () => categories.find((c) => String(c.id) === String(form.categoryId))?.name ?? '',
-    [categories, form.categoryId],
-  );
-  const shiftVerificationHint = highValueVerificationHint(
-    selectedCategoryName,
-    form.defaultSalePrice,
-  );
-  const qualifiesForShiftVerification = willAppearInShiftVerification(
-    selectedCategoryName,
-    form.defaultSalePrice,
-  );
 
   const summary = useMemo(() => {
     if (!showWarehouseStock) return null;
@@ -392,7 +370,6 @@ export default function ProductsPage() {
     <div className="w-full">
       <PageHeader
         title={isWm ? 'Products & central stock' : 'Products'}
-        description={pageDescription(role, canManage, isWm)}
         actions={
           showCount ? (
             <Button variant="secondary" onClick={() => setCountOpen((v) => !v)}>
@@ -402,7 +379,23 @@ export default function ProductsPage() {
         }
       />
 
-      {showCount && <InventoryCountPanel open={countOpen} onClose={() => setCountOpen(false)} />}
+      {showCount && (
+        <InventoryCountPanel
+          open={countOpen}
+          onClose={() => setCountOpen(false)}
+          onSubmitted={() => {
+            setCountOpen(false);
+            setCountSuccess('Inventory count submitted. Branch stock has been updated.');
+            load();
+          }}
+        />
+      )}
+
+      {countSuccess && (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {countSuccess}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -440,9 +433,6 @@ export default function ProductsPage() {
               <h2 className="text-base font-semibold text-[var(--admin-text)]">
                 {editingId ? 'Edit product' : 'Add product'}
               </h2>
-              {showScan && !editingId && (
-                <span className="text-xs text-[var(--admin-subtle)]">Focus barcode → scan</span>
-              )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -460,22 +450,43 @@ export default function ProductsPage() {
                     onScan={handleBarcodeScan}
                     onGenerate={handleGenerateBarcode}
                     generating={generatingBarcode}
-                    hint="USB scanner sends digits + Enter. Use Generate for items without a printed barcode."
                   />
                 ) : (
-                  <FormField label="Barcode" hint="Optional EAN / internal barcode.">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)]">
+                        Barcode
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleGenerateBarcode}
+                        disabled={generatingBarcode}
+                        className="rounded-lg border border-[#0058be]/30 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#0058be] hover:bg-[#f0f6ff] disabled:opacity-60"
+                      >
+                        {generatingBarcode ? 'Generating…' : 'Generate barcode'}
+                      </button>
+                    </div>
                     <input
                       value={form.barcode}
-                      onChange={(e) => patchForm({ barcode: e.target.value })}
+                      onChange={(e) =>
+                        patchForm({
+                          barcode: e.target.value.replace(/[^\dA-Za-z-]/g, ''),
+                        })
+                      }
                       placeholder="893000000001"
                       className={`${selectClass} font-mono`}
+                      autoComplete="off"
+                      spellCheck={false}
                     />
-                  </FormField>
+                    <p className="text-xs text-[var(--admin-subtle)]">
+                      Generates a unique EAN-13 with Vietnam prefix 893.
+                    </p>
+                  </div>
                 )}
 
                 <PrintableBarcode value={form.barcode} productName={form.name} />
 
-                {!editingId && showScan && (
+                {!editingId && (
                   <label className="flex items-center gap-2 text-sm text-[var(--admin-muted)]">
                     <input
                       type="checkbox"
@@ -495,13 +506,13 @@ export default function ProductsPage() {
                 <FormField label="Product code (SKU)" required={!editingId}>
                   <input
                     required={!editingId}
-                    readOnly={!editingId && form.syncCodeFromBarcode && showScan}
+                    readOnly={!editingId && form.syncCodeFromBarcode}
                     value={form.code}
                     onChange={(e) =>
                       patchForm({ code: e.target.value.toUpperCase(), syncCodeFromBarcode: false })
                     }
                     placeholder="SP000123"
-                    className={`${selectClass} font-mono uppercase tracking-wide ${!editingId && form.syncCodeFromBarcode && showScan ? 'bg-[#f0f6ff]' : ''}`}
+                    className={`${selectClass} font-mono uppercase tracking-wide ${!editingId && form.syncCodeFromBarcode ? 'bg-[#f0f6ff]' : ''}`}
                   />
                 </FormField>
 
@@ -537,7 +548,7 @@ export default function ProductsPage() {
                   </select>
                 </FormField>
 
-                <FormField label="Retail unit" required hint="Unit sold at POS and branch inventory.">
+                <FormField label="Retail unit" required>
                   <select
                     required
                     value={form.unit}
@@ -553,7 +564,7 @@ export default function ProductsPage() {
                 </FormField>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FormField label="Import unit" hint="Used when BM requests replenishment.">
+                  <FormField label="Import unit">
                     <select
                       value={form.importUnit}
                       onChange={(e) => patchForm({ importUnit: e.target.value })}
@@ -577,7 +588,7 @@ export default function ProductsPage() {
                   </FormField>
                 </div>
                 {isCentral && (
-                  <FormField label="Primary supplier" hint="Supplier receipts only list products assigned to the selected supplier.">
+                  <FormField label="Primary supplier">
                     <select value={form.supplierId} onChange={(e) => patchForm({ supplierId: e.target.value })} className={selectClass}>
                       <option value="">Not assigned</option>
                       {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
@@ -605,23 +616,7 @@ export default function ProductsPage() {
                       onChange={(v) => patchForm({ defaultSalePrice: v })}
                       disabled={Boolean(editingId)}
                     />
-                    {editingId && <p className="mt-1 text-xs text-[var(--admin-muted)]">Existing retail prices cannot change during the day. Warehouse Manager schedules a future effective date.</p>}
                   </FormField>
-                </div>
-                <div
-                  className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
-                    qualifiesForShiftVerification
-                      ? 'border-[var(--admin-brand-soft)] bg-[var(--admin-brand)]/5 text-[var(--admin-text)]'
-                      : 'border-[var(--admin-border)] bg-[#f7f9fb] text-[var(--admin-muted)]'
-                  }`}
-                >
-                  <p className="font-semibold text-[var(--admin-text)]">Shift closing — high-value count</p>
-                  <p className="mt-1">{shiftVerificationHint}</p>
-                  <p className="mt-1">
-                    There is no separate &quot;high-value&quot; product type. Pick a high-theft category
-                    (e.g. High-value tobacco, Cosmetics &amp; beauty, Prepaid cards, Premium alcohol),
-                    set the retail price above the threshold, and make sure the branch has stock on hand.
-                  </p>
                 </div>
               </section>
 
@@ -636,9 +631,6 @@ export default function ProductsPage() {
                   <span>
                     <span className="block text-sm font-semibold text-[var(--admin-text)]">
                       Refundable at POS
-                    </span>
-                    <span className="mt-1 block text-xs leading-relaxed text-[var(--admin-muted)]">
-                      A non-refundable product prevents the cashier from refunding the whole order.
                     </span>
                   </span>
                 </label>
@@ -673,18 +665,6 @@ export default function ProductsPage() {
                   </Button>
                 )}
               </div>
-
-              {isCentral && (
-                <p className="text-xs text-[var(--admin-subtle)]">
-                  Products you create are global and appear in every branch.
-                </p>
-              )}
-              {showScan && (
-                <p className="text-xs text-[var(--admin-subtle)]">
-                  Products you create are branch-local and visible only at your store (supervisors can
-                  still monitor them).
-                </p>
-              )}
             </form>
           </Card>
         )}

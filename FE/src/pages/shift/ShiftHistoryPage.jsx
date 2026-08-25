@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import Card from '../../components/ui/Card.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Pagination from '../../components/ui/Pagination.jsx';
 import { fetchShiftSessionHistory } from '../../api/shiftSessions.js';
-import useClientPage from '../../hooks/useClientPage.js';
+import useServerPage from '../../hooks/useServerPage.js';
 import { formatDateTime } from '../../lib/datetime.js';
 
 const STATUS_TONE = {
@@ -20,39 +20,22 @@ const STATUS_TONE = {
 };
 
 export default function ShiftHistoryPage() {
-  const [allRows, setAllRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const pageData = useClientPage(allRows);
-  const { items: rows } = pageData;
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await fetchShiftSessionHistory();
-        if (!cancelled) setAllRows(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (!cancelled) setError(err?.message || 'Failed to load history');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const fetchPage = useCallback((params) => fetchShiftSessionHistory(params), []);
+  const pageData = useServerPage(fetchPage);
+  const { items: rows, loading, error } = pageData;
 
   return (
     <div className="mx-auto min-h-0 w-full max-w-3xl flex-1 space-y-6 overflow-y-auto p-4 lg:p-6">
-      <PageHeader title="Shift history" description="Your recent shift sessions." />
+      <PageHeader title="Shift history" />
       {error && <p className="text-sm text-red-600">{error}</p>}
       <Card padding={false} className="overflow-hidden">
         {loading ? (
-          <p className="p-6 text-sm text-[var(--admin-muted)]">Loading…</p>
-        ) : allRows.length === 0 ? (
+          <div className="space-y-3 p-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-16 animate-pulse rounded-lg bg-[#eef2f6]" />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
           <p className="p-6 text-sm text-[var(--admin-muted)]">No shift sessions yet.</p>
         ) : (
           <>

@@ -70,10 +70,7 @@ export default function AssignModal({
           )}
           {assignCtx.slot.isFirst && (
             <div className="rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] p-3">
-              <FormField
-                label="Opening cash"
-                hint="Cash float placed in the drawer to start the day. Leave blank to use the branch default. Later slots of the day inherit the previous shift's counted cash."
-              >
+              <FormField label="Opening cash">
                 <MoneyInput value={openingCash} onChange={onOpeningCashChange} placeholder="0" />
               </FormField>
             </div>

@@ -53,15 +53,19 @@ function calcTotals(state) {
   }
 
   const promoSavings = subtotalOriginal - subtotalAfterPromo;
-  const afterPromo = subtotalAfterPromo;
+  const codeDiscount = Math.min(
+    Math.max(0, Number(state.campaignDiscount ?? 0) || 0),
+    subtotalAfterPromo,
+  );
+  const afterCampaign = Math.max(0, subtotalAfterPromo - codeDiscount);
 
   const { vndPerPoint, pointValueVnd } = state.loyalty ?? DEFAULT_LOYALTY;
   const maxPoints = state.customer?.points ?? 0;
   const pointsUsed = Math.min(state.pointsToRedeem, maxPoints);
   const pointsDiscount = pointsUsed * pointValueVnd;
-  const cappedPointsDiscount = Math.min(pointsDiscount, afterPromo);
+  const cappedPointsDiscount = Math.min(pointsDiscount, afterCampaign);
 
-  const total = Math.max(0, afterPromo - cappedPointsDiscount);
+  const total = Math.max(0, afterCampaign - cappedPointsDiscount);
   const pointsEarned =
     state.customer && total > 0 ? Math.floor(total / vndPerPoint) : 0;
 
@@ -69,7 +73,9 @@ function calcTotals(state) {
     subtotalOriginal,
     subtotalAfterPromo,
     promoSavings,
-    codeDiscount: 0,
+    codeDiscount,
+    campaignId: state.campaignId ?? null,
+    campaignName: state.campaignName ?? null,
     pointsUsed: Math.floor(cappedPointsDiscount / pointValueVnd),
     pointsDiscount: cappedPointsDiscount,
     total,
@@ -88,6 +94,9 @@ export function PosCartProvider({ children }) {
   /** Chốt đơn là thao tác ghi DB — ref chặn double-click chắc hơn state. */
   const checkoutInFlight = useRef(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [campaignId, setCampaignId] = useState(null);
+  const [campaignName, setCampaignName] = useState(null);
+  const [campaignDiscount, setCampaignDiscount] = useState(0);
   const [orderHistory, setOrderHistory] = useState([]);
   const [orderHistoryLoading, setOrderHistoryLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -116,9 +125,30 @@ export function PosCartProvider({ children }) {
         customer,
         pointsToRedeem,
         loyalty,
+        campaignId,
+        campaignName,
+        campaignDiscount,
       }),
-    [lines, customer, pointsToRedeem, loyalty],
+    [lines, customer, pointsToRedeem, loyalty, campaignId, campaignName, campaignDiscount],
   );
+
+  const applyCampaign = useCallback((promo) => {
+    if (!promo?.id || !promo.eligible) {
+      setCampaignId(null);
+      setCampaignName(null);
+      setCampaignDiscount(0);
+      return;
+    }
+    setCampaignId(promo.id);
+    setCampaignName(promo.name || null);
+    setCampaignDiscount(Number(promo.discountAmount) || 0);
+  }, []);
+
+  const clearCampaign = useCallback(() => {
+    setCampaignId(null);
+    setCampaignName(null);
+    setCampaignDiscount(0);
+  }, []);
 
   const addProduct = useCallback((product, qty = 1) => {
     const requested = Math.floor(Number(qty) || 0);
@@ -236,6 +266,9 @@ export function PosCartProvider({ children }) {
     setCustomerPhone('');
     setCustomerLookupError('');
     setPointsToRedeem(0);
+    setCampaignId(null);
+    setCampaignName(null);
+    setCampaignDiscount(0);
   }, []);
 
   /** Gỡ khách khỏi đơn hiện tại (không xóa tài khoản trong DB). */
@@ -353,6 +386,7 @@ export function PosCartProvider({ children }) {
           customerName: null,
           // pointsUsed đã bị chặn trên theo tổng đơn, không phải số thô cashier gõ.
           pointsToRedeem: totals.pointsUsed,
+          campaignId: campaignId ?? null,
         });
 
         setOrderHistory((prev) => [order, ...prev]);
@@ -370,7 +404,7 @@ export function PosCartProvider({ children }) {
         setCheckoutBusy(false);
       }
     },
-    [lines, totals, customer, clearCart],
+    [lines, totals, customer, clearCart, campaignId],
   );
 
   /**
@@ -396,6 +430,7 @@ export function PosCartProvider({ children }) {
         customerPhone: customer?.phone ?? null,
         customerName: null,
         pointsToRedeem: totals.pointsUsed,
+        campaignId: campaignId ?? null,
       });
       return { ok: true, order };
     } catch (error) {
@@ -404,7 +439,7 @@ export function PosCartProvider({ children }) {
       checkoutInFlight.current = false;
       setCheckoutBusy(false);
     }
-  }, [lines, totals, customer]);
+  }, [lines, totals, customer, campaignId]);
 
   /** payOS báo PAID → đưa đơn vào lịch sử và dọn giỏ cho khách tiếp theo. */
   const finishPayOSOrder = useCallback(
@@ -428,6 +463,9 @@ export function PosCartProvider({ children }) {
       checkoutBusy,
       pointsToRedeem,
       setPointsToRedeem,
+      campaignId,
+      applyCampaign,
+      clearCampaign,
       totals,
       orderHistory,
       orderHistoryLoading,
@@ -456,6 +494,9 @@ export function PosCartProvider({ children }) {
       checkoutBusy,
       pointsToRedeem,
       totals,
+      campaignId,
+      applyCampaign,
+      clearCampaign,
       orderHistory,
       orderHistoryLoading,
       loadOrderHistory,

@@ -407,10 +407,7 @@ export default function PosCartPanel({
               className="flex min-h-12 items-center justify-between rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <span>Checkout</span>
-              <span className="flex items-center gap-2">
-                <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
-                <span>{formatVnd(totals.total)}</span>
-              </span>
+              <span>{formatVnd(totals.total)}</span>
             </button>
           </div>
         )}

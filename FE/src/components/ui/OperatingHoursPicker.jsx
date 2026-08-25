@@ -21,7 +21,6 @@ export default function OperatingHoursPicker({ open, close, onChange, error: ext
     <FormField
       label="Operating hours"
       required
-      hint="Use time pickers or a preset — saved as “08:00 - 22:00” for the backend."
       error={error}
     >
       <div className="space-y-3">

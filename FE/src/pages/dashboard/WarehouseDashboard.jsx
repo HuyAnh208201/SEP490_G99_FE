@@ -79,7 +79,6 @@ export default function WarehouseDashboard() {
       label: 'Low stock',
       value: loading ? '…' : data?.lowStockCount ?? '—',
       icon: 'boxes',
-      hint: 'At or below reorder point',
     },
     {
       key: 'pending',
@@ -122,7 +121,6 @@ export default function WarehouseDashboard() {
     <div className="w-full space-y-5">
       <PageHeader
         title="Central warehouse"
-        description="Stock risk, fulfillment queues, and supplier receiving by reporting period."
         actions={(
           <div className="flex flex-wrap items-center gap-2">
             {data?.generatedAt ? (
@@ -187,10 +185,6 @@ export default function WarehouseDashboard() {
         <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-[var(--admin-text)]">Low stock items</h2>
-            <p className="text-xs text-[var(--admin-muted)]">
-              Central warehouse SKUs at or below reorder point
-              {data?.generatedAt ? ` · as of ${formatDateTime(data.generatedAt)}` : ''}.
-            </p>
           </div>
           <Link to="/catalog/products" className="text-sm font-semibold text-[var(--admin-brand)] hover:underline">
             View inventory →

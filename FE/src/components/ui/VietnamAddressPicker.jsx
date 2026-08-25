@@ -58,7 +58,6 @@ export default function VietnamAddressPicker({
       <FormField
         label="Street address"
         required
-        hint="House number, street name, building…"
         error={streetError}
       >
         <input

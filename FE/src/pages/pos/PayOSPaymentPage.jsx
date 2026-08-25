@@ -330,9 +330,6 @@ export default function PayOSPaymentPage() {
             <p className="mt-1 text-2xl font-bold text-[var(--admin-text)]">
               {formatVnd(amountDue)}
             </p>
-            <p className="mt-1 text-xs text-[var(--admin-subtle)]">
-              Scan with any banking app · Napas 24/7 transfer
-            </p>
             {link && (
               <div className="mt-3 space-y-1 text-xs text-[var(--admin-subtle)]">
                 <p>
@@ -374,11 +371,6 @@ export default function PayOSPaymentPage() {
           >
             {closed ? '← Back to Cart' : 'Cancel Payment'}
           </button>
-          <p className="text-xs text-[var(--admin-subtle)]">
-            {status === 'PENDING'
-              ? 'Waiting for the customer to transfer — this screen updates automatically.'
-              : 'Cancelling returns the stock and points to the order.'}
-          </p>
         </div>
 
         {error && (

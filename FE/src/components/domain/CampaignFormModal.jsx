@@ -333,18 +333,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
 
 
-  const modalDescription = isBranchManager
-
-    ? 'Create a promotion for your branch. It applies automatically to your location.'
-
-    : webRole === 'ADMIN'
-
-      ? 'Create or update chain-wide campaigns. Directors and admins can activate them.'
-
-      : 'Create chain-wide promotions and activate them when ready.';
-
-
-
   const footer =
 
     step === 'details' ? (
@@ -396,8 +384,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
       onClose={onClose}
 
       title={editing ? 'Edit campaign' : 'New campaign'}
-
-      description={modalDescription}
 
       size="lg"
 
@@ -477,16 +463,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
                   required
 
-                  hint={
-
-                    form.type === 'PERCENT'
-
-                      ? 'e.g. 10 for 10% off'
-
-                      : 'Tip: enter 50 → becomes 50.000 ₫ on blur'
-
-                  }
-
                 >
 
                   {form.type === 'FIXED_AMOUNT' ? (
@@ -498,8 +474,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
                       onChange={(v) => patch({ discountValue: v })}
 
                       required
-
-                      hint="Short numbers auto-scale on blur (e.g. 50 → 50,000 ₫)"
 
                     />
 
@@ -533,8 +507,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
 
                   label="Minimum order (₫)"
 
-                  hint="Optional — leave blank for no minimum."
-
                   className="sm:col-span-2"
 
                 >
@@ -544,8 +516,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
                     value={form.minOrderAmount}
 
                     onChange={(v) => patch({ minOrderAmount: v })}
-
-                    hint="Applied when the order reaches the minimum amount"
 
                   />
 
@@ -738,8 +708,6 @@ export default function CampaignFormModal({ open, onClose, onSaved, editing }) {
                 <FormField
 
                   label="Priority"
-
-                  hint="When several promotions apply, higher priority runs first. Default 0."
 
                 >
 

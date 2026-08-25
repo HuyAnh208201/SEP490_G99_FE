@@ -30,7 +30,7 @@ export default function BarcodeScannerModal({
   onDetected,
   formats = PRODUCT_FORMATS,
   title = 'Scan product barcode',
-  hint = 'Point the camera at a product barcode.',
+  hint = '',
 }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);

@@ -82,9 +82,6 @@ export default function PurchaseOrdersPage() {
             ))}
           </select>
           <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search supplier receipts…" className={selectClass} />
-          <span className="text-sm text-[var(--admin-muted)]">
-            Receipt history is view-only for Director accounts.
-          </span>
           <span className="ml-auto text-sm text-[var(--admin-muted)]">
             <strong>{pageData.totalRecords}</strong> receipts
           </span>

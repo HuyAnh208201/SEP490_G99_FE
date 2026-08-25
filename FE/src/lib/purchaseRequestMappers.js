@@ -19,8 +19,12 @@ export function normalizeRequestDetail(row) {
     id: it.id,
     requestedQuantity: it.requestedQuantity ?? it.requestedQty ?? 0,
     approvedQuantity: it.approvedQuantity ?? null,
+    unitCost: it.unitCost ?? it.referenceImportPrice ?? null,
+    referenceImportPrice: it.referenceImportPrice ?? it.unitCost ?? null,
+    lineCost: it.lineCost ?? null,
     topPackagingLabel: it.topPackagingLabel,
     topPackagingConversionQty: it.topPackagingConversionQty ?? 1,
+    unitsPerImportUnit: it.unitsPerImportUnit ?? it.topPackagingConversionQty ?? 1,
     shortDate: Boolean(it.shortDate),
   }));
   return {

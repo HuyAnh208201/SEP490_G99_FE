@@ -215,7 +215,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               />
             </FormField>
 
-            <FormField label="Phone" required hint="0912345678 or +84912345678">
+            <FormField label="Phone" required>
               <input
                 required
                 pattern={PHONE_PATTERN}
@@ -248,7 +248,7 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               </select>
             </FormField>
 
-            <FormField label="Username" hint="Auto-generated from email; used at sign-in.">
+            <FormField label="Username">
               <input
                 value={form.userName}
                 onChange={(e) => {
@@ -263,11 +263,6 @@ export default function CreateUserModal({ open, onClose, onCreated }) {
               <FormField
                 label="Branch"
                 required
-                hint={
-                  branchLocked
-                    ? 'Branch managers can only add staff to their own branch.'
-                    : 'Required for branch-bound roles.'
-                }
                 className="sm:col-span-2"
               >
                 {branchLocked ? (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { formatVnd } from '../../../lib/money.js';
+import { fetchApplicablePromotions } from '../../../api/posOrders.js';
 import PosCheckoutPanel from './PosCheckoutPanel.jsx';
 
 export default function PosOrderSidebar({
@@ -17,6 +18,9 @@ export default function PosOrderSidebar({
   pointsToRedeem,
   setPointsToRedeem,
   loyalty,
+  campaignId,
+  onApplyCampaign,
+  onClearCampaign,
   onClearCart,
   paymentOpen,
   onPaymentOpenChange,
@@ -25,6 +29,8 @@ export default function PosOrderSidebar({
   onRequestReview,
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [promotions, setPromotions] = useState([]);
+  const [promoError, setPromoError] = useState('');
   const maxRedeemable =
     customer && loyalty?.pointValueVnd > 0
       ? Math.min(
@@ -38,6 +44,41 @@ export default function PosOrderSidebar({
   useEffect(() => {
     if (paymentOpen) setExpanded(true);
   }, [paymentOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const subtotal = totals.subtotalAfterPromo;
+    if (!lines.length) {
+      setPromotions([]);
+      setPromoError('');
+      return undefined;
+    }
+    (async () => {
+      try {
+        const list = await fetchApplicablePromotions(subtotal);
+        if (cancelled) return;
+        const filtered = (list ?? []).filter((p) => String(p.type || '').toUpperCase() !== 'BUY_X_GET_Y');
+        setPromotions(filtered);
+        setPromoError('');
+        if (campaignId) {
+          const selected = filtered.find((p) => Number(p.id) === Number(campaignId));
+          if (!selected?.eligible) {
+            onClearCampaign?.();
+          } else if (Number(selected.discountAmount) !== Number(totals.codeDiscount)) {
+            onApplyCampaign?.(selected);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPromotions([]);
+          setPromoError(error?.message || 'Could not load promotions.');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lines.length, totals.subtotalAfterPromo, campaignId]);
 
   return (
     <details
@@ -134,6 +175,43 @@ export default function PosOrderSidebar({
                   ) : null}
                 </div>
               ) : null}
+
+              <label className="mt-3 block text-[10px] font-bold uppercase tracking-wide text-[var(--admin-subtle)]">
+                Promotion
+              </label>
+              <select
+                value={campaignId ?? ''}
+                disabled={!lines.length}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  if (!id) {
+                    onClearCampaign?.();
+                    return;
+                  }
+                  const promo = promotions.find((p) => String(p.id) === id);
+                  if (promo?.eligible) onApplyCampaign?.(promo);
+                }}
+                className="mt-1.5 w-full rounded-lg border border-[var(--admin-border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--admin-brand)] disabled:opacity-50"
+              >
+                <option value="">None</option>
+                {promotions.map((promo) => (
+                  <option
+                    key={promo.id}
+                    value={promo.id}
+                    disabled={!promo.eligible}
+                    title={promo.reason || undefined}
+                  >
+                    {promo.name}
+                    {!promo.eligible && promo.reason ? ` — ${promo.reason}` : ''}
+                    {promo.eligible && promo.discountAmount != null
+                      ? ` (−${formatVnd(promo.discountAmount)})`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+              {promoError ? (
+                <p className="mt-1 text-xs text-[var(--admin-danger)]">{promoError}</p>
+              ) : null}
             </section>
           </div>
 
@@ -143,6 +221,12 @@ export default function PosOrderSidebar({
                 <span>Subtotal</span>
                 <span>{formatVnd(totals.subtotalAfterPromo)}</span>
               </div>
+              {totals.codeDiscount > 0 ? (
+                <div className="flex justify-between text-[var(--admin-success)]">
+                  <span>{totals.campaignName || 'Promotion'}</span>
+                  <span>− {formatVnd(totals.codeDiscount)}</span>
+                </div>
+              ) : null}
               {totals.pointsDiscount > 0 ? (
                 <div className="flex justify-between text-[var(--admin-success)]">
                   <span>{totals.pointsUsed} redeemed points</span><span>− {formatVnd(totals.pointsDiscount)}</span>
@@ -152,6 +236,11 @@ export default function PosOrderSidebar({
                 <span className="font-semibold">Total due</span>
                 <span className="shrink-0 whitespace-nowrap text-2xl font-extrabold tracking-tight text-[var(--admin-brand)]">{formatVnd(totals.total)}</span>
               </div>
+              {customer && totals.pointsEarned > 0 ? (
+                <p className="text-[11px] text-[var(--admin-subtle)]">
+                  Earns ~{totals.pointsEarned} pts (on amount after promo)
+                </p>
+              ) : null}
             </div>
 
             <PosCheckoutPanel

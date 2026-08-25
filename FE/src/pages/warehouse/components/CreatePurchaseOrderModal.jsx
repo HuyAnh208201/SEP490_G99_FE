@@ -185,7 +185,6 @@ export default function CreatePurchaseOrderModal({ open, onClose, onCreated }) {
           <div className="mb-2 flex flex-wrap items-center gap-3">
             <div>
               <h3 className="text-sm font-semibold">Add products</h3>
-              <p className="text-xs text-[var(--admin-muted)]">Search any active product. Supplier is who delivered, not a product catalog lock.</p>
             </div>
             <input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Filter by SKU or name…" className={`${inputClass} ml-auto max-w-sm`} />
           </div>

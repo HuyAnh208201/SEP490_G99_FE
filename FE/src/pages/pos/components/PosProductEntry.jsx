@@ -35,7 +35,7 @@ export default function PosProductEntry({
             autoFocus
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Scan or search by product name, SKU, or barcode (F3)"
+            placeholder="Scan or search by product name, SKU, or barcode"
             role="combobox"
             aria-expanded={hasQuery}
             aria-controls="pos-product-results"
@@ -98,7 +98,6 @@ export default function PosProductEntry({
             <path d="M3 7V5a1 1 0 0 1 1-1h2M21 7V5a1 1 0 0 0-1-1h-2M3 17v2a1 1 0 0 0 1 1h2M21 17v2a1 1 0 0 1-1 1h-2M7 8v8M11 8v8M15 8v8M18 8v8" strokeLinecap="round" />
           </svg>
           Scan
-          <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F2</kbd>
         </button>
 
         <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--admin-border)] px-3 text-xs font-semibold text-[var(--admin-muted)]">

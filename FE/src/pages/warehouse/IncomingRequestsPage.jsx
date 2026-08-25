@@ -60,20 +60,7 @@ export default function IncomingRequestsPage() {
 
   return (
     <div className="w-full">
-      <PageHeader
-        title="Incoming Requests"
-        description={
-          canApprove
-            ? 'Review pending requests, track awaiting-stock, and see approved requests ready to ship.'
-            : 'View branch import requests. Approval is limited to Warehouse Manager accounts.'
-        }
-      />
-
-      {!canApprove && (
-        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-          View-only mode: only Warehouse Managers can approve pending import requests.
-        </div>
-      )}
+      <PageHeader title="Incoming Requests" />
 
       {error && (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

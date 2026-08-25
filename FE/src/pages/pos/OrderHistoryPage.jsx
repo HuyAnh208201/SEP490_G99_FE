@@ -124,10 +124,6 @@ export default function OrderHistoryPage() {
     <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-5">
       <PosPageTitle title="Order History" />
 
-      <p className="mb-4 text-xs text-[var(--admin-muted)]">
-        Showing invoices from the current shift only.
-      </p>
-
       {location.state?.completedInvoice && (
         <div className="mb-4 rounded-xl border border-[var(--admin-success)]/20 bg-[#0d7a3e]/5 px-4 py-3 text-sm text-[var(--admin-success)]">
           <span className="font-semibold">{location.state.completedInvoice}</span> completed successfully.

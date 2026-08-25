@@ -78,22 +78,19 @@ export async function listCountHistory() {
 }
 
 export async function listCountHistoryPage(params = {}) {
-  const { data } = await http.get(`${BASE}/page`, { params: compactPageParams(params) });
+  const { discrepancy, from, to, status, ...rest } = params;
+  const query = {
+    ...compactPageParams(rest),
+    ...(discrepancy ? { discrepancy } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+    ...(status ? { status } : {}),
+  };
+  const { data } = await http.get(`${BASE}/page`, { params: query });
   return unwrapPage(data);
 }
 
 export async function getCountSession(id) {
   const { data } = await http.get(`${BASE}/${id}`);
-  return unwrap(data);
-}
-
-/** Duyệt phiên kiểm kê → cập nhật tồn kho chi nhánh. */
-export async function approveCountSession(id) {
-  const { data } = await http.patch(`${BASE}/${id}/approve`);
-  return unwrap(data);
-}
-
-export async function rejectCountSession(id) {
-  const { data } = await http.patch(`${BASE}/${id}/reject`);
   return unwrap(data);
 }

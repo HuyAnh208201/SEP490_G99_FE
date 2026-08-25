@@ -137,7 +137,7 @@ export default function InventoryCountPage() {
     setSubmitting(true);
     try {
       await submitCount({ items });
-      navigate('/inventory/count-history');
+      navigate('/catalog/products?countSubmitted=1');
     } catch (err) {
       setError(err?.message || 'Failed to submit inventory count');
     } finally {

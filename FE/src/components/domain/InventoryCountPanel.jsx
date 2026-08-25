@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Card from '../ui/Card.jsx';
 import Button from '../ui/Button.jsx';
 import NavIcon from '../layout/NavIcon.jsx';
@@ -26,8 +25,7 @@ function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
-export default function InventoryCountPanel({ open, onClose }) {
-  const navigate = useNavigate();
+export default function InventoryCountPanel({ open, onClose, onSubmitted }) {
   const { user } = useAuth();
   const confirmSave = useSaveConfirmation();
   const [now, setNow] = useState(() => new Date());
@@ -134,8 +132,8 @@ export default function InventoryCountPanel({ open, onClose }) {
     setSubmitting(true);
     try {
       await submitCount({ items });
+      onSubmitted?.();
       onClose?.();
-      navigate('/inventory/count-history');
     } catch (err) {
       setError(err?.message || 'Failed to submit inventory count');
     } finally {

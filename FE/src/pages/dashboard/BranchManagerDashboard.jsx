@@ -112,10 +112,9 @@ export default function BranchManagerDashboard() {
   }));
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-4">
       <PageHeader
         title={data?.branchName ? `${data.branchName} operations` : 'Branch operations'}
-        description="Today’s results and the queues that need your action."
         actions={
           data?.generatedAt ? (
             <span className="text-sm font-medium text-[var(--admin-muted)]">
@@ -125,7 +124,7 @@ export default function BranchManagerDashboard() {
         }
       />
 
-      <Card className="!p-4">
+      <Card className="!p-3">
         <ReportPeriodFilters
           period={period}
           anchorDate={anchorDate}
@@ -144,16 +143,16 @@ export default function BranchManagerDashboard() {
 
       <DashboardKpiGrid items={kpis} />
 
-      <div className="grid gap-4 lg:grid-cols-5 w-full">
-        <div className="space-y-4 lg:col-span-3">
-          <Card>
-            <div className="mb-3 flex items-center justify-between">
+      <div className="grid w-full gap-3 lg:grid-cols-5">
+        <div className="space-y-3 lg:col-span-3">
+          <Card className="!p-4">
+            <div className="mb-2 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--admin-text)]">Revenue trend</h2>
               <Link to="/reports" className="text-sm font-semibold text-[var(--admin-brand)] hover:underline">
                 Full reports →
               </Link>
             </div>
-            <div className="h-56 w-full">
+            <div className="h-52 w-full">
               {loading ? (
                 <div className="flex h-full items-center justify-center text-sm text-[var(--admin-muted)]">
                   Loading…
@@ -178,10 +177,10 @@ export default function BranchManagerDashboard() {
           </Card>
 
           <Card className="!p-0 overflow-hidden">
-            <div className="border-b border-[var(--admin-border)] px-4 py-3">
+            <div className="border-b border-[var(--admin-border)] px-4 py-2.5">
               <h2 className="text-sm font-semibold text-[var(--admin-text)]">Top products</h2>
             </div>
-            <table className="min-w-full text-left text-sm">
+            <table className="min-w-full w-full text-left text-sm">
               <thead className="bg-[#f7f9fb] text-xs font-semibold uppercase text-[var(--admin-subtle)]">
                 <tr>
                   <th className="px-4 py-2">Product</th>
@@ -211,26 +210,28 @@ export default function BranchManagerDashboard() {
           </Card>
         </div>
 
-        <Card className="lg:col-span-2">
+        <Card className="!p-4 lg:col-span-2">
           <h2 className="text-sm font-semibold text-[var(--admin-text)]">Action queue</h2>
-          <p className="mt-1 text-xs text-[var(--admin-muted)]">Items waiting on branch manager decisions.</p>
           <div className="mt-3 space-y-2">
             <ActionLink
               to="/purchase-requests"
               label="Open import requests"
               count={loading ? '…' : data?.pendingImports ?? 0}
-              hint="Pending through in-transit"
             />
             <ActionLink
-              to="/branch-manager/cash-reconciliation"
+              to="/branch-manager/audit?tab=discrepancies"
               label="Cash reconciliations"
               count={loading ? '…' : data?.pendingReconciliations ?? 0}
+            />
+            <ActionLink
+              to="/branch-manager/audit?tab=attendance"
+              label="Attendance review"
+              count={loading ? '…' : '→'}
             />
             <ActionLink
               to="/catalog/products"
               label="Low stock SKUs"
               count={loading ? '…' : data?.lowStockSkus ?? 0}
-              hint="At or below reorder point"
             />
             <ActionLink
               to="/branch-manager/shifts"

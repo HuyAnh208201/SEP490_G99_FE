@@ -4,8 +4,8 @@ import { isTypingTarget } from '../posHotkeys.js';
 import Modal from '../../../components/ui/Modal.jsx';
 
 const METHODS = [
-  { id: 'cash', label: 'Cash', shortcut: '1' },
-  { id: 'payos', label: 'PayOS', shortcut: '2' },
+  { id: 'cash', label: 'Cash' },
+  { id: 'payos', label: 'PayOS' },
 ];
 
 export default function PosCheckoutPanel({
@@ -96,17 +96,13 @@ export default function PosCheckoutPanel({
         className="flex min-h-12 w-full items-center justify-between rounded-xl bg-[var(--admin-brand)] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <span>Checkout</span>
-        <span className="flex items-center gap-2">
-          <kbd className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">F4</kbd>
-          <span>{formatVnd(totals.total)}</span>
-        </span>
+        <span>{formatVnd(totals.total)}</span>
       </button>
 
       <Modal
         open={open}
         onClose={() => onOpenChange(false)}
         title="Payment"
-        description="Enter cash received. Due, received, and change stay fully visible."
         size="lg"
         layer={60}
         footer={(
@@ -124,7 +120,7 @@ export default function PosCheckoutPanel({
               onClick={requestReview}
               className="min-h-14 min-w-[16rem] rounded-xl bg-[var(--admin-brand)] px-6 text-lg font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
-              Review payment <kbd className="ml-2 rounded bg-white/20 px-1.5 py-0.5 text-xs">F4</kbd>
+              Review payment
             </button>
           </div>
         )}
@@ -145,7 +141,7 @@ export default function PosCheckoutPanel({
                     : 'border-[var(--admin-border)] bg-white text-[var(--admin-text)] hover:border-[#0058be]/40'
                 }`}
               >
-                {item.label} <kbd className="ml-1 text-sm font-bold opacity-70">{item.shortcut}</kbd>
+                {item.label}
               </button>
             ))}
           </div>
@@ -200,11 +196,7 @@ export default function PosCheckoutPanel({
               </div>
               {cashError ? <p className="text-base font-semibold text-[var(--admin-danger)]">{cashError}</p> : null}
             </>
-          ) : (
-            <p className="rounded-xl bg-[#f7f9fb] px-4 py-4 text-base text-[var(--admin-muted)]">
-              Confirmation continues to the existing PayOS QR flow.
-            </p>
-          )}
+          ) : null}
         </div>
       </Modal>
     </>

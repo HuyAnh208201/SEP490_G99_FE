@@ -4,20 +4,13 @@ import Button from '../../../components/ui/Button.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import { formatDateTime } from '../../../lib/datetime.js';
 import { unitLabel } from '../../../constants/productUnits.js';
-import { approvalStatusMeta } from '../../../constants/inventoryStaff.js';
-import {
-  approveCountSession,
-  getCountSession,
-  rejectCountSession,
-} from '../../../api/inventoryCount.js';
-import { useSaveConfirmation } from '../../../contexts/SaveConfirmationContext.jsx';
+import { countStatusMeta } from '../../../constants/inventoryStaff.js';
+import { getCountSession } from '../../../api/inventoryCount.js';
 
-export default function CountSessionDetailModal({ open, sessionId, onClose, onChanged }) {
-  const confirmSave = useSaveConfirmation();
+export default function CountSessionDetailModal({ open, sessionId, onClose }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [busy, setBusy] = useState('');
 
   useEffect(() => {
     if (!open || !sessionId) return;
@@ -40,63 +33,23 @@ export default function CountSessionDetailModal({ open, sessionId, onClose, onCh
     };
   }, [open, sessionId]);
 
-  const meta = approvalStatusMeta(detail?.status);
-  const pending = String(detail?.status).toUpperCase() === 'PENDING_APPROVAL';
-
-  async function act(kind) {
-    const confirmed = await confirmSave({
-      title: kind === 'approve' ? 'Confirm count approval' : 'Confirm count rejection',
-      message:
-        kind === 'approve'
-          ? 'Approve this physical count and update stock with every recorded variance?'
-          : 'Reject this physical count without updating stock?',
-      confirmLabel: kind === 'approve' ? 'Yes, approve and update' : 'Yes, reject count',
-      danger: kind !== 'approve',
-    });
-    if (!confirmed) return;
-    setBusy(kind);
-    setError('');
-    try {
-      const updated =
-        kind === 'approve'
-          ? await approveCountSession(sessionId)
-          : await rejectCountSession(sessionId);
-      setDetail(updated);
-      onChanged?.();
-    } catch (err) {
-      setError(err?.message || 'Action failed');
-    } finally {
-      setBusy('');
-    }
-  }
+  const meta = countStatusMeta(detail?.status);
+  const varianceCount = detail?.varianceCount ?? (detail?.items || []).filter((it) => it.variance !== 0).length;
+  const isLegacyReviewed = detail?.reviewedByName || detail?.reviewedAt;
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Count Session ${detail?.sessionCode || ''}`}
-      description="Physical stock count details and approval."
+      title={`Count session ${detail?.sessionCode || ''}`}
+      description="Physical stock count audit record."
       size="xl"
       footer={
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex justify-end">
           {error && <span className="mr-auto text-sm text-red-600">{error}</span>}
           <Button variant="secondary" onClick={onClose}>
             Close
           </Button>
-          {pending && (
-            <>
-              <Button
-                variant="secondary"
-                loading={busy === 'reject'}
-                onClick={() => act('reject')}
-              >
-                Reject
-              </Button>
-              <Button loading={busy === 'approve'} onClick={() => act('approve')}>
-                Approve &amp; update stock
-              </Button>
-            </>
-          )}
         </div>
       }
     >
@@ -105,9 +58,9 @@ export default function CountSessionDetailModal({ open, sessionId, onClose, onCh
       ) : detail ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--admin-border)] bg-[#f7f9fb]/60 p-4 sm:grid-cols-4">
-            <Info label="Count Date" value={detail.countDate || '—'} />
-            <Info label="Counted By" value={detail.countedByName || '—'} />
-            <Info label="Total Products" value={detail.totalProducts ?? 0} />
+            <Info label="Count date" value={detail.countDate || '—'} />
+            <Info label="Counted by" value={detail.countedByName || '—'} />
+            <Info label="Total products" value={detail.totalProducts ?? 0} />
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--admin-subtle)]">
                 Status
@@ -117,11 +70,19 @@ export default function CountSessionDetailModal({ open, sessionId, onClose, onCh
               </Badge>
             </div>
             <Info label="Submitted" value={formatDateTime(detail.createdAt)} />
-            <Info label="Reviewed By" value={detail.reviewedByName || '—'} />
             <Info
-              label="Reviewed At"
-              value={detail.reviewedAt ? formatDateTime(detail.reviewedAt) : '—'}
+              label="Variances"
+              value={varianceCount > 0 ? `${varianceCount} item(s)` : 'None'}
             />
+            {isLegacyReviewed && (
+              <>
+                <Info label="Reviewed by (legacy)" value={detail.reviewedByName || '—'} />
+                <Info
+                  label="Reviewed at (legacy)"
+                  value={detail.reviewedAt ? formatDateTime(detail.reviewedAt) : '—'}
+                />
+              </>
+            )}
           </div>
 
           <div className="overflow-x-auto rounded-xl border border-[var(--admin-border)]">

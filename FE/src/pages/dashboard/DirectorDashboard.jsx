@@ -105,16 +105,12 @@ export default function DirectorDashboard() {
       label: '7-day estimate',
       value: loading ? '…' : formatVnd(data?.projectedRevenue7d),
       icon: 'plan',
-      hint: 'Estimate (recent avg)',
     },
   ];
 
   return (
     <div className="w-full space-y-5">
-      <PageHeader
-        title="Executive overview"
-        description="Branch portfolio, promotions, and exceptions across the chain."
-      />
+      <PageHeader title="Executive overview" />
 
       <Card className="!p-4">
         <ReportPeriodFilters
@@ -140,7 +136,6 @@ export default function DirectorDashboard() {
           <div className="flex items-center justify-between border-b border-[var(--admin-border)] px-4 py-3">
             <div>
               <h2 className="text-sm font-semibold text-[var(--admin-text)]">Branch portfolio</h2>
-              <p className="text-xs text-[var(--admin-muted)]">Revenue share of the chain for the selected period.</p>
             </div>
             <Link to="/reports" className="text-sm font-semibold text-[var(--admin-brand)] hover:underline">
               Revenue Dashboard →

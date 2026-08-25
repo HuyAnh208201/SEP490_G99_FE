@@ -79,7 +79,7 @@ export default function CashReconciliationReviewPage() {
         approved,
         note: managerNote.trim(),
       });
-      navigate('/branch-manager/cash-reconciliation', { replace: true });
+      navigate('/branch-manager/audit?tab=discrepancies', { replace: true });
     } catch (err) {
       setError(err?.message || 'Could not save decision');
     } finally {
@@ -99,7 +99,7 @@ export default function CashReconciliationReviewPage() {
         description="Verify cash and product variances, then approve or reject the closing."
         actions={
           <Link
-            to="/branch-manager/cash-reconciliation"
+            to="/branch-manager/audit?tab=discrepancies"
             className="text-sm font-medium text-[var(--admin-brand)] hover:underline"
           >
             ← Back to list
@@ -332,7 +332,7 @@ export default function CashReconciliationReviewPage() {
               />
             </label>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => navigate('/branch-manager/cash-reconciliation')}>
+              <Button variant="secondary" onClick={() => navigate('/branch-manager/audit?tab=discrepancies')}>
                 Cancel
               </Button>
               <Button variant="secondary" disabled={busy === 'reject'} onClick={() => submit(false)}>

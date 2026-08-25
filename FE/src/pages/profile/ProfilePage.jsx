@@ -347,7 +347,6 @@ export default function ProfilePage() {
               autoComplete="new-password"
               required
               minLength={6}
-              hint="At least 6 characters"
             />
             <PasswordInput
               label="Confirm new password"

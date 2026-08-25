@@ -24,7 +24,26 @@ export function shipmentStatusMeta(status) {
   return SHIPMENT_STATUS_META[key] || { label: status || '—', tone: 'default' };
 }
 
-// --- Approval status shared by Receiving History & Count History ---
+// --- Inventory count audit filters (Branch Audit tab) ---
+export const COUNT_DISCREPANCY_OPTIONS = [
+  { value: 'with', label: 'With discrepancy (default)' },
+  { value: 'without', label: 'No discrepancy' },
+  { value: 'all', label: 'All' },
+];
+
+export const COUNT_STATUS_META = {
+  COMPLETED: { label: 'Completed', tone: 'success' },
+  PENDING_APPROVAL: { label: 'Pending (legacy)', tone: 'warning' },
+  APPROVED: { label: 'Approved (legacy)', tone: 'success' },
+  REJECTED: { label: 'Rejected (legacy)', tone: 'danger' },
+};
+
+export function countStatusMeta(status) {
+  const key = String(status || '').toUpperCase();
+  return COUNT_STATUS_META[key] || { label: status || '—', tone: 'default' };
+}
+
+// --- Approval status shared by Receiving History (legacy count rows may still use these) ---
 export const APPROVAL_STATUS_META = {
   PENDING_APPROVAL: { label: 'Pending Approval', tone: 'warning' },
   APPROVED: { label: 'Received', tone: 'success' },

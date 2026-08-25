@@ -16,6 +16,14 @@ function isMine(staff, currentUserId) {
   return staff.some((e) => Number(e.employeeId) === id);
 }
 
+function myAttendance(staff, currentUserId, shiftEnded) {
+  if (currentUserId == null || !shiftEnded) return null;
+  const id = Number(currentUserId);
+  const me = staff.find((e) => Number(e.employeeId) === id);
+  if (!me) return null;
+  return me.checkInAt ? 'present' : 'absent';
+}
+
 function SkeletonCell() {
   return (
     <div className="min-h-[4.5rem] animate-pulse rounded-lg border border-[var(--admin-border)] bg-[#f7f9fb] px-2 py-2">
@@ -118,9 +126,18 @@ function ScheduleGrid({
                     const published = shift?.status === 'PUBLISHED';
                     const staff = (shift?.assignedEmployees || []).filter(Boolean);
                     const mine = isMine(staff, currentUserId);
+                    const shiftEnded =
+                      Boolean(shift?.endTime) && new Date(shift.endTime).getTime() < Date.now();
+                    const attendance = readOnly ? myAttendance(staff, currentUserId, shiftEnded) : null;
                     const cellClass = [
                       CELL_STYLES[state],
-                      mine ? 'ring-2 ring-[#0058be] ring-offset-1' : '',
+                      attendance === 'present'
+                        ? 'border-emerald-300 bg-emerald-50'
+                        : attendance === 'absent'
+                          ? 'border-rose-200 bg-rose-50'
+                          : mine
+                            ? 'ring-2 ring-[#0058be] ring-offset-1'
+                            : '',
                       readOnly ? 'cursor-default' : published ? 'cursor-default' : 'cursor-pointer',
                     ]
                       .filter(Boolean)
@@ -136,7 +153,9 @@ function ScheduleGrid({
                       ) : (
                         <>
                           <div className="flex flex-wrap items-center gap-1">
-                            {mine && <Badge tone="brand">You</Badge>}
+                            {mine && !attendance && <Badge tone="brand">You</Badge>}
+                            {attendance === 'present' && <Badge tone="success">Present</Badge>}
+                            {attendance === 'absent' && <Badge tone="danger">Absent</Badge>}
                             {!readOnly &&
                               (published ? (
                                 <Badge tone="success">Published</Badge>
@@ -145,7 +164,7 @@ function ScheduleGrid({
                               ) : (
                                 <Badge tone="default">Draft</Badge>
                               ))}
-                            {readOnly && published && !mine && (
+                            {readOnly && published && !mine && !attendance && (
                               <Badge tone="success">Published</Badge>
                             )}
                             {!readOnly && (
@@ -160,15 +179,28 @@ function ScheduleGrid({
                             </p>
                           )}
                           <ul className="space-y-0.5 text-xs text-[var(--admin-text)]">
-                            {staff.map((e) => (
-                              <li key={e.employeeId || e.assignmentId}>
-                                <span className="font-medium">{e.fullName}</span>
-                                <span className="text-[var(--admin-subtle)]">
-                                  {' '}
-                                  · {roleLabel(e.role)}
-                                </span>
-                              </li>
-                            ))}
+                            {staff.map((e) => {
+                              const isMe = currentUserId != null && Number(e.employeeId) === Number(currentUserId);
+                              const pastMine = readOnly && isMe && shiftEnded;
+                              return (
+                                <li key={e.employeeId || e.assignmentId}>
+                                  <span className="font-medium">{e.fullName}</span>
+                                  <span className="text-[var(--admin-subtle)]">
+                                    {' '}
+                                    · {roleLabel(e.role)}
+                                  </span>
+                                  {pastMine ? (
+                                    <span
+                                      className={`ml-1 text-[10px] font-semibold ${
+                                        e.checkInAt ? 'text-emerald-700' : 'text-rose-700'
+                                      }`}
+                                    >
+                                      {e.checkInAt ? '· Present' : '· Absent'}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
                           </ul>
                           {missing.length > 0 && (
                             <p className="text-[10px] font-medium text-amber-800">

@@ -3,20 +3,37 @@ import Modal from '../../../components/ui/Modal.jsx';
 import { formatVnd } from '../../../lib/money.js';
 import { unitPrice } from '../posProduct.js';
 
+function clampQty(value, maxStock) {
+  const n = Number.parseInt(String(value).replace(/\D/g, ''), 10);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  if (maxStock > 0) return Math.min(n, maxStock);
+  return n;
+}
+
 export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
   const [qty, setQty] = useState(1);
+  const [qtyText, setQtyText] = useState('1');
 
   useEffect(() => {
-    if (open) setQty(1);
+    if (open) {
+      setQty(1);
+      setQtyText('1');
+    }
   }, [open, product?.id]);
 
   if (!product) return null;
 
   const price = unitPrice(product);
-  const subtotal = price * qty;
   const stock = Number(product.stock);
   const maxStock = Number.isFinite(stock) && stock > 0 ? stock : 0;
   const canConfirm = maxStock > 0 && qty >= 1 && qty <= maxStock;
+  const subtotal = price * qty;
+
+  function applyQty(next) {
+    const clamped = clampQty(next, maxStock);
+    setQty(clamped);
+    setQtyText(String(clamped));
+  }
 
   return (
     <Modal open={open} onClose={onClose} title={product.name} size="sm">
@@ -51,19 +68,31 @@ export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
         <div className="inline-flex items-center overflow-hidden rounded-lg border border-[var(--admin-border)]">
           <button
             type="button"
-            onClick={() => setQty((value) => Math.max(1, value - 1))}
+            onClick={() => applyQty(qty - 1)}
             className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8]"
             aria-label="Decrease quantity"
           >
             −
           </button>
-          <span className="flex h-11 min-w-14 items-center justify-center border-x border-[var(--admin-border)] bg-white text-lg font-bold">
-            {qty}
-          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={qtyText}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^\d]/g, '');
+              setQtyText(raw);
+              if (raw !== '') {
+                setQty(clampQty(raw, maxStock));
+              }
+            }}
+            onBlur={() => applyQty(qtyText === '' ? 1 : qtyText)}
+            className="h-11 w-16 border-x border-[var(--admin-border)] bg-white text-center text-lg font-bold outline-none"
+            aria-label="Quantity"
+          />
           <button
             type="button"
-            disabled={qty >= maxStock}
-            onClick={() => setQty((value) => Math.min(maxStock, value + 1))}
+            disabled={maxStock > 0 && qty >= maxStock}
+            onClick={() => applyQty(qty + 1)}
             className="h-11 w-11 bg-[#f7f9fb] text-lg hover:bg-[#eef3f8] disabled:opacity-40"
             aria-label="Increase quantity"
           >
@@ -83,7 +112,10 @@ export default function ProductQtyPopup({ open, product, onClose, onConfirm }) {
       <button
         type="button"
         disabled={!canConfirm}
-        onClick={() => onConfirm?.(product, qty)}
+        onClick={() => {
+          const finalQty = clampQty(qtyText === '' ? qty : qtyText, maxStock);
+          onConfirm?.(product, finalQty);
+        }}
         className="mt-5 w-full rounded-lg bg-[var(--admin-brand)] py-3 text-sm font-semibold text-white transition hover:bg-[var(--admin-brand-hover)] disabled:cursor-not-allowed disabled:opacity-45"
       >
         Confirm

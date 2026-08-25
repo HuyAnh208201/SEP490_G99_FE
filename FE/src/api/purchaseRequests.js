@@ -74,6 +74,8 @@ export async function getRecommendedProducts(branchId) {
     suggestedQty: r.suggestedQty ?? r.suggestedQuantity,
     topPackagingLabel: r.topPackagingLabel,
     topPackagingConversionQty: r.topPackagingConversionQty,
+    unitCost: r.unitCost ?? r.referenceImportPrice ?? null,
+    referenceImportPrice: r.referenceImportPrice ?? r.unitCost ?? null,
     soldLast30Days: r.soldLast30Days ?? 0,
     priorityReason: r.priorityReason,
   }));
@@ -101,6 +103,8 @@ export async function searchRequestProducts(keyword, params = {}) {
     lowStock: Boolean(p.lowStock),
     topPackagingLabel: p.topPackagingLabel,
     unitsPerImportUnit: p.topPackagingConversionQty,
+    unitCost: p.unitCost ?? p.referenceImportPrice ?? null,
+    referenceImportPrice: p.referenceImportPrice ?? p.unitCost ?? null,
   }));
 }
 
